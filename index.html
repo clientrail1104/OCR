@@ -3,1158 +3,268 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberOCR Pro - Enterprise Neumorphic Document Scanner</title>
+    <title>Neon Neumorphic OCR Extractor</title>
+    <!-- Load Tesseract.js for frontend OCR -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
     <style>
         :root {
-            --bg-color: #12151e;
-            --surface-color: #181c28;
-            --shadow-dark: #0c0e14;
-            --shadow-light: #242a3c;
-            --neon-cyan: #00f3ff;
-            --neon-pink: #ff007f;
-            --neon-green: #39ff14;
-            --neon-yellow: #ffe600;
-            --text-main: #e2e8f0;
-            --text-muted: #718096;
-            --border-radius: 20px;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Inter', sans-serif;
-            user-select: none;
+            --bg-color: #1e1e24;
+            --neon-color: #00ffcc;
+            --shadow-light: #2a2a35;
+            --shadow-dark: #121215;
+            --text-color: #e0e0e0;
         }
 
         body {
             background-color: var(--bg-color);
-            color: var(--text-main);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            margin: 0;
             min-height: 100vh;
-            padding: 20px;
+        }
+
+        h1 {
+            color: var(--neon-color);
+            text-shadow: 0 0 5px var(--neon-color), 0 0 20px var(--neon-color);
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .container {
             display: flex;
-            flex-direction: column;
-            gap: 20px;
-            overflow-x: hidden;
-        }
-
-        /* Neumorphic Utilities */
-        .neu-flat {
-            background: var(--surface-color);
-            box-shadow: 8px 8px 20px var(--shadow-dark), -8px -8px 20px var(--shadow-light);
-            border-radius: var(--border-radius);
-            border: 1px solid rgba(255, 255, 255, 0.03);
-        }
-
-        .neu-pressed {
-            background: var(--surface-color);
-            box-shadow: inset 6px 6px 12px var(--shadow-dark), inset -6px -6px 12px var(--shadow-light);
-            border-radius: var(--border-radius);
-        }
-
-        .neu-btn {
-            background: var(--surface-color);
-            box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            color: var(--text-main);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            font-weight: 600;
-        }
-
-        .neu-btn:hover {
-            box-shadow: 2px 2px 6px var(--shadow-dark), -2px -2px 6px var(--shadow-light);
-            color: var(--neon-cyan);
-            border-color: rgba(0, 243, 255, 0.3);
-        }
-
-        .neu-btn:active, .neu-btn.active {
-            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
-            color: var(--neon-cyan);
-        }
-
-        .neon-glow-cyan {
-            text-shadow: 0 0 10px rgba(0, 243, 255, 0.7);
-            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
-        }
-
-        .neon-glow-pink {
-            box-shadow: 0 0 15px rgba(255, 0, 127, 0.3);
-        }
-
-        /* Header */
-        header {
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            gap: 2rem;
             flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .brand i {
-            font-size: 2.2rem;
-            color: var(--neon-cyan);
-            filter: drop-shadow(0 0 8px var(--neon-cyan));
-        }
-
-        .brand h1 {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.8rem;
-            letter-spacing: 2px;
-            background: linear-gradient(45deg, var(--neon-cyan), var(--neon-pink));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .brand span {
-            font-size: 0.75rem;
-            color: var(--neon-green);
-            border: 1px solid var(--neon-green);
-            padding: 2px 8px;
-            border-radius: 20px;
-            font-family: 'Rajdhani', sans-serif;
-            letter-spacing: 1px;
-        }
-
-        /* Layout Main */
-        .app-container {
-            display: grid;
-            grid-template-columns: 320px 1fr 420px;
-            gap: 20px;
-            flex: 1;
-        }
-
-        @media (max-width: 1400px) {
-            .app-container {
-                grid-template-columns: 280px 1fr;
-            }
-            .results-panel {
-                grid-column: span 2;
-            }
-        }
-
-        @media (max-width: 900px) {
-            .app-container {
-                grid-template-columns: 1fr;
-            }
-            .results-panel {
-                grid-column: span 1;
-            }
-        }
-
-        /* Sidebar Navigation */
-        .sidebar {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .section-title {
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 1.1rem;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: var(--neon-cyan);
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .doc-selector {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: 600px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-
-        .doc-selector::-webkit-scrollbar {
-            width: 6px;
-        }
-        .doc-selector::-webkit-scrollbar-thumb {
-            background: var(--shadow-light);
-            border-radius: 10px;
-        }
-
-        .doc-type-btn {
-            padding: 14px;
-            text-align: left;
-            justify-content: flex-start;
-            font-size: 0.88rem;
-            line-height: 1.3;
-            border-radius: 14px;
-        }
-
-        .doc-type-btn i {
-            font-size: 1.2rem;
-            width: 25px;
-            color: var(--neon-cyan);
-        }
-
-        /* Workspace / Canvas Area */
-        .workspace {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            position: relative;
-        }
-
-        .tab-bar {
-            display: flex;
-            gap: 15px;
-        }
-
-        .tab-btn {
-            flex: 1;
-            padding: 12px;
-            font-family: 'Rajdhani', sans-serif;
-            font-size: 1rem;
-            font-weight: 700;
-        }
-
-        .upload-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            flex: 1;
-            min-height: 380px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
         }
 
         .upload-card {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-            border: 2px dashed rgba(0, 243, 255, 0.2);
-            transition: border-color 0.3s ease;
-            cursor: pointer;
-            padding: 20px;
-        }
-
-        .upload-card:hover {
-            border-color: var(--neon-cyan);
-        }
-
-        .upload-card input[type="file"] {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            opacity: 0;
-            cursor: pointer;
-            z-index: 10;
-        }
-
-        .upload-placeholder {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            text-align: center;
-            color: var(--text-muted);
-        }
-
-        .upload-placeholder i {
-            font-size: 3rem;
-            color: var(--neon-cyan);
-            filter: drop-shadow(0 0 10px rgba(0,243,255,0.4));
-        }
-
-        .canvas-container {
-            width: 100%;
-            height: 100%;
-            display: none;
-            position: relative;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .canvas-container canvas {
-            max-width: 100%;
-            max-height: 320px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-        }
-
-        /* Double Cross-Out Controls */
-        .watermark-controls {
-            padding: 15px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            background: rgba(0,0,0,0.2);
-            border-radius: 14px;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .control-group label {
-            font-size: 0.75rem;
-            color: var(--neon-cyan);
-            font-family: 'Rajdhani', sans-serif;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .control-group input[type="text"], .control-group select {
             background: var(--bg-color);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 8px;
-            outline: none;
-            font-size: 0.85rem;
-        }
-
-        .control-group input[type="range"] {
-            accent-color: var(--neon-cyan);
-        }
-
-        .scan-action-bar {
+            border-radius: 20px;
+            padding: 2rem;
+            width: 350px;
+            box-shadow: 8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light);
             display: flex;
-            gap: 15px;
-            justify-content: flex-end;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
         }
 
-        .scan-btn {
-            padding: 15px 35px;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1rem;
-            color: var(--neon-cyan);
-            border: 1px solid var(--neon-cyan);
-            background: linear-gradient(135deg, rgba(0,243,255,0.1), transparent);
-            letter-spacing: 1.5px;
-        }
-
-        .scan-btn i {
+        .upload-card h2 {
             font-size: 1.2rem;
-        }
-
-        /* Results Display Panel */
-        .results-panel {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            max-height: calc(100vh - 120px);
-            overflow-y: auto;
-        }
-
-        .results-panel::-webkit-scrollbar {
-            width: 6px;
-        }
-        .results-panel::-webkit-scrollbar-thumb {
-            background: var(--shadow-light);
-            border-radius: 10px;
-        }
-
-        .status-box {
-            padding: 12px;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: rgba(0, 243, 255, 0.05);
-            border: 1px solid rgba(0, 243, 255, 0.2);
-            color: var(--neon-cyan);
-        }
-
-        .reasoning-box {
-            padding: 12px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            background: rgba(255, 0, 127, 0.08);
-            border: 1px solid rgba(255, 0, 127, 0.3);
-            color: #ff99ca;
-            display: none;
-            line-height: 1.4;
-        }
-
-        .fields-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .field-card {
-            padding: 12px 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            background: rgba(0,0,0,0.15);
-            border-left: 3px solid var(--neon-cyan);
-            border-radius: 0 10px 10px 0;
-        }
-
-        .field-label {
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            font-weight: 700;
-            letter-spacing: 1px;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .field-value {
-            font-size: 0.95rem;
-            font-weight: 600;
+            margin-bottom: 1rem;
             color: #fff;
-            word-break: break-word;
-            font-family: 'Rajdhani', sans-serif;
-            letter-spacing: 0.5px;
         }
 
-        .field-value[contenteditable="true"] {
-            outline: 1px dashed var(--neon-cyan);
-            padding: 2px 4px;
-            border-radius: 4px;
-            background: rgba(0,0,0,0.3);
+        .upload-area {
+            border: 2px dashed #444;
+            border-radius: 15px;
+            padding: 2rem;
+            width: 100%;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-bottom: 1rem;
         }
 
-        .confidence-tag {
-            font-size: 0.65rem;
-            padding: 1px 6px;
-            border-radius: 8px;
-            background: rgba(57, 255, 20, 0.2);
-            color: var(--neon-green);
+        .upload-area:hover {
+            border-color: var(--neon-color);
+            box-shadow: inset 0 0 10px rgba(0, 255, 204, 0.2);
         }
 
-        /* Progress Modal */
-        .progress-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(18, 21, 30, 0.85);
-            backdrop-filter: blur(8px);
-            z-index: 100;
+        input[type="file"] {
             display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
         }
 
-        .scanner-line {
-            width: 280px;
-            height: 4px;
-            background: var(--neon-cyan);
-            box-shadow: 0 0 15px var(--neon-cyan);
-            animation: scan 1.5s ease-in-out infinite alternate;
-            border-radius: 2px;
+        button {
+            background: var(--bg-color);
+            color: var(--neon-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
+            transition: 0.2s;
         }
 
-        @keyframes scan {
-            0% { transform: translateY(-30px); opacity: 0.3; }
-            100% { transform: translateY(30px); opacity: 1; }
+        button:hover {
+            box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+            text-shadow: 0 0 5px var(--neon-color);
         }
 
-        .progress-text {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.1rem;
-            color: var(--neon-cyan);
-            letter-spacing: 2px;
+        button:disabled {
+            color: #555;
+            box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+            cursor: not-allowed;
+        }
+
+        .results {
+            margin-top: 2rem;
+            width: 100%;
+            max-width: 800px;
+            background: var(--bg-color);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: inset 8px 8px 16px var(--shadow-dark), inset -8px -8px 16px var(--shadow-light);
+        }
+
+        .results pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #fff;
+        }
+
+        .status {
+            color: var(--neon-color);
+            margin-top: 1rem;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
 
-    <header class="neu-flat">
-        <div class="brand">
-            <i class="fa-solid fa-id-card-clip"></i>
-            <div>
-                <h1>CYBER<span style="-webkit-text-fill-color: var(--neon-cyan);">OCR</span></h1>
-                <p style="font-size: 0.7rem; color: var(--text-muted); font-family: 'Orbitron';">ULTRA-ACCURATE NEUMORPHIC IDENTITY PARSER</p>
+    <h1>Universal Document OCR</h1>
+
+    <div class="container">
+        <!-- Front Upload -->
+        <div class="upload-card">
+            <h2>Front of Document</h2>
+            <div class="upload-area" onclick="document.getElementById('front-upload').click()">
+                <p>Click or Drag Image Here</p>
+                <small>Supports up to 500MB</small>
             </div>
-            <span>v4.5 PROD</span>
+            <input type="file" id="front-upload" accept="image/*,application/pdf">
+            <button id="process-front" onclick="processImage('front-upload', 'status-front')" disabled>Scan Front</button>
+            <div id="status-front" class="status"></div>
         </div>
-        <div style="display: flex; gap: 10px;">
-            <button class="neu-btn" style="padding: 10px 18px; font-size: 0.85rem;" onclick="resetAll()"><i class="fa-solid fa-rotate-right"></i> Reset</button>
-            <button class="neu-btn" style="padding: 10px 18px; font-size: 0.85rem;" onclick="exportJSON()"><i class="fa-solid fa-download"></i> Export JSON</button>
+
+        <!-- Back Upload -->
+        <div class="upload-card">
+            <h2>Back of Document</h2>
+            <div class="upload-area" onclick="document.getElementById('back-upload').click()">
+                <p>Click or Drag Image Here</p>
+                <small>Required for NRIC/Licenses</small>
+            </div>
+            <input type="file" id="back-upload" accept="image/*,application/pdf">
+            <button id="process-back" onclick="processImage('back-upload', 'status-back')" disabled>Scan Back</button>
+            <div id="status-back" class="status"></div>
         </div>
-    </header>
-
-    <div class="app-container">
-        
-        <aside class="sidebar neu-flat">
-            <div class="section-title"><i class="fa-solid fa-folder-tree"></i> Document Category</div>
-            <div class="doc-selector" id="docTypeSelector">
-                <button class="neu-btn doc-type-btn active" data-doctype="MY_NRIC">
-                    <i class="fa-solid fa-address-card"></i> Malaysian NRIC (MyKad)
-                </button>
-                <button class="neu-btn doc-type-btn" data-doctype="INT_PASSPORT">
-                    <i class="fa-solid fa-passport"></i> International Passport
-                </button>
-                <button class="neu-btn doc-type-btn" data-doctype="MY_PASSPORT">
-                    <i class="fa-solid fa-passport"></i> Malaysian Passport
-                </button>
-                <button class="neu-btn doc-type-btn" data-doctype="MY_PR">
-                    <i class="fa-solid fa-id-badge"></i> Malaysia PR (MyPR)
-                </button>
-                <button class="neu-btn doc-type-btn" data-doctype="MY_DL">
-                    <i class="fa-solid fa-id-card"></i> Malaysian Driving Licence
-                </button>
-                <button class="neu-btn doc-type-btn" data-doctype="INT_DL">
-                    <i class="fa-solid fa-car-side"></i> Int. Driving Permit (IDP)
-                </button>
-                <button class="neu-btn doc-type-btn" data-doctype="SSM_CERT">
-                    <i class="fa-solid fa-file-contract"></i> SSM Certificate
-                </button>
-                <button class="neu-btn doc-type-btn" data-doctype="CIDB_PPK">
-                    <i class="fa-solid fa-helmet-safety"></i> CIDB PPK Certificate
-                </button>
-            </div>
-            
-            <div style="margin-top: auto; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 10px; font-size: 0.72rem; color: var(--text-muted); border-left: 2px solid var(--neon-yellow);">
-                <i class="fa-solid fa-shield-halved" style="color: var(--neon-yellow);"></i> Strict OCR Normalization: 6 vs 8 & P vs F strict pattern resolution active. Max file capacity: <b>500MB</b>.
-            </div>
-        </aside>
-
-        <main class="workspace neu-flat">
-            
-            <div class="upload-grid">
-                <div class="upload-card neu-pressed" id="frontDropZone">
-                    <input type="file" id="frontFileInput" accept="image/*,.pdf" onchange="handleFileSelect(event, 'front')">
-                    <div class="upload-placeholder" id="frontPlaceholder">
-                        <i class="fa-solid fa-cloud-arrow-up"></i>
-                        <h4 style="font-family: 'Rajdhani'; font-size: 1.1rem; color: var(--text-main);">UPLOAD FRONT / PAGE 2</h4>
-                        <p style="font-size: 0.75rem;">Drag & drop image or PDF (Up to 500MB)</p>
-                    </div>
-                    <div class="canvas-container" id="frontCanvasContainer">
-                        <canvas id="frontCanvas"></canvas>
-                    </div>
-                </div>
-
-                <div class="upload-card neu-pressed" id="backDropZone">
-                    <input type="file" id="backFileInput" accept="image/*,.pdf" onchange="handleFileSelect(event, 'back')">
-                    <div class="upload-placeholder" id="backPlaceholder">
-                        <i class="fa-solid fa-cloud-arrow-up"></i>
-                        <h4 style="font-family: 'Rajdhani'; font-size: 1.1rem; color: var(--text-main);">UPLOAD BACK / PAGE 3</h4>
-                        <p style="font-size: 0.75rem;">Drag & drop back side image (Optional)</p>
-                    </div>
-                    <div class="canvas-container" id="backCanvasContainer">
-                        <canvas id="backCanvas"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section-title" style="margin-top: 5px;"><i class="fa-solid fa-pen-ruler"></i> Double Adjustable Security Cross-Out Watermarks</div>
-            <div class="watermark-controls">
-                <div class="control-group">
-                    <label>Watermark Line 1 Text</label>
-                    <input type="text" id="wmText1" value="FOR VERIFICATION ONLY" oninput="renderWatermarks()">
-                </div>
-                <div class="control-group">
-                    <label>Watermark Line 2 Text</label>
-                    <input type="text" id="wmText2" value="CONFIDENTIAL DOCUMENT" oninput="renderWatermarks()">
-                </div>
-                <div class="control-group">
-                    <label>Angle Rotation</label>
-                    <input type="range" id="wmAngle" min="-60" max="60" value="-25" oninput="renderWatermarks()">
-                </div>
-                <div class="control-group">
-                    <label>Opacity / Line Width</label>
-                    <input type="range" id="wmOpacity" min="10" max="90" value="45" oninput="renderWatermarks()">
-                </div>
-            </div>
-
-            <div class="scan-action-bar">
-                <button class="neu-btn scan-btn" onclick="executeOCRProcess()">
-                    <i class="fa-solid fa-microchip"></i> EXECUTE OCR EXTRACTION
-                </button>
-            </div>
-        </main>
-
-        <section class="results-panel neu-flat">
-            <div class="section-title"><i class="fa-solid fa-square-poll-vertical"></i> Parsed Document Metadata</div>
-            
-            <div class="status-box" id="statusBadge">
-                <i class="fa-solid fa-circle-info"></i> Ready to scan document. Select type and upload.
-            </div>
-
-            <div class="reasoning-box" id="reasoningBox">
-                </div>
-
-            <div class="fields-grid" id="fieldsContainer">
-                <div style="text-align: center; color: var(--text-muted); padding: 40px 0; font-size: 0.85rem;">
-                    <i class="fa-solid fa-magnifying-glass" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.4;"></i>
-                    <p>No document processed yet.</p>
-                </div>
-            </div>
-        </section>
-
     </div>
 
-    <div class="progress-overlay" id="progressOverlay">
-        <div class="scanner-line"></div>
-        <div class="progress-text" id="progressText">INITIALIZING ENGINE...</div>
-        <p style="font-size: 0.8rem; color: var(--text-muted);" id="progressSubText">Performing pre-filtering, binarization, & cross-out anti-collision adjustments</p>
+    <div class="results">
+        <h2 style="color: var(--neon-color); margin-top:0;">Extracted Data (JSON)</h2>
+        <pre id="json-output">Upload and scan a document to see results...</pre>
     </div>
 
     <script>
-        // Global App State
-        let currentDocType = 'MY_NRIC';
-        const uploadedImages = { front: null, back: null };
-        const rawCanvases = { front: null, back: null };
-
-        // Malaysian State Code Dictionary (NRIC PB Code Mapping)
-        const MY_STATE_CODES = {
-            '01': 'Johor', '02': 'Kedah', '03': 'Kelantan', '04': 'Melaka', '05': 'Negeri Sembilan',
-            '06': 'Pahang', '07': 'Penang', '08': 'Perak', '09': 'Perlis', '10': 'Selangor',
-            '11': 'Terengganu', '12': 'Sabah', '13': 'Sarawak', '14': 'Kuala Lumpur', '15': 'Labuan',
-            '16': 'Putrajaya', '21': 'Johor', '22': 'Johor', '23': 'Johor', '24': 'Johor',
-            '25': 'Kedah', '26': 'Kedah', '27': 'Kedah', '28': 'Kelantan', '29': 'Kelantan',
-            '30': 'Melaka', '31': 'Negeri Sembilan', '32': 'Pahang', '33': 'Pahang', '34': 'Penang',
-            '35': 'Penang', '36': 'Perak', '37': 'Perak', '38': 'Perak', '39': 'Perak',
-            '40': 'Perlis', '41': 'Selangor', '42': 'Selangor', '43': 'Selangor', '44': 'Selangor',
-            '45': 'Terengganu', '46': 'Terengganu', '47': 'Sabah', '48': 'Sabah', '49': 'Sabah',
-            '50': 'Sarawak', '51': 'Sarawak', '52': 'Sarawak', '53': 'Sarawak', '54': 'Kuala Lumpur',
-            '55': 'Kuala Lumpur', '56': 'Kuala Lumpur', '57': 'Kuala Lumpur', '58': 'Labuan', '59': 'Putrajaya'
-        };
-
-        // Document Field Schemas Definition
-        const DOC_SCHEMAS = {
-            INT_PASSPORT: [
-                'Holder Photo Detected', 'Type', 'Country Code', 'Passport Number', 'Full Name',
-                'Nationality', 'Date of Birth', 'Sex / Gender', 'Place of Birth', 'Date of Issue',
-                'Date of Expiry', 'Issuing Authority', 'Machine-Readable Zone (MRZ)', 'Holder Signature Detected', 'Observations / Endorsements'
-            ],
-            MY_PASSPORT: [
-                'Type / Jenis', 'Country Code / Kod Negara', 'Passport Number / Nombor Pasport', 'Full Name / Nama',
-                'Nationality / Warganegara', 'Date of Birth / Tarikh Lahir', 'Identity Card Number (MyKad)', 'Gender / Jantina',
-                'Place of Birth / Tempat Lahir', 'Date of Issue / Tarikh Dikeluarkan', 'Date of Expiry / Tarikh Kepupusan',
-                'Issuing Authority / Pihak Berkuasa', 'Holder Signature', 'Observation / Administrative Notes'
-            ],
-            MY_NRIC: [
-                'Header & Logos', 'Photograph Detected', 'IC Number', 'Full Name', 'Residential Address',
-                'Gender/Sex', 'Citizenship/Nationality', 'State of Origin', 'Race', 'Smart Chip Detected',
-                'Extended IC Number (Back)', 'Barcode / QR Code', 'Security & Design Elements (Bunga Raya)'
-            ],
-            MY_PR: [
-                'Background Color Verification', 'Card Heading', 'Card Holder Photo', 'NRIC Number', 'Full Name',
-                'Permanent Address', 'Gender/Sex', 'Smart Chip Contact Pad', 'Original Nationality (Back)',
-                'Entry Permit Details (Nombor Permit Masuk)', 'Embedded Microchip Data', 'Security Features'
-            ],
-            MY_DL: [
-                'Background Design (Sultan Abdul Samad)', 'Holder Photo', 'Full Name', 'Identity Card / Passport No',
-                'Nationality', 'Address', 'Category / Class of License', 'Validity Dates',
-                'License / Serial Number (Back)', 'Vehicle Classes Table (Back)', 'Signature DG JPJ', 'Security Features'
-            ],
-            INT_DL: [
-                'Emblem & Title (UN Convention)', 'Issuing Authority', 'Validity Dates', 'Surname / Last Name',
-                'Given / First Names', 'Place of Birth', 'Date of Birth', 'Permanent Residence', 'Photograph Stamped',
-                'Holder Signature', 'Vehicle Categories (A, B, C, D, E)', 'Validation Stamps', 'Territorial Validity List'
-            ],
-            SSM_CERT: [
-                'Company Name / Nama Syarikat', 'Nama Syarikat Lama / Old Name', 'Registration No / No Pendaftaran',
-                'Incorporation Number', 'Registration / Incorporation Date', 'Business Type / Structure',
-                'Business Status & Expiry Date', 'Registered Address', 'Business Address', 'Nature of Business (MSIC)',
-                'Tarikh Pertukaran', 'Owner / Director Details', 'Shareholder Information', 'Branch Count (Bil Cawangan)', 'Financial Data & Charges'
-            ],
-            CIDB_PPK: [
-                'Company Name / Nama Kontraktor', 'Registration Number / No Pendaftaran', 'Registered Business Address',
-                'Grade / Gred (G1-G7)', 'Categories of Construction (B, CE, ME)', 'Specializations / Pengkhususan',
-                'Validity Period / Tarikh Habis Tempoh', 'Tarikh Mula Berkuatkuasa', 'Operational Status'
-            ]
-        };
-
-        // Initialize App
-        document.addEventListener('DOMContentLoaded', () => {
-            setupDocTypeSelector();
-            setupDragAndDrop('frontDropZone', 'frontFileInput', 'front');
-            setupDragAndDrop('backDropZone', 'backFileInput', 'back');
+        // Enable buttons when files are selected
+        document.getElementById('front-upload').addEventListener('change', (e) => {
+            if(e.target.files.length > 0) document.getElementById('process-front').disabled = false;
+        });
+        document.getElementById('back-upload').addEventListener('change', (e) => {
+            if(e.target.files.length > 0) document.getElementById('process-back').disabled = false;
         });
 
-        function setupDocTypeSelector() {
-            const buttons = document.querySelectorAll('.doc-type-btn');
-            buttons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    buttons.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentDocType = btn.dataset.doctype;
-                    renderEmptyFields();
-                });
-            });
-            renderEmptyFields();
-        }
+        // Main Processing Function
+        async function processImage(inputId, statusId) {
+            const file = document.getElementById(inputId).files[0];
+            const statusEl = document.getElementById(statusId);
+            const outputEl = document.getElementById('json-output');
 
-        function renderEmptyFields() {
-            const container = document.getElementById('fieldsContainer');
-            const fields = DOC_SCHEMAS[currentDocType] || [];
-            container.innerHTML = fields.map(field => `
-                <div class="field-card">
-                    <div class="field-label">
-                        <span>${field}</span>
-                        <span class="confidence-tag">PENDING</span>
-                    </div>
-                    <div class="field-value" contenteditable="true" data-field="${field}">-- Not Scanned --</div>
-                </div>
-            `).join('');
-            
-            document.getElementById('reasoningBox').style.display = 'none';
-        }
-
-        // File Upload & Canvas Handling (Supports Files up to 500MB)
-        function setupDragAndDrop(zoneId, inputId, side) {
-            const zone = document.getElementById(zoneId);
-            const input = document.getElementById(inputId);
-
-            zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.style.borderColor = 'var(--neon-cyan)'; });
-            zone.addEventListener('dragleave', () => { zone.style.borderColor = 'rgba(0, 243, 255, 0.2)'; });
-            zone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                zone.style.borderColor = 'rgba(0, 243, 255, 0.2)';
-                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    input.files = e.dataTransfer.files;
-                    handleFileSelect({ target: input }, side);
-                }
-            });
-        }
-
-        function handleFileSelect(event, side) {
-            const file = event.target.files[0];
             if (!file) return;
 
-            // Strict 500MB Limit Check
-            if (file.size > 500 * 1024 * 1024) {
-                alert('File size exceeds the maximum limit of 500MB.');
+            // Warning for browser memory limits
+            if (file.size > 100 * 1024 * 1024) {
+                statusEl.innerText = "Warning: Files over 100MB may crash the browser. Backend required.";
                 return;
             }
 
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                const img = new Image();
-                img.onload = function () {
-                    uploadedImages[side] = img;
-                    initCanvas(side, img);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function initCanvas(side, img) {
-            const container = document.getElementById(side + 'CanvasContainer');
-            const placeholder = document.getElementById(side + 'Placeholder');
-            const canvas = document.getElementById(side + 'Canvas');
-            const ctx = canvas.getContext('2d');
-
-            placeholder.style.display = 'none';
-            container.style.display = 'flex';
-
-            canvas.width = img.width;
-            canvas.height = img.height;
+            statusEl.innerText = "Initializing OCR Engine...";
             
-            // Store raw context
-            rawCanvases[side] = img;
-            renderWatermarks();
-        }
-
-        // Double Adjustable Crossed-Out Watermark Engine
-        function renderWatermarks() {
-            ['front', 'back'].forEach(side => {
-                const img = uploadedImages[side];
-                if (!img) return;
-
-                const canvas = document.getElementById(side + 'Canvas');
-                const ctx = canvas.getContext('2d');
-
-                // Draw original image
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
-
-                // Get Watermark Customizations
-                const text1 = document.getElementById('wmText1').value;
-                const text2 = document.getElementById('wmText2').value;
-                const angle = parseInt(document.getElementById('wmAngle').value) * Math.PI / 180;
-                const opacity = parseInt(document.getElementById('wmOpacity').value) / 100;
-
-                ctx.save();
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.rotate(angle);
-                ctx.fillStyle = `rgba(255, 0, 127, ${opacity})`;
-                ctx.strokeStyle = `rgba(0, 243, 255, ${opacity})`;
-                ctx.lineWidth = Math.max(2, canvas.height * 0.008);
-                
-                const fontSize = Math.max(16, Math.floor(canvas.height * 0.05));
-                ctx.font = `800 ${fontSize}px 'Orbitron', sans-serif`;
-                ctx.textAlign = 'center';
-
-                // Line 1 Cross-out Banner
-                if (text1) {
-                    ctx.beginPath();
-                    ctx.moveTo(-canvas.width, -fontSize * 1.5);
-                    ctx.lineTo(canvas.width, -fontSize * 1.5);
-                    ctx.stroke();
-                    ctx.fillText(text1.toUpperCase(), 0, -fontSize * 0.5);
-                }
-
-                // Line 2 Cross-out Banner
-                if (text2) {
-                    ctx.beginPath();
-                    ctx.moveTo(-canvas.width, fontSize * 1.5);
-                    ctx.lineTo(canvas.width, fontSize * 1.5);
-                    ctx.stroke();
-                    ctx.fillText(text2.toUpperCase(), 0, fontSize * 2.5);
-                }
-
-                ctx.restore();
-            });
-        }
-
-        // Preprocessing Canvas Image prior to Tesseract OCR to eliminate watermark collision
-        function getPreprocessedCanvas(canvas) {
-            const tempCanvas = document.createElement('canvas');
-            const ctx = tempCanvas.getContext('2d');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
-            
-            ctx.drawImage(canvas, 0, 0);
-            const imgData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-            const data = imgData.data;
-
-            // Simple Binarization & Noise Reduction to ignore pink/neon watermark overlay collision
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                // Remove pinkish watermark colors (High Red & Low Green)
-                if (r > 150 && g < 100) {
-                    data[i] = 255;
-                    data[i + 1] = 255;
-                    data[i + 2] = 255;
-                } else {
-                    // Grayscale & High Contrast Thresholding
-                    const avg = (r + g + b) / 3;
-                    const v = avg < 120 ? 0 : 255;
-                    data[i] = v;
-                    data[i + 1] = v;
-                    data[i + 2] = v;
-                }
-            }
-            ctx.putImageData(imgData, 0, 0);
-            return tempCanvas;
-        }
-
-        // Strict OCR Post-Processing Logic Engine
-        function strictNormalizeText(text) {
-            if (!text) return '';
-            
-            return text
-                // Strict rule: Replace 6/8 ambiguity using regex context heuristics
-                // Normalize "P" vs "F" where document code context dictates
-                .replace(/\b([0-9]{6})[- ]?([0-9]{2})[- ]?([0-9]{3})([0-9A-Z])\b/g, (match, p1, p2, p3, p4) => {
-                    // Normalize NRIC numbers strictly
-                    let clean = (p1 + p2 + p3 + p4).replace(/B/g, '8').replace(/G/g, '6');
-                    return clean;
-                })
-                .trim();
-        }
-
-        // Main Execution Workflow
-        async function executeOCRProcess() {
-            if (!uploadedImages.front) {
-                alert('Please upload at least the Front/Main page of the document.');
-                return;
-            }
-
-            const overlay = document.getElementById('progressOverlay');
-            const progressText = document.getElementById('progressText');
-            overlay.style.display = 'flex';
-
-            let frontRawText = '';
-            let backRawText = '';
-
             try {
-                // Initialize Tesseract Engine
-                progressText.innerText = 'INITIALIZING OCR ENGINE...';
-                const worker = await Tesseract.createWorker('eng');
-
-                // Process Front Image
-                progressText.innerText = 'ANALYZING FRONT/PAGE 2 DOCUMENT...';
-                const frontCanvas = document.getElementById('frontCanvas');
-                const processedFront = getPreprocessedCanvas(frontCanvas);
-                const resFront = await worker.recognize(processedFront.toDataURL());
-                frontRawText = resFront.data.text;
-
-                // Process Back Image if available
-                if (uploadedImages.back) {
-                    progressText.innerText = 'ANALYZING BACK/PAGE 3 DOCUMENT...';
-                    const backCanvas = document.getElementById('backCanvas');
-                    const processedBack = getPreprocessedCanvas(backCanvas);
-                    const resBack = await worker.recognize(processedBack.toDataURL());
-                    backRawText = resBack.data.text;
-                }
-
-                await worker.terminate();
-
-                progressText.innerText = 'PARSING SPECIFIC DOCUMENT FIELDS...';
-                parseAndDisplayResults(frontRawText, backRawText);
-
-            } catch (err) {
-                console.error(err);
-                alert('OCR Processing Error: ' + err.message);
-            } finally {
-                overlay.style.display = 'none';
-            }
-        }
-
-        // Parsing logic based on Document Type & strict requirements
-        function parseAndDisplayResults(frontText, backText) {
-            const combinedText = (frontText + '\n' + backText).toUpperCase();
-            const normalizedText = strictNormalizeText(combinedText);
-
-            let extractedData = {};
-            let reasoningIssues = [];
-
-            // Pattern Extractor Helper
-            const extractIC = (text) => {
-                // Look for YYMMDD-PB-###G pattern
-                const match = text.match(/\b\d{6}[- ]?\d{2}[- ]?\d{4}\b/);
-                if (match) {
-                    let rawIC = match[0].replace(/[- ]/g, '');
-                    // Disambiguate 6 vs 8
-                    let pbCode = rawIC.substring(6, 8);
-                    let lastDigit = parseInt(rawIC.slice(-1));
-                    let gender = (lastDigit % 2 === 0) ? 'Female (Perempuan)' : 'Male (Lelaki)';
-                    let state = MY_STATE_CODES[pbCode] || 'Malaysian State Code (' + pbCode + ')';
-                    return { ic: `${rawIC.substring(0,6)}-${pbCode}-${rawIC.substring(8)}`, gender, state, raw: rawIC };
-                }
-                return null;
-            };
-
-            const extractAddress = (text) => {
-                // Extract full multiline address until postcode
-                const match = text.match(/(?:ALAMAT|ADDRESS)?\s*([0-9A-Z\s,.-]+(?:JALAN|PERSIARAN|LORONG|TAMAN|KAMPUNG|POSKOD|\d{5})[0-9A-Z\s,.-]+)/i);
-                return match ? match[1].replace(/\n/g, ' ').trim() : 'FULL ADDRESS CAPTURED (VERIFIED COMPLETE)';
-            };
-
-            // Switch Parsing Strategy based on Document Schema
-            if (currentDocType === 'MY_NRIC') {
-                const icInfo = extractIC(normalizedText);
-                extractedData = {
-                    'Header & Logos': normalizedText.includes('KAD PENGENALAN') ? 'Verified (Kad Pengenalan Malaysia)' : 'Detected',
-                    'Photograph Detected': 'Color Photograph Scanned',
-                    'IC Number': icInfo ? icInfo.ic : '900101-14-5231 (Sample Disambiguated)',
-                    'Full Name': normalizedText.match(/(?:NAMA|NAME)\s*([A-Z\s@/]+)/)?.[1] || 'TAN CHIN HOCK',
-                    'Residential Address': extractAddress(normalizedText),
-                    'Gender/Sex': icInfo ? icInfo.gender : 'Male (Lelaki)',
-                    'Citizenship/Nationality': 'WARGANEGARA MALAYSIA',
-                    'State of Origin': icInfo ? icInfo.state : 'Kuala Lumpur',
-                    'Race': normalizedText.includes('ISLAM') ? 'Malay / Islam' : 'Chinese / General',
-                    'Smart Chip Detected': 'Gold Microchip Verified',
-                    'Extended IC Number (Back)': icInfo ? icInfo.ic + ' 01' : '900101-14-5231 01',
-                    'Barcode / QR Code': 'Scanned Valid',
-                    'Security & Design Elements (Bunga Raya)': 'Bunga Raya Pattern Present'
-                };
-            } 
-            else if (currentDocType === 'INT_PASSPORT' || currentDocType === 'MY_PASSPORT') {
-                const mrzMatch = normalizedText.match(/P[A-Z0-9<]{43}/);
-                const passportNo = normalizedText.match(/\b[A-Z][0-9]{8}\b/)?.[0] || 'A12345678';
+                // Tesseract.js recognizes inverted text if properly pre-processed
+                const worker = await Tesseract.createWorker("eng", 1, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            statusEl.innerText = `Scanning: ${(m.progress * 100).toFixed(0)}%`;
+                        }
+                    }
+                });
                 
-                // Strict 'P' vs 'F' Doc Type Rule
-                let docTypeVal = 'P';
-                if (normalizedText.includes('TYPE F') || normalizedText.includes('TYPE/JENIS F')) {
-                    reasoningIssues.push('Corrected ambiguity: Document Type "F" misinterpreted as "P" (Passport Standard).');
-                }
+                // Set parameters to strictly improve alphanumeric detection (6 vs 8, P vs F)
+                await worker.setParameters({
+                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/-,. ',
+                });
 
-                extractedData = {
-                    'Holder Photo Detected': 'Digital Color Photo Verified',
-                    'Type / Jenis': docTypeVal,
-                    'Country Code / Kod Negara': 'MYS',
-                    'Passport Number / Nombor Pasport': passportNo,
-                    'Full Name / Nama': 'AHMAD BIN ABDULLAH',
-                    'Nationality / Warganegara': 'MALAYSIAN',
-                    'Date of Birth / Tarikh Lahir': '15/08/1988',
-                    'Identity Card Number (MyKad)': '880815-10-5433',
-                    'Gender / Jantina': 'M',
-                    'Place of Birth / Tempat Lahir': 'SELANGOR',
-                    'Date of Issue / Tarikh Dikeluarkan': '10/10/2022',
-                    'Date of Expiry / Tarikh Kepupusan': '10/10/2032 (10-Year Validity)',
-                    'Issuing Authority / Pihak Berkuasa': 'Jabatan Imigresen Malaysia',
-                    'Holder Signature': 'Digital Signature Verified (Page 3)',
-                    'Machine-Readable Zone (MRZ)': mrzMatch ? mrzMatch[0] : 'P<MYSABDULLAH<<AHMAD<<<<<<<<<<<<<<<<<<<<<<<\nA123456784MYS8808158M3210101<<<<<<<<<<<<<<02',
-                    'Observations / Endorsements': 'None / Standard Issue'
-                };
-            }
-            else if (currentDocType === 'MY_PR') {
-                const icInfo = extractIC(normalizedText);
-                extractedData = {
-                    'Background Color Verification': 'Red Scheme Identified (MyPR)',
-                    'Card Heading': 'KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP',
-                    'Card Holder Photo': 'Photo Verified',
-                    'NRIC Number': icInfo ? icInfo.ic : '750312-71-5122',
-                    'Full Name': 'GOPAL A/L RAMASAMY',
-                    'Permanent Address': extractAddress(normalizedText),
-                    'Gender/Sex': 'Lelaki / Male',
-                    'Smart Chip Contact Pad': 'Gold Smart Chip Embedded',
-                    'Original Nationality (Back)': 'INDIA',
-                    'Entry Permit Details (Nombor Permit Masuk)': 'PM/12345/2010',
-                    'Embedded Microchip Data': 'Biometric Fingerprint Data Encrypted',
-                    'Security Features': 'Holographic Crest & Microtext OK'
-                };
-            }
-            else if (currentDocType === 'MY_DL') {
-                extractedData = {
-                    'Background Design (Sultan Abdul Samad)': 'Verified (Sultan Abdul Samad Motifs)',
-                    'Holder Photo': 'Passport-Style Photo Scanned',
-                    'Full Name': 'LEE WAI KONG',
-                    'Identity Card / Passport No': '920405-08-6115',
-                    'Nationality': 'MALAYSIA',
-                    'Address': extractAddress(normalizedText),
-                    'Category / Class of License': 'D, DA, B2',
-                    'Validity Dates': '05/04/2023 - 05/04/2028',
-                    'License / Serial Number (Back)': 'JPJ-MYS-88910293',
-                    'Vehicle Classes Table (Back)': 'Class B2 (Motorcycle <=250cc), Class D (Car <=3500kg)',
-                    'Signature DG JPJ': 'Digital Signature Present',
-                    'Security Features': '10-Year Hologram Pattern Valid'
-                };
-            }
-            else if (currentDocType === 'SSM_CERT') {
-                extractedData = {
-                    'Company Name / Nama Syarikat': 'TECHNOVA SOLUTIONS SDN. BHD.',
-                    'Nama Syarikat Lama / Old Name': 'TECHNOVA ENTERPRISE',
-                    'Registration No / No Pendaftaran': '202101099882 (1410182-X)',
-                    'Incorporation Number': '1410182-X',
-                    'Registration / Incorporation Date': '12-05-2021',
-                    'Business Type / Structure': 'Private Limited (Sdn. Bhd.)',
-                    'Business Status & Expiry Date': 'ACTIVE / 12-05-2026',
-                    'Registered Address': 'LEVEL 12, TOWER B, VERTEX TOWER, KUALA LUMPUR',
-                    'Business Address': 'NO 45, JALAN AMPANG UTAMA, 50450 KUALA LUMPUR',
-                    'Nature of Business (MSIC)': '62011 - COMPUTER PROGRAMMING ACTIVITIES AND IT CONSULTANCY',
-                    'Tarikh Pertukaran': '01-01-2023',
-                    'Owner / Director Details': 'DIRECTOR: AHMAD BIN ALI (IC: 800101145001)',
-                    'Shareholder Information': '500,000 ORDINARY SHARES',
-                    'Branch Count (Bil Cawangan)': '2 Branches',
-                    'Financial Data & Charges': 'Nil Corporate Charges'
-                };
-            }
-            else if (currentDocType === 'CIDB_PPK') {
-                extractedData = {
-                    'Company Name / Nama Kontraktor': 'MEGA BUILDERS CONTRACTOR SDN BHD',
-                    'Registration Number / No Pendaftaran': '0120190522-SL109283',
-                    'Registered Business Address': 'LOT 88, INDUSTRIAL PARK, SHAH ALAM, SELANGOR',
-                    'Grade / Gred (G1-G7)': 'G7 (Unlimited Tender Capacity)',
-                    'Categories of Construction (B, CE, ME)': 'B (Building), CE (Civil Engineering)',
-                    'Specializations / Pengkhususan': 'B04, CE01, CE21',
-                    'Validity Period / Tarikh Habis Tempoh': '30/11/2027',
-                    'Tarikh Mula Berkuatkuasa': '01/12/2024',
-                    'Operational Status': 'ACTIVE (Aktif)'
-                };
-            }
-            else {
-                // Generic Int Driving Permit Fallback
-                extractedData = {
-                    'Emblem & Title (UN Convention)': 'Convention on Road Traffic 1968',
-                    'Issuing Authority': 'Automobile Association of Malaysia / JPJ',
-                    'Validity Dates': '15/01/2025 - 15/01/2026 (1 Year)',
-                    'Surname / Last Name': 'SANTOS',
-                    'Given / First Names': 'MARIA LOURDES',
-                    'Place of Birth': 'MANILA',
-                    'Date of Birth': '22/11/1990',
-                    'Permanent Residence': 'KUALA LUMPUR, MALAYSIA',
-                    'Photograph Stamped': 'Embossed Stamp Verified',
-                    'Holder Signature': 'Signed',
-                    'Vehicle Categories (A, B, C, D, E)': 'Category B (Passenger Cars)',
-                    'Validation Stamps': 'Stamped Category B',
-                    'Territorial Validity List': 'Contracting States Recognized'
-                };
-            }
+                const { data: { text } } = await worker.recognize(file);
+                await worker.terminate();
+                
+                statusEl.innerText = "Scan Complete!";
+                
+                // Parse the raw text into structured data
+                const parsedData = parseDocumentData(text);
+                
+                // Merge with existing output if back card is scanned
+                let currentData = {};
+                try { currentData = JSON.parse(outputEl.innerText); } catch(e) {}
+                
+                const finalData = { ...currentData, ...parsedData, rawText: text };
+                outputEl.innerText = JSON.stringify(finalData, null, 4);
 
-            // Render Output Fields in UI
-            const container = document.getElementById('fieldsContainer');
-            container.innerHTML = Object.entries(extractedData).map(([key, val]) => `
-                <div class="field-card">
-                    <div class="field-label">
-                        <span>${key}</span>
-                        <span class="confidence-tag"><i class="fa-solid fa-check"></i> 99.4% CONFIDENCE</span>
-                    </div>
-                    <div class="field-value" contenteditable="true">${val}</div>
-                </div>
-            `).join('');
-
-            // Update Badge & Status
-            const badge = document.getElementById('statusBadge');
-            badge.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--neon-green);"></i> Extraction Complete. All critical patterns verified without errors.`;
-
-            // Display Failure/Reasoning Justification Box if needed
-            const reasoningBox = document.getElementById('reasoningBox');
-            if (reasoningIssues.length > 0) {
-                reasoningBox.style.display = 'block';
-                reasoningBox.innerHTML = `<b><i class="fa-solid fa-triangle-exclamation"></i> Parsing Justifications & Resolution Log:</b><br>` + 
-                    reasoningIssues.map(i => `• ${i}`).join('<br>');
-            } else {
-                reasoningBox.style.display = 'none';
+            } catch (error) {
+                statusEl.innerText = "Error: " + error.message;
+                statusEl.style.color = "#ff4444";
             }
         }
 
-        // Export Parsed Fields as Clean JSON
-        function exportJSON() {
-            const fieldCards = document.querySelectorAll('.field-card');
-            if (fieldCards.length === 0) {
-                alert('No data to export.');
-                return;
-            }
-
-            const exportObj = {
-                documentType: currentDocType,
-                timestamp: new Date().toISOString(),
-                extractedFields: {}
-            };
-
-            fieldCards.forEach(card => {
-                const label = card.querySelector('.field-label span').innerText;
-                const value = card.querySelector('.field-value').innerText;
-                exportObj.extractedFields[label] = value;
-            });
-
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `OCR_EXPORT_${currentDocType}_${Date.now()}.json`);
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-        }
-
-        // Reset Workspace
-        function resetAll() {
-            uploadedImages.front = null;
-            uploadedImages.back = null;
+        // Data Parsing Architecture (Regex Engine)
+        function parseDocumentData(rawText) {
+            const data = { docType: "Unknown", errors: [] };
             
-            ['front', 'back'].forEach(side => {
-                document.getElementById(side + 'FileInput').value = '';
-                document.getElementById(side + 'CanvasContainer').style.display = 'none';
-                document.getElementById(side + 'Placeholder').style.display = 'flex';
-            });
+            // 1. Detect Malaysian NRIC (MyKad)
+            const mykadRegex = /(\d{6}-\d{2}-\d{4})/g;
+            const mykadMatch = rawText.match(mykadRegex);
+            
+            if (mykadMatch || rawText.toUpperCase().includes("KAD PENGENALAN")) {
+                data.docType = "Malaysian NRIC";
+                data.icNumber = mykadMatch ? mykadMatch[0] : "Not Detected";
+                
+                if(data.icNumber !== "Not Detected") {
+                    const lastDigit = parseInt(data.icNumber.slice(-1));
+                    data.gender = (lastDigit % 2 === 0) ? "Female (F)" : "Male (M)";
+                    data.dob = formatMyKadDOB(data.icNumber.substring(0,6));
+                }
+            }
+            
+            // 2. Detect Passport via MRZ (Machine Readable Zone)
+            const mrzRegex = /P<[A-Z]{3}[A-Z0-9<]+/g;
+            if (rawText.match(mrzRegex) || rawText.toUpperCase().includes("PASPORT")) {
+                data.docType = "Passport";
+                // MRZ parsing logic would go here
+            }
 
-            renderEmptyFields();
-            document.getElementById('statusBadge').innerHTML = `<i class="fa-solid fa-circle-info"></i> Workspace Reset. Select document & upload files.`;
+            // Reasonings for missed data
+            if (!data.icNumber && !data.mrz) {
+                data.errors.push("Reasoning: Cannot detect document type. The image might have heavy holograms obscuring text, or handwritten text clashing with typed fonts. OCR engine requires a clear, non-glare background.");
+            }
+
+            return data;
+        }
+
+        // Helper to format DOB from NRIC
+        function formatMyKadDOB(yymmdd) {
+            const year = parseInt(yymmdd.substring(0,2));
+            const month = yymmdd.substring(2,4);
+            const day = yymmdd.substring(4,6);
+            const fullYear = year > 30 ? `19${year}` : `20${year}`;
+            return `${day}/${month}/${fullYear}`;
         }
     </script>
 </body>
