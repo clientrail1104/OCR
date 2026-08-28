@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroOCR Enterprise - High-Precision Document Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #e4ebf5;
+            --neu-light: #ffffff;
+            --neu-dark: #c5d0e6;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --shadow-out: 8px 8px 16px var(--neu-dark), -8px -8px 16px var(--neu-light);
+            --shadow-out-sm: 4px 4px 8px var(--neu-dark), -4px -4px 8px var(--neu-light);
+            --shadow-in: inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+            --shadow-in-sm: inset 2px 2px 4px var(--neu-dark), inset -2px -2px 4px var(--neu-light);
+            --radius: 16px;
+            --radius-sm: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.25s ease;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: var(--bg-color);
+            box-shadow: var(--shadow-out-sm);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--bg-color);
+            box-shadow: var(--shadow-out-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+        }
+
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            border-radius: 30px;
+            background: var(--bg-color);
+            box-shadow: var(--shadow-in-sm);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 30px;
+            padding: 30px 40px;
+            flex: 1;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media(max-width: 1024px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+        }
+
+        /* Sidebar Styles */
+        aside {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card-neu {
+            background: var(--bg-color);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-out);
+            padding: 24px;
+        }
+
+        .sidebar-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .doc-type-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 480px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .doc-type-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-color);
+            box-shadow: var(--shadow-out-sm);
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-main);
+            font-size: 0.9rem;
+        }
+
+        .doc-type-btn:hover {
+            color: var(--primary);
+        }
+
+        .doc-type-btn.active {
+            box-shadow: var(--shadow-in);
+            color: var(--primary);
+            background: rgba(79, 70, 229, 0.05);
+        }
+
+        .doc-type-btn i {
+            font-size: 1.1rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        /* Content Workspace */
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .upload-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media(max-width: 768px) {
+            .upload-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .dropzone-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .dropzone-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .dropzone {
+            border: 2px dashed var(--neu-dark);
+            border-radius: var(--radius);
+            background: var(--bg-color);
+            box-shadow: var(--shadow-in-sm);
+            padding: 30px 20px;
+            text-align: center;
+            cursor: pointer;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dropzone:hover {
+            border-color: var(--primary);
+        }
+
+        .dropzone.dragover {
+            background: rgba(79, 70, 229, 0.05);
+            border-color: var(--primary);
+            box-shadow: var(--shadow-in);
+        }
+
+        .dropzone i {
+            font-size: 2.5rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .dropzone p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+
+        .dropzone span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            opacity: 0.8;
+        }
+
+        .dropzone input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-preview {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: var(--bg-color);
+            padding: 10px;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-preview img {
+            max-height: 100px;
+            max-width: 100%;
+            border-radius: 6px;
+            object-fit: contain;
+            box-shadow: var(--shadow-out-sm);
+        }
+
+        .file-preview .file-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 90%;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .btn-neu {
+            padding: 14px 28px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-color);
+            box-shadow: var(--shadow-out-sm);
+            border: none;
+            font-weight: 600;
+            color: var(--text-main);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.95rem;
+        }
+
+        .btn-neu:hover {
+            box-shadow: var(--shadow-out);
+            color: var(--primary);
+        }
+
+        .btn-neu:active, .btn-neu.primary {
+            box-shadow: var(--shadow-in-sm);
+            color: var(--primary);
+        }
+
+        .btn-neu.primary-action {
+            background: var(--primary);
+            color: white;
+            box-shadow: 4px 4px 10px var(--neu-dark), -4px -4px 10px var(--neu-light);
+        }
+
+        .btn-neu.primary-action:hover {
+            background: var(--primary-hover);
+            color: white;
+        }
+
+        .btn-neu.primary-action:active {
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .progress-container {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .progress-bar-bg {
+            height: 12px;
+            border-radius: 6px;
+            background: var(--bg-color);
+            box-shadow: var(--shadow-in);
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            width: 0%;
+            border-radius: 6px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Results Panel */
+        .results-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .results-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .export-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .extracted-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .field-card {
+            background: var(--bg-color);
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-out-sm);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .field-value {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+            background: var(--bg-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            box-shadow: var(--shadow-in-sm);
+            outline: none;
+            border: none;
+            width: 100%;
+        }
+
+        .field-value:focus {
+            box-shadow: var(--shadow-in);
+        }
+
+        .mrz-card {
+            grid-column: 1 / -1;
+            font-family: monospace;
+            background: #1e293b;
+            color: #38bdf8;
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5);
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            line-height: 1.5;
+        }
+
+        .mrz-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+        }
+
+        .placeholder-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .placeholder-state i {
+            font-size: 3rem;
+            opacity: 0.5;
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--bg-color);
+            box-shadow: var(--shadow-out);
+            padding: 16px 24px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 2000;
+            transform: translateY(150%);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .toast.success i { color: var(--success); }
+        .toast.error i { color: var(--danger); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-area">
+            <div class="logo-icon">
+                <i class="fa-solid fa-brain"></i>
+            </div>
+            <div class="logo-text">
+                <h1>NeuroOCR Enterprise</h1>
+                <p>Universal High-End Biometric & Document Intelligence</p>
+            </div>
+        </div>
+        <div class="system-status">
+            <div class="status-dot"></div>
+            <span>Engine Online (500MB Limit Active)</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <aside>
+            <div class="card-neu">
+                <div class="sidebar-title">
+                    <i class="fa-solid fa-folder-tree"></i> Document Schema
+                </div>
+                <div class="doc-type-list" id="docTypeList">
+                    <button class="doc-type-btn active" data-type="nric">
+                        <i class="fa-solid fa-id-card"></i> NRIC (MyKad)
+                    </button>
+                    <button class="doc-type-btn" data-type="malaysian-passport">
+                        <i class="fa-solid fa-passport"></i> Malaysian Passport
+                    </button>
+                    <button class="doc-type-btn" data-type="intl-passport">
+                        <i class="fa-solid fa-globe"></i> International Passport
+                    </button>
+                    <button class="doc-type-btn" data-type="pr-card">
+                        <i class="fa-solid fa-address-card"></i> Malaysia PR Card
+                    </button>
+                    <button class="doc-type-btn" data-type="malaysian-dl">
+                        <i class="fa-solid fa-car"></i> Malaysian Driving Licence
+                    </button>
+                    <button class="doc-type-btn" data-type="intl-dl">
+                        <i class="fa-solid fa-id-badge"></i> International Driving Permit
+                    </button>
+                    <button class="doc-type-btn" data-type="universal">
+                        <i class="fa-solid fa-file-arrow-up"></i> Any Document / Permit (Universal)
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-neu">
+                <div class="sidebar-title">
+                    <i class="fa-solid fa-sliders"></i> Engine Settings
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem; color: var(--text-muted);">
+                    <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                        <span>Deep Neural MRZ Parser</span>
+                        <input type="checkbox" checked style="accent-color: var(--primary);">
+                    </label>
+                    <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                        <span>Smart Chip / Barcode Decoder</span>
+                        <input type="checkbox" checked style="accent-color: var(--primary);">
+                    </label>
+                    <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                        <span>Gender Extraction from G-Digit</span>
+                        <input type="checkbox" checked style="accent-color: var(--primary);">
+                    </label>
+                </div>
+            </div>
+        </aside>
+
+        {/* Workspace Area */}
+        <main class="workspace">
+            <div class="card-neu">
+                <div class="sidebar-title" id="uploadHeaderTitle">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Upload Front & Back Documents (Max 500MB per file)
+                </div>
+
+                <div class="upload-section">
+                    <div class="dropzone-container">
+                        <div class="dropzone-label" id="frontLabelText">Front Side / Page 2 (Biographic Data)</div>
+                        <div class="dropzone" id="dropzoneFront">
+                            <i class="fa-solid fa-file-image"></i>
+                            <p>Drag & drop or <strong>Browse file</strong></p>
+                            <span>Supports PDF, PNG, JPG, TIFF up to 500MB</span>
+                            <input type="file" id="fileFront" accept="image/*,.pdf,.tiff,.tif">
+                            <div class="file-preview" id="previewFront">
+                                <img id="imgFront" src="" alt="Front Preview">
+                                <span class="file-name" id="nameFront"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dropzone-container">
+                        <div class="dropzone-label" id="backLabelText">Back Side / Page 3 (Signatures & Endorsements)</div>
+                        <div class="dropzone" id="dropzoneBack">
+                            <i class="fa-solid fa-file-shield"></i>
+                            <p>Drag & drop or <strong>Browse file</strong></p>
+                            <span>Supports PDF, PNG, JPG, TIFF up to 500MB</span>
+                            <input type="file" id="fileBack" accept="image/*,.pdf,.tiff,.tif">
+                            <div class="file-preview" id="previewBack">
+                                <img id="imgBack" src="" alt="Back Preview">
+                                <span class="file-name" id="nameBack"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 24px;" class="action-row">
+                    <button class="btn-neu primary-action" id="btnProcess">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Execute High-End OCR Extraction
+                    </button>
+                    <button class="btn-neu" id="btnClear">
+                        <i class="fa-solid fa-rotate-right"></i> Reset Files
+                    </button>
+                </div>
+
+                <div class="progress-container" id="progressContainer" style="margin-top: 20px;">
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="progressBarFill"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span id="progressStatusText">Initializing neural networks...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-neu results-panel">
+                <div class="results-header">
+                    <div class="results-title">
+                        <i class="fa-solid fa-table-cells"></i> Fully Aligned OCR Extraction Output
+                    </div>
+                    <div class="export-group" id="exportGroup">
+                        <button class="btn-neu" id="btnExportExcel" disabled>
+                            <i class="fa-solid fa-file-excel" style="color: #10b981;"></i> Download Excel (.csv/.xlsx)
+                        </button>
+                        <button class="btn-neu" id="btnExportWord" disabled>
+                            <i class="fa-solid fa-file-word" style="color: #3b82f6;"></i> Download Word (.docx/.txt)
+                        </button>
+                        <button class="btn-neu" id="btnExportText" disabled>
+                            <i class="fa-solid fa-file-lines" style="color: #f59e0b;"></i> Download Text (.txt)
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resultsContent">
+                    <div class="placeholder-state">
+                        <i class="fa-solid fa-file-circle-exclamation"></i>
+                        <p>No document processed yet. Upload document files and click <strong>Execute High-End OCR Extraction</strong> to extract complete information.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast" id="toast">
+        <i class="fa-solid fa-circle-check"></i>
+        <span id="toastMsg">Operation successful!</span>
+    </div>
+
+    <script>
+        // State Management
+        let currentDocType = 'nric';
+        let frontFile = null;
+        let backFile = null;
+
+        // Document Schemas & Mock Extracted Data
+        const schemas = {
+            'nric': {
+                title: 'NRIC (MyKad) Full Extraction Schema',
+                frontLabel: 'Front of Card (Photo, IC Number, Chip, Name, Address)',
+                backLabel: 'Back of Card (Extended IC, Barcode/QR, Security Elements)',
+                fields: [
+                    { key: 'header_logo', label: 'Header & Logos', val: 'Kad Pengenalan Malaysia / National Flag / MyKad Logo' },
+                    { key: 'ic_number', label: 'IC Number (12-Digit)', val: '920814-10-5431' },
+                    { key: 'gender_derived', label: 'Gender (Derived from G-Digit)', val: 'Male (Odd Number: 1)' },
+                    { key: 'full_name', label: 'Full Name', val: 'MUHAMMAD AMIRUL BIN ABDULLAH' },
+                    { key: 'residential_address', label: 'Residential Address', val: 'NO. 12, JALAN SS 2/64, 47300 PETALING JAYA, SELANGOR' },
+                    { key: 'gender_text', label: 'Gender Text', val: 'Lelaki / Male' },
+                    { key: 'citizenship', label: 'Citizenship / Nationality', val: 'Warganegara Malaysia' },
+                    { key: 'race', label: 'Race', val: 'Malay' },
+                    { key: 'smart_chip', label: 'Smart Chip Status', val: 'Detected (Gold Contact Pad Active - Biometric Encrypted)' },
+                    { key: 'extended_ic', label: 'Extended IC Number (Back)', val: '920814-10-5431-01' },
+                    { key: 'barcode_qr', label: 'Barcode / QR Code', val: 'VERIFIED_SECURE_HASH_98432A' },
+                    { key: 'security_elements', label: 'Security & Design Elements', val: 'Bunga Raya Hologram & Laser-Engraved UV Patterns' }
+                ]
+            },
+            'malaysian-passport': {
+                title: 'Malaysian Passport (Page 2 & 3) Extraction Schema',
+                frontLabel: 'Page 2: Identity Information (Polycarbonate Window)',
+                backLabel: 'Page 3: Signature & Digital Observations',
+                fields: [
+                    { key: 'doc_type', label: 'Type / Jenis', val: 'P' },
+                    { key: 'country_code', label: 'Country Code / Kod Negara', val: 'MYS' },
+                    { key: 'passport_no', label: 'Passport Number / Nombor Pasport', val: 'A98234561' },
+                    { key: 'full_name', label: 'Full Name / Nama', val: 'NUR AIN BINTI AHMAD' },
+                    { key: 'nationality', label: 'Nationality / Warganegara', val: 'Malaysian' },
+                    { key: 'dob', label: 'Date of Birth / Tarikh Lahir', val: '15/07/1995' },
+                    { key: 'ic_no', label: 'Identity Card Number (MyKad)', val: '950715-14-5222' },
+                    { key: 'gender', label: 'Gender / Jantina', val: 'F (Female / Perempuan)' },
+                    { key: 'pob', label: 'Place of Birth / Tempat Lahir', val: 'KUALA LUMPUR' },
+                    { key: 'doi', label: 'Date of Issue / Tarikh Dikeluarkan', val: '10/01/2022' },
+                    { key: 'doe', label: 'Date of Expiry / Tarikh Kepupusan', val: '09/01/2032 (10-Year Option)' },
+                    { key: 'authority', label: 'Issuing Authority / Pihak Berkuasa', val: 'Government of Malaysia / Jabatan Imigresen Malaysia' },
+                    { key: 'signature', label: 'Holder’s Official Signature (Page 3)', val: 'Digitally Captured & Verified' },
+                    { key: 'observations', label: 'Observations / Endorsements (Page 3)', val: 'NO SPECIAL ENDORSEMENTS RECORDED' },
+                    { key: 'mrz', label: 'Machine-Readable Zone (MRZ)', val: 'P<MYSNUR<<AIN<<BINTI<<AHMAD<<<<<<<<<<<<<<<<<<<\nA982345613MYS9507155F3201090<<<<<<<<<<<<<<<04', isMrz: true }
+                ]
+            },
+            'intl-passport': {
+                title: 'International Passport (Page 2 & 3) Extraction Schema',
+                frontLabel: 'Page 2: Biographic Data & Holder Photo',
+                backLabel: 'Page 3: Signature & Official Endorsements',
+                fields: [
+                    { key: 'doc_type', label: 'Type', val: 'P' },
+                    { key: 'country_code', label: 'Country Code', val: 'USA' },
+                    { key: 'passport_no', label: 'Passport Number', val: '548920173' },
+                    { key: 'full_name', label: 'Full Name (Given & Surname)', val: 'JOHNATHAN EDWARD DOE' },
+                    { key: 'nationality', label: 'Nationality', val: 'UNITED STATES OF AMERICA' },
+                    { key: 'dob', label: 'Date of Birth', val: '22/11/1988' },
+                    { key: 'sex', label: 'Sex / Gender', val: 'M' },
+                    { key: 'pob', label: 'Place of Birth', val: 'NEW YORK, NY' },
+                    { key: 'doi', label: 'Date of Issue', val: '04/05/2020' },
+                    { key: 'doe', label: 'Date of Expiry', val: '03/05/2030' },
+                    { key: 'authority', label: 'Issuing Authority', val: 'DEPARTMENT OF STATE' },
+                    { key: 'signature', label: 'Holder’s Signature (Page 3)', val: 'Scanned Digital Signature Verified' },
+                    { key: 'endorsements', label: 'Observations / Endorsements', val: 'EXTENDED VALIDITY NOTED ON PAGE 3' },
+                    { key: 'mrz', label: 'Machine-Readable Zone (MRZ)', val: 'P<USADOE<<JOHNATHAN<EDWARD<<<<<<<<<<<<<<<<<<<\n5489201732USA8811227M3005034<<<<<<<<<<<<<<06', isMrz: true }
+                ]
+            },
+            'pr-card': {
+                title: 'Malaysia Permanent Resident Card Schema',
+                frontLabel: 'Front: Red Background, Photo, NRIC, Name, Address, Smart-Chip',
+                backLabel: 'Back: Original Nationality, Entry Permit Details, Hologram',
+                fields: [
+                    { key: 'heading', label: 'Card Heading', val: 'KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP' },
+                    { key: 'nric_no', label: 'NRIC Number (12-Digit)', val: '781203-71-5024' },
+                    { key: 'gender_derived', label: 'Gender (Derived from G-Digit)', val: 'Female (Even Number: 4)' },
+                    { key: 'full_name', label: 'Full Name', val: 'MEI LING ZHANG' },
+                    { key: 'permanent_address', label: 'Permanent Address', val: 'NO. 45, LORONG BUKIT BINTANG, 55100 KUALA LUMPUR' },
+                    { key: 'gender_text', label: 'Gender / Sex', val: 'Perempuan / Female' },
+                    { key: 'chip', label: 'Smart-Chip Interface', val: 'Embedded Gold/Silver Contact Pad Active' },
+                    { key: 'orig_nationality', label: 'Original Nationality', val: 'CHINA (CN)' },
+                    { key: 'entry_permit', label: 'Entry Permit Number (Nombor Permit Masuk)', val: 'IM.PERM/2018/9834' },
+                    { key: 'security', label: 'Security Features', val: 'Holographic Crest, Microtext & Encrypted Biometric Store' }
+                ]
+            },
+            'malaysian-dl': {
+                title: 'Malaysian Driving Licence Schema',
+                frontLabel: 'Front: Sultan Abdul Samad Building, Photo, Classes, Validity',
+                backLabel: 'Back: Istana Negara, Serial Number, Vehicle Classes Table, Signature',
+                fields: [
+                    { key: 'full_name', label: 'Full Name', val: 'AHMAD ZAKI BIN ISMAIL' },
+                    { key: 'id_number', label: 'MyKad / Passport Number', val: '890412-08-6111' },
+                    { key: 'nationality', label: 'Nationality', val: 'MALAYSIAN' },
+                    { key: 'address', label: 'Registered Address', val: 'TAMAN SRI GOMBAK, 68100 BATU CAVES, SELANGOR' },
+                    { key: 'license_classes', label: 'Category / Class of License', val: 'B (Full Motorcycle), D (Motor Cars)' },
+                    { key: 'validity', label: 'Validity Dates', val: '01/03/2023 to 01/03/2028' },
+                    { key: 'serial_no', label: 'License / Serial Number (JPJ)', val: 'JPJ-MY-99823741' },
+                    { key: 'director_sig', label: 'Director-General Signature', val: 'Digital Facsimile Verified (Road Transport Dept)' },
+                    { key: 'security', label: 'Security Features', val: 'Holographic Elements & 10-Year Anti-Forgery Pattern' }
+                ]
+            },
+            'intl-dl': {
+                title: 'International Driving Permit (IDP) Schema',
+                frontLabel: 'Front: UN 1949/1968 Convention Title, Photo, Issuer, Validity',
+                backLabel: 'Back: Vehicle Categories (A-E), Stamps, Territorial List',
+                fields: [
+                    { key: 'convention', label: 'UN Convention Title', val: 'Convention on Road Traffic of 19 September 1949' },
+                    { key: 'distinguishing_sign', label: 'National Distinguishing Sign', val: 'MALAYSIA (MAL)' },
+                    { key: 'issuing_authority', label: 'Issuing Authority', val: 'Road Transport Department (JPJ) / AAM' },
+                    { key: 'validity', label: 'Validity Dates (Max 1 Year)', val: '15/06/2026 to 14/06/2027' },
+                    { key: 'holder_name', label: 'Surname & Given Names', val: 'ISMAIL, AHMAD ZAKI' },
+                    { key: 'pob', label: 'Place & Date of Birth', val: 'PENANG | 12/04/1989' },
+                    { key: 'residence', label: 'Permanent Place of Residence', val: 'KUALA LUMPUR, MALAYSIA' },
+                    { key: 'categories', label: 'Vehicle Categories Authorized', val: 'A, B, C, D, E Fully Endorsed' },
+                    { key: 'territorial', label: 'Territorial Validity List', val: 'Recognized in Contracting States Worldwide' }
+                ]
+            },
+            'universal': {
+                title: 'Universal Document & Permit OCR Extraction Schema',
+                frontLabel: 'Front Document / Page 1',
+                backLabel: 'Back Document / Page 2',
+                fields: [
+                    { key: 'doc_detected', label: 'Document Type Detected', val: 'Generic Official Identification / Visa / Permit' },
+                    { key: 'extracted_text_block_1', label: 'Primary OCR Text Block', val: 'REPUBLIC OF SINGAPORE WORK PERMIT - HOLDER: TAN WEI MING - ID: S7819203A - EXPIRY: 31/12/2028' },
+                    { key: 'extracted_text_block_2', label: 'Secondary OCR Text Block', val: 'ISSUED BY MINISTRY OF MANPOWER - AUTHORIZED EMPLOYMENT IN MANUFACTURING SECTOR' },
+                    { key: 'barcodes', label: 'Barcodes / QR / Hashes', val: 'MOM_SECURE_2D_BARCODE_PARSED_SUCCESSFULLY' },
+                    { key: 'metadata', label: 'File Metadata', val: 'Format: PDF/High-Res Image | Size: 14.2 MB | Resolution: 300 DPI' }
+                ]
+            }
+        };
+
+        // UI Element Selectors
+        const docTypeList = document.getElementById('docTypeList');
+        const uploadHeaderTitle = document.getElementById('uploadHeaderTitle');
+        const frontLabelText = document.getElementById('frontLabelText');
+        const backLabelText = document.getElementById('backLabelText');
+        const fileFront = document.getElementById('fileFront');
+        const fileBack = document.getElementById('fileBack');
+        const dropzoneFront = document.getElementById('dropzoneFront');
+        const dropzoneBack = document.getElementById('dropzoneBack');
+        const previewFront = document.getElementById('previewFront');
+        const previewBack = document.getElementById('previewBack');
+        const imgFront = document.getElementById('imgFront');
+        const imgBack = document.getElementById('imgBack');
+        const nameFront = document.getElementById('nameFront');
+        const nameBack = document.getElementById('nameBack');
+        const btnProcess = document.getElementById('btnProcess');
+        const btnClear = document.getElementById('btnClear');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressStatusText = document.getElementById('progressStatusText');
+        const progressPercent = document.getElementById('progressPercent');
+        const resultsContent = document.getElementById('resultsContent');
+        const btnExportExcel = document.getElementById('btnExportExcel');
+        const btnExportWord = document.getElementById('btnExportWord');
+        const btnExportText = document.getElementById('btnExportText');
+        const toast = document.getElementById('toast');
+        const toastMsg = document.getElementById('toastMsg');
+
+        // Switch Document Type
+        document.querySelectorAll('.doc-type-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.doc-type-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentDocType = btn.getAttribute('data-type');
+                updateSchemaLabels();
+            });
+        });
+
+        function updateSchemaLabels() {
+            const schema = schemas[currentDocType];
+            if (!schema) return;
+            uploadHeaderTitle.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Upload Front & Back - ${schema.title}`;
+            frontLabelText.innerText = schema.frontLabel;
+            backLabelText.innerText = schema.backLabel;
+        }
+
+        // File Selection Handlers with 500MB Limit Verification
+        const MAX_SIZE = 500 * 1024 * 1024; // 500MB
+
+        function handleFileSelect(file, isFront) {
+            if (!file) return;
+            if (file.size > MAX_SIZE) {
+                showToast('File size exceeds 500MB limit!', 'error');
+                return;
+            }
+
+            if (isFront) {
+                frontFile = file;
+                nameFront.innerText = file.name;
+                if (file.type.startsWith('image/')) {
+                    imgFront.src = URL.createObjectURL(file);
+                    previewFront.style.display = 'flex';
+                } else {
+                    imgFront.src = '';
+                    previewFront.style.display = 'flex';
+                    nameFront.innerText = file.name + ' (Document Ready)';
+                }
+            } else {
+                backFile = file;
+                nameBack.innerText = file.name;
+                if (file.type.startsWith('image/')) {
+                    imgBack.src = URL.createObjectURL(file);
+                    previewBack.style.display = 'flex';
+                } else {
+                    imgBack.src = '';
+                    previewBack.style.display = 'flex';
+                    nameBack.innerText = file.name + ' (Document Ready)';
+                }
+            }
+            showToast('File loaded successfully (Size OK)', 'success');
+        }
+
+        fileFront.addEventListener('change', (e) => handleFileSelect(e.target.files[0], true));
+        fileBack.addEventListener('change', (e) => handleFileSelect(e.target.files[0], false));
+
+        // Drag and Drop styling
+        ['dropzoneFront', 'dropzoneBack'].forEach((id, idx) => {
+            const dz = document.getElementById(id);
+            const isFront = idx === 0;
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dz.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dz.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dz.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dz.classList.remove('dragover');
+                }, false);
+            });
+
+            dz.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+                handleFileSelect(file, isFront);
+            });
+        });
+
+        // OCR Processing Simulation
+        btnProcess.addEventListener('click', () => {
+            progressContainer.style.display = 'flex';
+            let progress = 0;
+            btnProcess.disabled = true;
+
+            const steps = [
+                { p: 15, text: 'Validating document structural integrity & resolution...' },
+                { p: 35, text: 'Executing neural optical character recognition (OCR)...' },
+                { p: 65, text: 'Parsing MRZ, biometric fields & microchip signatures...' },
+                { p: 85, text: 'Cross-verifying G-digit gender logic & checksums...' },
+                { p: 100, text: 'Extraction complete! Rendering structured output...' }
+            ];
+
+            let stepIdx = 0;
+            const interval = setInterval(() => {
+                if (stepIdx < steps.length) {
+                    progress = steps[stepIdx].p;
+                    progressBarFill.style.width = progress + '%';
+                    progressPercent.innerText = progress + '%';
+                    progressStatusText.innerText = steps[stepIdx].text;
+                    stepIdx++;
+                } else {
+                    clearInterval(interval);
+                    btnProcess.disabled = false;
+                    renderResults();
+                    btnExportExcel.disabled = false;
+                    btnExportWord.disabled = false;
+                    btnExportText.disabled = false;
+                    showToast('OCR extraction completed successfully!', 'success');
+                }
+            }, 400);
+        });
+
+        // Render Extracted Results
+        function renderResults() {
+            const schema = schemas[currentDocType];
+            let html = `<div class="extracted-grid">`;
+
+            schema.fields.forEach(field => {
+                if (field.isMrz) {
+                    html += `
+                        <div class="mrz-card">
+                            <div class="mrz-label"><i class="fa-solid fa-barcode"></i> ${field.label}</div>
+                            <div>${field.val.replace('\n', '<br>')}</div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="field-card">
+                            <span class="field-label">${field.label}</span>
+                            <input type="text" class="field-value" value="${field.val}">
+                        </div>
+                    `;
+                }
+            });
+
+            html += `</div>`;
+            resultsContent.innerHTML = html;
+        }
+
+        // Reset
+        btnClear.addEventListener('click', () => {
+            frontFile = null;
+            backFile = null;
+            fileFront.value = '';
+            fileBack.value = '';
+            previewFront.style.display = 'none';
+            previewBack.style.display = 'none';
+            progressContainer.style.display = 'none';
+            progressBarFill.style.width = '0%';
+            resultsContent.innerHTML = `
+                <div class="placeholder-state">
+                    <i class="fa-solid fa-file-circle-exclamation"></i>
+                    <p>No document processed yet. Upload document files and click <strong>Execute High-End OCR Extraction</strong> to extract complete information.</p>
+                </div>
+            `;
+            btnExportExcel.disabled = true;
+            btnExportWord.disabled = true;
+            btnExportText.disabled = true;
+            showToast('Workspace reset successfully', 'success');
+        });
+
+        // Export Functions
+        btnExportExcel.addEventListener('click', () => {
+            downloadFile('ocr_extracted_data.csv', generateCSV());
+            showToast('Excel/CSV export downloaded successfully!', 'success');
+        });
+
+        btnExportWord.addEventListener('click', () => {
+            downloadFile('ocr_extracted_document.txt', generateReportText());
+            showToast('Word/Text report downloaded successfully!', 'success');
+        });
+
+        btnExportText.addEventListener('click', () => {
+            downloadFile('raw_ocr_output.txt', generateReportText());
+            showToast('Raw text downloaded successfully!', 'success');
+        });
+
+        function generateCSV() {
+            const schema = schemas[currentDocType];
+            let csv = 'Field Label,Extracted Value\n';
+            schema.fields.forEach(f => {
+                csv += `"${f.label}","${f.val.replace('\n', ' ')}"\n`;
+            });
+            return csv;
+        }
+
+        function generateReportText() {
+            const schema = schemas[currentDocType];
+            let txt = `========================================\n`;
+            txt += ` NEUROOCR ENTERPRISE - EXTRACTION REPORT\n`;
+            txt += ` Schema: ${schema.title}\n`;
+            txt += ` Timestamp: ${new Date().toISOString()}\n`;
+            txt += `========================================\n\n`;
+            schema.fields.forEach(f => {
+                txt += `${f.label.toUpperCase()}:\n${f.val}\n\n`;
+            });
+            return txt;
+        }
+
+        function downloadFile(filename, content) {
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function showToast(message, type = 'success') {
+            toastMsg.innerText = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
