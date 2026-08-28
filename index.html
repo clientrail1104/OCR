@@ -3,204 +3,299 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuroOCR — Evidence-First Document OCR</title>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
-<script type="module">
-import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
-window.pdfjsLib=pdfjsLib;
-pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
-window.dispatchEvent(new Event("pdfjs-ready"));
-</script>
+<title>NeonOCR Pro — Document Intelligence</title>
 <style>
-:root{--bg:#e8edf3;--ink:#17212b;--muted:#657487;--blue:#3f72ef;--green:#16865e;--amber:#b87912;--red:#c44747;--line:#c7d0dc;--s1:10px 10px 22px rgba(163,174,189,.72);--s2:-10px -10px 22px rgba(255,255,255,.92);--in:inset 5px 5px 12px rgba(163,174,189,.55),inset -5px -5px 12px rgba(255,255,255,.9)}
-*{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
-.app{height:100vh;padding:12px 15px;display:grid;grid-template-rows:68px 1fr 28px;gap:12px}header,.panel,.drop,.card,.stat,.field,.log,.notice{background:var(--bg);border-radius:20px;box-shadow:var(--s1),var(--s2)}
-header{padding:10px 17px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:12px}.logo{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#628eff,#345de0);color:#fff;font-weight:950;box-shadow:6px 6px 12px #b4bfce,-5px -5px 12px #fff}h1{font-size:19px;margin:0}.sub{font-size:10px;color:var(--muted)}.actions{display:flex;gap:8px;align-items:center}
-.btn{border:0;padding:10px 13px;border-radius:13px;background:var(--bg);color:var(--ink);font-weight:800;box-shadow:6px 6px 12px #c2cbd6,-5px -5px 10px #fff;cursor:pointer}.btn:active{box-shadow:var(--in)}.primary{background:var(--blue);color:#fff}.pill{padding:7px 10px;border-radius:12px;box-shadow:var(--in);font-size:9px;font-weight:900;color:var(--muted)}
-.main{min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr) 375px;gap:14px}.panel{padding:13px;min-height:0;overflow:hidden}.left,.right{display:flex;flex-direction:column;gap:10px}.center{min-height:0;display:grid;grid-template-rows:155px 1fr;gap:12px}
-.drop{height:155px;border:2px dashed #b9c4d1;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:15px}.drop.drag{border-color:var(--blue)}.drop b{font-size:16px}.drop span{font-size:10px;color:var(--muted);max-width:700px;margin:5px 0 11px}.drop input{display:none}
-.title{font-size:10px;font-weight:950;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:2px 3px 6px}.control label{display:block;font-size:10px;font-weight:800;color:var(--muted);margin:0 0 5px 3px}.control select,.control input{width:100%;border:0;padding:9px;border-radius:12px;background:var(--bg);box-shadow:var(--in);color:var(--ink);outline:0}
-.toggle{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:12px;box-shadow:var(--in);font-size:10px;font-weight:800}.switch{width:37px;height:20px;border-radius:20px;background:#c6cfd9;position:relative}.switch i{position:absolute;width:14px;height:14px;top:3px;left:3px;border-radius:50%;background:#fff;transition:.2s}.switch.on{background:var(--blue)}.switch.on i{left:20px}
-.filelist{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px}.file{padding:9px;border-radius:12px;box-shadow:var(--in);font-size:10px}.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file small{color:var(--muted)}.side{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.workspace{display:grid;grid-template-rows:40px 1fr;gap:9px}.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.tab{border:0;border-radius:12px;background:var(--bg);box-shadow:var(--s1),var(--s2);font-size:10px;font-weight:900;color:var(--muted)}.tab.active{color:var(--blue);box-shadow:var(--in)}.output{min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}.view{min-height:0;overflow:auto;padding:12px;border-radius:18px;box-shadow:var(--in)}.empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:11px;padding:20px}
-.previewimg{max-width:100%;display:block;margin:auto;border-radius:12px}.text{white-space:pre-wrap;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.fields{display:grid;grid-template-columns:1fr 1fr;gap:7px}.field{padding:9px;box-shadow:var(--in);min-width:0}.field.full{grid-column:1/-1}.field .key{font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:950}.field .value{font-size:11px;font-weight:750;word-break:break-word;margin-top:3px}.status{font-size:8px;display:inline-block;margin-top:5px;padding:3px 6px;border-radius:7px}.detected{background:#dcefe8;color:var(--green)}.notdetected{background:#f2e7d0;color:var(--amber)}.verify{background:#f3dddd;color:var(--red)}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}.stat{padding:9px;box-shadow:var(--in)}.stat .n{font-size:18px;font-weight:950}.stat .l{font-size:8px;color:var(--muted);text-transform:uppercase}.progress{padding:9px;box-shadow:var(--in);border-radius:14px}.track{height:7px;border-radius:8px;background:#cbd4df;box-shadow:inset 2px 2px 4px #aeb8c4;overflow:hidden}.bar{height:100%;width:0;background:var(--blue)}#state{font-size:9px;color:var(--muted);margin-top:5px}.notice{padding:9px;box-shadow:var(--in);font-size:9px;line-height:1.35}.log{height:95px;box-shadow:var(--in);padding:9px;overflow:auto;font:9px/1.4 ui-monospace,monospace;color:#475564}
-footer{font-size:8px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;padding:0 7px}
-@media(max-width:1050px){body{overflow:auto}.app{height:auto;min-height:100vh}.main{grid-template-columns:1fr}.center{min-height:650px}.output{grid-template-columns:1fr}.app{grid-template-rows:68px auto 28px}}
+:root{
+  --bg:#dfe6ee;--panel:#e9eef4;--ink:#18212b;--muted:#687582;--cyan:#00d9ff;
+  --pink:#ff36d1;--green:#28e59b;--shadow1:14px 14px 30px #b7c0ca, -14px -14px 30px #fff;
+  --inset:inset 7px 7px 14px #c0c8d1,inset -7px -7px 14px #fff;
+}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+.app{max-width:1500px;margin:auto;padding:18px}.top{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:15px}
+.brand{display:flex;align-items:center;gap:13px}.logo{width:52px;height:52px;border-radius:17px;background:var(--panel);box-shadow:var(--shadow1);display:grid;place-items:center;color:var(--cyan);font-weight:900;font-size:20px;text-shadow:0 0 14px var(--cyan)}
+h1{font-size:21px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+.badge{padding:9px 13px;border-radius:14px;background:var(--panel);box-shadow:var(--shadow1);font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);margin-right:7px}
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr) 360px;gap:16px}.panel{background:var(--panel);border-radius:24px;box-shadow:var(--shadow1);padding:16px;min-width:0}
+.section{margin-bottom:14px}.section h2{font-size:13px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.09em;color:#53616d}
+.drop{border:2px dashed #9ba8b5;border-radius:18px;padding:18px;text-align:center;cursor:pointer;box-shadow:var(--inset);transition:.2s}.drop:hover,.drop.over{border-color:var(--cyan);box-shadow:var(--inset),0 0 18px #00d9ff44}
+.drop strong{display:block;margin-bottom:5px}.drop small{color:var(--muted)}
+input[type=file]{display:none}.row{display:flex;gap:8px;align-items:center}.btn{border:0;border-radius:13px;padding:10px 12px;background:var(--panel);color:var(--ink);font-weight:700;cursor:pointer;box-shadow:7px 7px 15px #bbc4cd,-6px -6px 13px #fff}.btn:active{box-shadow:var(--inset)}.btn.primary{color:#006e80;box-shadow:7px 7px 15px #bbc4cd,-6px -6px 13px #fff,0 0 12px #00d9ff55}.btn.warn{color:#9a4b00}.btn:disabled{opacity:.45;cursor:not-allowed}
+select,input[type=text],input[type=number],textarea{width:100%;border:0;border-radius:12px;background:var(--panel);padding:10px;color:var(--ink);box-shadow:var(--inset);outline:none}
+label{font-size:11px;color:var(--muted);display:block;margin:8px 0 5px}.checks{display:grid;grid-template-columns:1fr 1fr;gap:7px}.check{font-size:11px;background:#e2e8ee;padding:8px;border-radius:11px;box-shadow:var(--inset)}.check input{accent-color:var(--cyan)}
+.viewer{height:calc(100vh - 150px);min-height:620px;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;gap:7px;flex-wrap:wrap}.canvasWrap{position:relative;flex:1;min-height:0;border-radius:20px;background:#cfd7df;box-shadow:var(--inset);overflow:auto;display:grid;place-items:center;padding:12px}.canvasWrap canvas{max-width:100%;max-height:100%;box-shadow:0 0 22px #0004;border-radius:4px;background:white}.empty{color:#697783;text-align:center}.status{font-size:11px;color:var(--muted);min-height:17px}.progress{height:8px;border-radius:10px;background:#c4ccd4;box-shadow:var(--inset);overflow:hidden}.bar{height:100%;width:0;background:var(--cyan);box-shadow:0 0 14px var(--cyan);transition:.2s}
+.tabs{display:flex;gap:6px;margin-bottom:10px}.tab{flex:1;border:0;padding:9px;border-radius:12px;background:var(--panel);box-shadow:5px 5px 11px #bcc4cd,-5px -5px 11px #fff;font-weight:700;font-size:11px;cursor:pointer}.tab.active{box-shadow:var(--inset);color:#0086a0}.output{height:calc(100vh - 230px);min-height:540px;overflow:auto;border-radius:17px;padding:13px;background:#e3e9ef;box-shadow:var(--inset);font-size:12px}.field{padding:9px 0;border-bottom:1px solid #cbd3da}.field b{display:block;font-size:10px;color:#66737f;text-transform:uppercase}.value{margin-top:3px;white-space:pre-wrap;overflow-wrap:anywhere}.conf{font-size:9px;color:#008b6a}.reason{font-size:11px;line-height:1.45;color:#5e6b76}.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:10px;padding:6px 8px;border-radius:9px;background:#e4eaf0;box-shadow:var(--inset)}
+.overlay{position:absolute;inset:0;pointer-events:none}.editBox{position:absolute;pointer-events:auto;background:#ffffffdd;border:1px solid var(--pink);padding:4px 6px;border-radius:4px;min-width:90px;color:#111;font-size:12px;box-shadow:0 0 12px #ff36d155}
+.small{font-size:10px;color:var(--muted);line-height:1.4}.footer{margin-top:10px;font-size:10px;color:#71808c;text-align:center}
+@media(max-width:1150px){.grid{grid-template-columns:260px 1fr}.right{grid-column:1/-1}.output{height:420px}} @media(max-width:760px){.grid{grid-template-columns:1fr}.viewer{height:600px}.right{grid-column:auto}}
 </style>
 </head>
 <body>
 <div class="app">
-<header>
- <div class="brand"><div class="logo">N</div><div><h1>NeuroOCR</h1><div class="sub">Evidence-first OCR • never invents missing information</div></div></div>
- <div class="actions"><span class="pill" id="engine">READY</span><button class="btn" id="clear">Clear</button><button class="btn primary" id="run">Run OCR</button></div>
+<header class="top">
+ <div class="brand"><div class="logo">OCR</div><div><h1>NeonOCR Pro</h1><div class="sub">Multiformat document capture • front/back cards • multilingual OCR • review before acceptance</div></div></div>
+ <div class="badge"><span class="dot"></span><span id="engineState">Engine ready</span></div>
 </header>
 
-<div class="main">
-<aside class="panel left">
- <div class="title">Document profile</div>
- <div class="control"><label>Document type</label><select id="type">
-  <option value="auto">Auto-detect</option><option value="international_passport">International Passport</option><option value="malaysian_passport">Malaysian Passport</option><option value="nric">Malaysian NRIC / MyKad</option><option value="pr">Malaysia Permanent Resident</option><option value="malaysia_license">Malaysian Driving Licence</option><option value="international_license">International Driving Permit</option><option value="ssm">SSM Certificate</option><option value="ppk">CIDB PPK Certificate</option><option value="general">General Document</option>
- </select></div>
- <div class="title">Safety controls</div>
- <div class="toggle" data-k="preprocess"><span>Image enhancement</span><i class="switch on"><i></i></i></div>
- <div class="toggle" data-k="tables"><span>Table detection</span><i class="switch on"><i></i></i></div>
- <div class="toggle" data-k="fields"><span>Strict field extraction</span><i class="switch on"><i></i></i></div>
- <div class="toggle" data-k="preserve"><span>Preserve complete OCR text</span><i class="switch on"><i></i></i></div>
- <div class="title">Required safety rule</div>
- <div class="notice">The app will <b>not guess</b> a field. If evidence is weak, missing, conflicting or unreadable, it reports <b>Not detected</b> or <b>Needs verification</b>.</div>
- <div class="title">Files</div><div class="filelist" id="filelist"><div class="empty">No files</div></div>
- <div class="side"><button class="btn" id="guide">Guide</button><button class="btn" id="json">JSON</button></div>
+<div class="grid">
+<aside class="panel">
+ <div class="section">
+  <h2>Upload</h2>
+  <div id="drop" class="drop"><strong>Drop files here</strong><small>PNG • JPG/JPEG • TIFF • WEBP • HEIC • PDF • DOCX • XLSX</small><small>Maximum selected file size: 500 MB</small><input id="files" type="file" multiple accept=".png,.jpg,.jpeg,.tif,.tiff,.webp,.heic,.heif,.pdf,.docx,.xlsx,.xls"></div>
+ </div>
+ <div class="section">
+  <h2>Card sides</h2>
+  <div class="row"><button class="btn" id="frontBtn">Front</button><button class="btn" id="backBtn">Back</button></div>
+  <div class="small" id="sideState">Side: Front</div>
+ </div>
+ <div class="section">
+  <h2>Document type</h2>
+  <select id="docType">
+   <option value="auto">Auto-detect</option><option>International Passport</option><option>Malaysian Passport</option><option>Malaysian NRIC / MyKad</option><option>Malaysia Permanent Resident</option><option>Malaysian Driving Licence</option><option>International Driving Licence</option><option>SSM Certificate</option><option>CIDB PPK Certificate</option><option>Other document</option>
+  </select>
+ </div>
+ <div class="section">
+  <h2>OCR controls</h2>
+  <div class="checks">
+   <label class="check"><input id="pre" type="checkbox" checked> Preprocess</label>
+   <label class="check"><input id="invert" type="checkbox"> Force invert</label>
+   <label class="check"><input id="rotate" type="checkbox" checked> Auto rotate</label>
+   <label class="check"><input id="exclude" type="checkbox" checked> Exclusion mask</label>
+  </div>
+  <label>OCR language(s)</label>
+  <select id="lang"><option value="eng">English</option><option value="eng+msa">English + Malay (requires traineddata)</option><option value="eng+msa+chi_sim">English + Malay + Chinese (requires traineddata)</option></select>
+ </div>
+ <div class="section">
+  <h2>Review tools</h2>
+  <div class="row"><button class="btn" id="maskBtn">Draw exclusion</button><button class="btn" id="clearMask">Clear</button></div>
+  <div class="row" style="margin-top:8px"><button class="btn" id="addEdit">Add editable text</button><button class="btn" id="clearEdits">Clear edits</button></div>
+  <div class="small">Use exclusion masks for crossed-out, watermark, handwriting or other regions that must not contaminate numeric fields. Editable text is a review overlay; it does not alter the original document.</div>
+ </div>
+ <div class="section">
+  <h2>Run</h2>
+  <button class="btn primary" id="run" style="width:100%">Scan & Extract</button>
+  <div class="progress" style="margin-top:10px"><div class="bar" id="bar"></div></div>
+  <div class="status" id="status">Waiting for a document.</div>
+ </div>
 </aside>
 
-<section class="center">
- <div class="drop" id="drop"><b>Drop documents, cards or passport pages</b><span>PNG/JPG/JPEG/WebP/BMP/GIF/TIFF/HEIC/HEIF/PDF/DOCX/XLSX/XLS/CSV • up to 500 MB per file</span><button class="btn primary" id="browse">Choose files</button><input id="files" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.bmp,.gif,.tif,.tiff,.heic,.heif,.pdf,.docx,.xlsx,.xls,.csv,image/*,application/pdf"></div>
- <div class="panel workspace">
-  <div class="tabs"><button class="tab active" data-tab="fields">Captured information</button><button class="tab" data-tab="text">All text</button><button class="tab" data-tab="tables">Tables</button><button class="tab" data-tab="pages">Pages</button></div>
-  <div class="output"><div class="view" id="leftview"><div class="empty">Upload files to begin.</div></div><div class="view" id="rightview"><div class="empty">No results yet.</div></div></div>
+<main class="panel viewer">
+ <div class="toolbar">
+  <button class="btn" id="zoomOut">−</button><button class="btn" id="zoomIn">+</button><button class="btn" id="fit">Fit</button>
+  <button class="btn" id="rotateLeft">↶</button><button class="btn" id="rotateRight">↷</button>
+  <button class="btn" id="reset">Reset</button>
  </div>
-</section>
+ <div class="canvasWrap" id="wrap"><div class="empty" id="empty">Upload a document to preview it here.</div><canvas id="canvas" hidden></canvas><div id="overlay" class="overlay"></div></div>
+ <div class="footer">Important: OCR is probabilistic. This interface deliberately separates detected values from review overlays so uncertain characters such as 6/8 and P/F can be manually verified.</div>
+</main>
 
 <aside class="panel right">
- <div class="title">Processing summary</div>
- <div class="stats"><div class="stat"><div class="n" id="pages">0</div><div class="l">Pages</div></div><div class="stat"><div class="n" id="words">0</div><div class="l">Words</div></div><div class="stat"><div class="n" id="fieldsN">0</div><div class="l">Fields</div></div><div class="stat"><div class="n" id="conf">—</div><div class="l">Confidence</div></div></div>
- <div class="progress"><div class="track"><div class="bar" id="bar"></div></div><div id="state">Ready</div></div>
- <div class="title">Field verification</div>
- <div class="notice">A value is displayed as <b>Detected</b> only when there is direct textual evidence. Derived values are separately marked. Conflicting evidence is never automatically resolved.</div>
- <div class="title">Activity</div><div class="log" id="log">NeuroOCR initialized.\n</div>
+ <div class="tabs"><button class="tab active" data-tab="fields">Fields</button><button class="tab" data-tab="text">All text</button><button class="tab" data-tab="review">Review</button></div>
+ <div id="fields" class="output"></div><div id="text" class="output" hidden></div><div id="review" class="output" hidden></div>
 </aside>
 </div>
-<footer><span>Client-side browser processing • No automatic claim of 100% accuracy</span><span>Maximum accepted file size: 500 MB</span></footer>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 
 <script>
 "use strict";
-const S={files:[],pages:[],text:"",tables:[],fields:{},conf:0,settings:{preprocess:true,tables:true,fields:true,preserve:true}};
-const $=x=>document.getElementById(x);
-const esc=x=>String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-const norm=x=>String(x||"").replace(/\\s+/g," ").trim();
-const log=x=>{$("log").textContent+=`[${new Date().toLocaleTimeString()}] ${x}\\n`;$("log").scrollTop=$("log").scrollHeight};
-const setState=(x,p)=>{$("state").textContent=x;if(p!==undefined)$("bar").style.width=Math.min(100,Math.max(0,p))+"%"};
-document.querySelectorAll("[data-k]").forEach(e=>e.onclick=()=>{let k=e.dataset.k;S.settings[k]=!S.settings[k];e.querySelector(".switch").classList.toggle("on",S.settings[k])});
-$("browse").onclick=()=>$("files").click();
-$("files").onchange=e=>add(e.target.files);
-$("clear").onclick=()=>{S.files=[];S.pages=[];S.text="";S.tables=[];S.fields={};S.conf=0;$("files").value="";renderFiles();render();setState("Ready",0);$("engine").textContent="READY";$("log").textContent="NeuroOCR initialized.\\n"};
-$("guide").onclick=()=>alert("Safety-first workflow:\\n\\n1. Upload the actual document/card.\\n2. Upload front and back separately when applicable.\\n3. Run OCR.\\n4. Use Captured information only for values supported by OCR evidence.\\n5. Check the source image for every critical number, name and date.\\n\\nThe app deliberately refuses to invent missing information.");
-$("json").onclick=exportJSON;
-["dragenter","dragover"].forEach(x=>$("drop").addEventListener(x,e=>{e.preventDefault();$("drop").classList.add("drag")}));
-["dragleave","drop"].forEach(x=>$("drop").addEventListener(x,e=>{e.preventDefault();$("drop").classList.remove("drag")}));
-$("drop").addEventListener("drop",e=>add(e.dataTransfer.files));
-document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>tab(t.dataset.tab));
-function add(list){for(const f of list){if(f.size>500*1024*1024){log(`Rejected ${f.name}: over 500 MB.`);continue}S.files.push(f)}renderFiles();log(`Added ${list.length} file(s) within the size rule.`)}
-function bytes(n){let u=["B","KB","MB","GB"],i=0;while(n>=1024&&i<3){n/=1024;i++}return n.toFixed(i?1:0)+" "+u[i]}
-function renderFiles(){let b=$("filelist");if(!S.files.length){b.innerHTML='<div class="empty">No files</div>';return}b.innerHTML=S.files.map((f,i)=>`<div class="file"><b>${esc(f.name)}</b><small>${bytes(f.size)} • ${esc(f.type||"unknown")}</small></div>`).join("")}
+const $=id=>document.getElementById(id);
+const state={files:[],index:0,side:"Front",img:null,scale:1,rot:0,masking:false,mask:[],edits:[],ocr:"",boxes:[]};
 
-async function run(){
- if(!S.files.length)return alert("Upload at least one file.");
- $("run").disabled=true;$("engine").textContent="PROCESSING";S.pages=[];S.text="";S.tables=[];S.fields={};S.conf=0;
+function status(t,p=null){$("status").textContent=t;if(p!==null)$("bar").style.width=Math.max(0,Math.min(100,p))+"%";}
+function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function ext(name){return name.split(".").pop().toLowerCase();}
+function setSide(s){state.side=s;$("sideState").textContent="Side: "+s;$("frontBtn").classList.toggle("primary",s==="Front");$("backBtn").classList.toggle("primary",s==="Back");}
+function isImage(e){return ["png","jpg","jpeg","tif","tiff","webp","heic","heif"].includes(e);}
+function addFiles(fs){
+ const incoming=[...fs]; const too=incoming.filter(f=>f.size>500*1024*1024);
+ if(too.length) alert("These files exceed 500 MB and were rejected:\\n"+too.map(f=>f.name).join("\\n"));
+ state.files=incoming.filter(f=>f.size<=500*1024*1024);state.index=0;
+ if(state.files.length) loadFile(state.files[0]);
+}
+$("drop").onclick=()=>$("files").click();$("files").onchange=e=>addFiles(e.target.files);
+$("drop").ondragover=e=>{e.preventDefault();$("drop").classList.add("over")};$("drop").ondragleave=()=>$("drop").classList.remove("over");
+$("drop").ondrop=e=>{e.preventDefault();$("drop").classList.remove("over");addFiles(e.dataTransfer.files)};
+$("frontBtn").onclick=()=>setSide("Front");$("backBtn").onclick=()=>setSide("Back");
+
+async function loadFile(file){
+ state.mask=[];state.edits=[];renderOverlay();
+ $("empty").hidden=true;$("canvas").hidden=false;status("Loading "+file.name+"…",3);
+ const e=ext(file.name);
  try{
-  for(let i=0;i<S.files.length;i++){
-   let f=S.files[i];setState("Preparing "+f.name,(i/S.files.length)*100);
-   let ps=await toPages(f);
-   for(let j=0;j<ps.length;j++){
-    setState(`Reading ${f.name} • page ${j+1}/${ps.length}`,((i+j/ps.length)/S.files.length)*100);
-    let o=await ocr(ps[j].data);
-    S.pages.push({file:f.name,index:j+1,data:ps[j].data,text:o.text,confidence:o.confidence});
-    S.text+=`\\n\\n===== ${f.name} • PAGE ${j+1} =====\\n${o.text}`;
-    S.conf+=o.confidence;
-    if(S.settings.tables)S.tables.push(...tables(o.text,f.name,j+1));
-   }
-  }
-  S.conf=S.pages.length?S.conf/S.pages.length:0;
-  if(S.settings.fields)S.fields=extractStrict(S.text,$("type").value);
-  render();setState("Complete — verify critical values against the image.",100);$("engine").textContent="COMPLETE";log(`Completed ${S.pages.length} page(s). Average OCR confidence ${S.conf.toFixed(1)}%.`);
- }catch(e){console.error(e);log("ERROR: "+e.message);setState("Processing failed");$("engine").textContent="ERROR";alert(e.message)}
- $("run").disabled=false;
+  if(isImage(e)){let blob=file;if(e==="heic"||e==="heif"){blob=await heic2any({blob:file,toType:"image/jpeg",quality:.95});if(Array.isArray(blob))blob=blob[0]}await imageBlob(blob);}
+  else if(e==="pdf"){await pdfFirstPage(file);}
+  else if(e==="docx"){await docxText(file);}
+  else if(e==="xlsx"||e==="xls"){await sheetText(file);}
+  else throw Error("Unsupported file type");
+ }catch(err){status("Could not load file: "+err.message);console.error(err);}
 }
-$("run").onclick=run;
-
-async function toPages(f){
- let e=f.name.split(".").pop().toLowerCase();
- if(["png","jpg","jpeg","webp","bmp","gif"].includes(e)||f.type.startsWith("image/"))return[{data:await img(f)}];
- if(["tif","tiff"].includes(e))return[{data:await tiff(f)}];
- if(["heic","heif"].includes(e))return[{data:await heic(f)}];
- if(e==="pdf"||f.type==="application/pdf")return pdf(f);
- if(e==="docx")return[{data:textImg((await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value)}];
- if(["xlsx","xls","csv"].includes(e)){let wb=XLSX.read(await f.arrayBuffer(),{type:"array"});let txt=wb.SheetNames.map(n=>"===== "+n+" =====\\n"+XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\\n");return[{data:textImg(txt)}]}
- throw new Error("Unsupported file format: "+e);
-}
-async function img(f){let b=await createImageBitmap(f),c=document.createElement("canvas");c.width=b.width;c.height=b.height;c.getContext("2d").drawImage(b,0,0);b.close();return prep(c).toDataURL("image/png")}
-async function heic(f){if(!window.heic2any)throw new Error("HEIC converter unavailable.");let x=await heic2any({blob:f,toType:"image/png",quality:1});return img(Array.isArray(x)?x[0]:x)}
-async function tiff(f){if(!window.UTIF)throw new Error("TIFF decoder unavailable.");let b=await f.arrayBuffer(),a=UTIF.decode(b);if(!a.length)throw new Error("Invalid TIFF.");UTIF.decodeImage(b,a[0]);let r=UTIF.toRGBA8(a[0]),c=document.createElement("canvas");c.width=a[0].width;c.height=a[0].height;c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(r),c.width,c.height),0,0);return prep(c).toDataURL("image/png")}
-async function pdf(f){if(!window.pdfjsLib)throw new Error("PDF engine is loading. Please wait and try again.");let p=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,o=[];for(let i=1;i<=p.numPages;i++){let pg=await p.getPage(i),v=pg.getViewport({scale:2.3}),c=document.createElement("canvas");c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);await pg.render({canvasContext:c.getContext("2d"),viewport:v}).promise;o.push({data:prep(c).toDataURL("image/png")})}return o}
-function prep(c){if(!S.settings.preprocess)return c;let m=3200;if(Math.max(c.width,c.height)>m){let s=m/Math.max(c.width,c.height),n=document.createElement("canvas");n.width=Math.round(c.width*s);n.height=Math.round(c.height*s);n.getContext("2d").drawImage(c,0,0,n.width,n.height);c=n}let x=c.getContext("2d"),im=x.getImageData(0,0,c.width,c.height),d=im.data;for(let i=0;i<d.length;i+=4){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2],v=Math.max(0,Math.min(255,(y-128)*1.25+128));d[i]=d[i+1]=d[i+2]=v}x.putImageData(im,0,0);return c}
-function textImg(t){let lines=String(t).split("\\n"),c=document.createElement("canvas");c.width=1800;c.height=Math.max(500,Math.min(30000,lines.length*27+60));let x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.fillStyle="#111";x.font="20px monospace";lines.forEach((l,i)=>x.fillText(l.slice(0,145),20,35+i*27));return c.toDataURL("image/png")}
-async function ocr(data){if(!window.Tesseract)throw new Error("OCR engine unavailable.");let w=await Tesseract.createWorker("eng");let r=await w.recognize(data,{rotateAuto:true});let text=r.data.text||"";let confidence=Number(r.data.confidence)||0;await w.terminate();return{text,confidence}}
-
-function evidence(value,reason,status="Detected"){return{value,reason,status}}
-function field(text,labels,pattern){
- for(let label of labels){let re=new RegExp("(?:"+label+")\\\\s*[:#-]?\\\\s*([^\\\\n]{2,180})","i"),m=text.match(re);if(m&&norm(m[1]))return evidence(norm(m[1]),"Directly read next to the document label.","Detected")}
- if(pattern){let m=text.match(pattern);if(m)return evidence(norm(m[1]||m[0]),"Direct pattern matched in the OCR text.","Detected")}
- return evidence("",`The expected label or format was not clearly found in the OCR text.`,"Not detected")
-}
-function extractStrict(text,type){
- let f={};
- f["Full Name / Nama"]=field(text,["full name","nama penuh","name","nama","surname"],null);
- f["Identity / IC Number"]=field(text,["IC Number","Identity Card Number","Nombor Kad Pengenalan"],/\\b(\\d{6}[- ]?\\d{2}[- ]?\\d{4})\\b/);
- f["Passport Number"]=field(text,["Passport Number","Nombor Pasport"],/\\b([A-Z]\\d{8})\\b/i);
- f["Date of Birth / Tarikh Lahir"]=field(text,["Date of Birth","DOB","Tarikh Lahir"],null);
- f["Gender / Jantina"]=field(text,["Gender","Sex","Jantina","Kelamin"],null);
- f["Nationality / Warganegara"]=field(text,["Nationality","Warganegara","Citizenship"],null);
- f["Address / Alamat"]=field(text,["Residential Address","Permanent Address","Registered Address","Address","Alamat"],null);
- f["Date of Issue"]=field(text,["Date of Issue","Issued","Tarikh Dikeluarkan"],null);
- f["Date of Expiry"]=field(text,["Date of Expiry","Expiry","Valid Until","Tarikh Kepupusan"],null);
- f["Place of Birth / Tempat Lahir"]=field(text,["Place of Birth","Tempat Lahir"],null);
- f["Issuing Authority / Pihak Berkuasa"]=field(text,["Issuing Authority","Pihak Berkuasa"],null);
- f["Registration / Incorporation Number"]=field(text,["Registration Number","Registration / Incorporation Number","ROC","ROB","LLP"],null);
- f["CIDB Grade"]=field(text,["Grade"],/\\b(G[1-7])\\b/i);
-
- // Safe derivation from a clearly read Malaysian IC only.
- if(f["Identity / IC Number"].status==="Detected"){
-   let d=f["Identity / IC Number"].value.replace(/\\D/g,""),g=d.slice(-1);
-   if(d.length===12&&g){f["Gender from IC"]=evidence(+g%2?"M — Male":"F — Female","Derived only from the final digit of the clearly detected 12-digit IC number.","Derived")}
+function imageBlob(blob){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(blob),im=new Image();im.onload=()=>{state.img=im;draw();URL.revokeObjectURL(u);resolve()};im.onerror=reject;im.src=u})}
+async function pdfFirstPage(file){
+ if(!window.pdfjsLib){
+  const mod=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs");
+  window.pdfjsLib=mod;window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
  }
-
- // User-requested country/state detection: never silently replace nationality.
- const countries=["Malaysia","Singapore","Indonesia","Thailand","Brunei","Philippines","Vietnam","Myanmar","Cambodia","Laos","China","India","Pakistan","Bangladesh","Nepal","Sri Lanka","Japan","Korea","Australia","New Zealand","United Kingdom","United States","Canada","France","Germany","Italy","Spain","Netherlands","Belgium"];
- const states=["Sarawak","Sabah","Selangor","Johor","Perak","Penang","Pahang","Kelantan","Terengganu","Kedah","Perlis","Melaka","Negeri Sembilan","Kuala Lumpur","Putrajaya","Labuan"];
- let cp=countries.find(x=>new RegExp("\\\\b"+x.replace(/ /g,"\\\\s+")+"\\\\b","i").test(text));
- let st=states.find(x=>new RegExp("\\\\b"+x.replace(/ /g,"\\\\s+")+"\\\\b","i").test(text));
- f["Detected Country"]=cp?evidence(cp,"The country name appears explicitly in the OCR text.","Detected"):evidence("","No supported country name was clearly found.","Not detected");
- f["Detected State"]=st?evidence(st,"The state name appears explicitly in the OCR text.","Detected"):evidence("","No supported state name was clearly found.","Not detected");
-
- // Do not auto-assign a state to nationality. If nationality is explicitly Warganegara Malaysia, preserve that.
- if(/\\bwarganegara\\s+malaysia\\b/i.test(text)&&f["Nationality / Warganegara"].status==="Not detected")
-   f["Nationality / Warganegara"]=evidence("Malaysia","Explicit phrase “Warganegara Malaysia” was found.","Detected");
-
- return f;
+ const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+ state.pdf=pdf;state.pdfPage=1;await renderPdfPage(1);status("PDF loaded. OCR runs on the visible page; use page navigation in a production backend for all pages.",10);
 }
-function tables(text,file,page){let ls=text.split("\\n").map(norm).filter(Boolean).filter(x=>/\\||\\t| {3,}/.test(x));return ls.length>1?[{file,page,rows:ls.slice(0,150)}]:[]}
+async function renderPdfPage(n){
+ const page=await state.pdf.getPage(n);const viewport=page.getViewport({scale:2.2});const c=$("canvas");c.width=viewport.width;c.height=viewport.height;
+ await page.render({canvasContext:c.getContext("2d"),viewport}).promise;state.img=null;state.rot=0;fit();$("empty").hidden=true;$("canvas").hidden=false;
+}
+async function docxText(file){
+ const r=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});state.ocr=r.value;showText();extract();status("DOCX text extracted. No visual OCR is needed for native text.",100);
+}
+async function sheetText(file){
+ const wb=XLSX.read(await file.arrayBuffer(),{cellDates:false});let out=[];
+ wb.SheetNames.forEach(n=>{out.push("=== SHEET: "+n+" ===");out.push(XLSX.utils.sheet_to_csv(wb.Sheets[n]));});
+ state.ocr=out.join("\\n");showText();extract();status("Spreadsheet text extracted from cells.",100);
+}
+function draw(){
+ const c=$("canvas"),ctx=c.getContext("2d"),im=state.img;
+ if(!im)return;
+ const max=2400,ratio=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight));c.width=Math.round(im.naturalWidth*ratio);c.height=Math.round(im.naturalHeight*ratio);
+ ctx.save();ctx.translate(c.width/2,c.height/2);ctx.rotate(state.rot*Math.PI/180);ctx.drawImage(im,-c.width/2,-c.height/2,c.width,c.height);ctx.restore();fit();renderOverlay();
+}
+function fit(){const c=$("canvas"),w=$("wrap");if(!c.width)return;state.scale=Math.min((w.clientWidth-30)/c.width,(w.clientHeight-30)/c.height,1);c.style.width=(c.width*state.scale)+"px";c.style.height=(c.height*state.scale)+"px";}
+$("zoomIn").onclick=()=>{state.scale=Math.min(3,state.scale*1.15);applyScale()};$("zoomOut").onclick=()=>{state.scale=Math.max(.2,state.scale/1.15);applyScale()};
+function applyScale(){const c=$("canvas");c.style.width=(c.width*state.scale)+"px";c.style.height=(c.height*state.scale)+"px";}
+$("fit").onclick=fit;$("rotateLeft").onclick=()=>{state.rot=(state.rot+270)%360;draw()};$("rotateRight").onclick=()=>{state.rot=(state.rot+90)%360;draw()};
+$("reset").onclick=()=>{state.rot=0;state.mask=[];state.edits=[];draw()};
 
-function render(){ $("pages").textContent=S.pages.length;$("words").textContent=S.text.trim()?S.text.trim().split(/\\s+/).length:0;$("fieldsN").textContent=Object.keys(S.fields).length;$("conf").textContent=S.pages.length?S.conf.toFixed(1)+"%":"—";tab("fields") }
-function tab(t){
- document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===t));
- let l=$("leftview"),r=$("rightview");
- if(!S.pages.length){l.innerHTML='<div class="empty">No processed document.</div>';r.innerHTML='<div class="empty">No results yet.</div>';return}
- if(t==="fields"){
-   l.innerHTML='<div class="title">Source pages</div>'+S.pages.map((p,i)=>`<div class="file" style="margin-bottom:7px"><b>${esc(p.file)} • page ${p.index}</b><small>OCR confidence ${p.confidence.toFixed(1)}%</small></div>`).join("");
-   r.innerHTML='<div class="fields">'+Object.entries(S.fields).map(([k,o])=>`<div class="field ${o.value.length>65?"full":""}"><div class="key">${esc(k)}</div><div class="value">${o.value?esc(o.value):"—"}</div><span class="status ${o.status==="Detected"||o.status==="Derived"?"detected":o.status==="Needs verification"?"verify":"notdetected"}">${esc(o.status)}</span><div style="font-size:8px;color:var(--muted);margin-top:5px">${esc(o.reason)}</div></div>`).join("")+'</div>';return
+function renderOverlay(){
+ const o=$("overlay");o.innerHTML="";
+ state.edits.forEach((e,i)=>{const d=document.createElement("div");d.className="editBox";d.style.left=e.x+"%";d.style.top=e.y+"%";d.style.transform=`rotate(${e.angle}deg)`;d.contentEditable="true";d.textContent=e.text;
+  d.oninput=()=>e.text=d.textContent;d.title="Editable review overlay";o.appendChild(d)});
+}
+$("addEdit").onclick=()=>{state.edits.push({x:45,y:45,text:"Review text",angle:0});renderOverlay()};
+$("clearEdits").onclick=()=>{state.edits=[];renderOverlay()};
+$("maskBtn").onclick=()=>{state.masking=!state.masking;$("maskBtn").textContent=state.masking?"Finish exclusion":"Draw exclusion";};
+$("clearMask").onclick=()=>{state.mask=[];draw()};
+$("canvas").addEventListener("click",e=>{
+ if(!state.masking)return;
+ const r=e.target.getBoundingClientRect();state.mask.push({x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height});const ctx=e.target.getContext("2d");
+ ctx.fillStyle="#ff36d188";ctx.fillRect((e.clientX-r.left)-25,(e.clientY-r.top)-25,50,50);
+});
+
+async function canvasForOCR(){
+ const src=$("canvas"),c=document.createElement("canvas");c.width=src.width;c.height=src.height;const x=c.getContext("2d");
+ x.drawImage(src,0,0);
+ if($("invert").checked){const d=x.getImageData(0,0,c.width,c.height),a=d.data;for(let i=0;i<a.length;i+=4){a[i]=255-a[i];a[i+1]=255-a[i+1];a[i+2]=255-a[i+2]}x.putImageData(d,0,0)}
+ if($("exclude").checked&&state.mask.length){x.fillStyle="white";for(const m of state.mask){x.fillRect(m.x*c.width-30,m.y*c.height-30,60,60)}}
+ if($("pre").checked){
+  const d=x.getImageData(0,0,c.width,c.height),a=d.data;
+  for(let i=0;i<a.length;i+=4){let g=.299*a[i]+.587*a[i+1]+.114*a[i+2];g=Math.max(0,Math.min(255,(g-128)*1.45+128));a[i]=a[i+1]=a[i+2]=g}
+  x.putImageData(d,0,0);
  }
- if(t==="text"){l.innerHTML='<div class="text">'+esc(S.text)+'</div>';r.innerHTML='<div class="notice"><b>Evidence rule:</b> this is the complete OCR text returned by the engine. No field should be considered verified merely because OCR produced text.</div>';return}
- if(t==="tables"){l.innerHTML='<div class="empty">Table-like rows detected from OCR.</div>';r.innerHTML=S.tables.length?S.tables.map(t=>`<div class="file" style="margin-bottom:8px"><b>${esc(t.file)} • page ${t.page}</b>${t.rows.map(x=>`<div style="padding:5px;border-bottom:1px solid var(--line);white-space:pre-wrap">${esc(x)}</div>`).join("")}</div>`).join(""):'<div class="empty">No table-like structure detected.</div>';return}
- l.innerHTML=S.pages.map(p=>`<div class="file" style="margin-bottom:7px"><b>${esc(p.file)} • page ${p.index}</b><small>Confidence ${p.confidence.toFixed(1)}%</small></div>`).join("");
- r.innerHTML=S.pages.map(p=>`<img class="previewimg" src="${p.data}" alt="${esc(p.file)} page ${p.index}" style="margin-bottom:10px">`).join("");
+ return c;
 }
-function exportJSON(){let x={application:"NeuroOCR",mode:"evidence-first",generatedAt:new Date().toISOString(),documentType:$("type").value,warning:"Values marked Detected are OCR evidence, not a guarantee of factual correctness. Always verify critical values against the original document.",fields:S.fields,pages:S.pages.map(p=>({file:p.file,index:p.index,text:p.text,confidence:p.confidence})),tables:S.tables,fullText:S.text};let b=new Blob([JSON.stringify(x,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="neuroocr-evidence-result.json";a.click();URL.revokeObjectURL(a.href)}
-renderFiles();render();
+async function runOCR(){
+ if(!$("canvas").width && !state.ocr){alert("Upload a document first.");return}
+ $("run").disabled=true;$("engineState").textContent="OCR processing…";
+ try{
+  if(state.ocr){extract();status("Structured text reviewed.",100);return}
+  const c=await canvasForOCR();
+  const lang=$("lang").value.split("+")[0]; // safe default for browser CDN
+  status("Starting OCR engine…",12);
+  const worker=await Tesseract.createWorker(lang,1,{logger:m=>{if(m.status)status(m.status,15+(m.progress||0)*80)}});
+  const r=await worker.recognize(c,{rotateAuto:$("rotate").checked});
+  state.ocr=r.data.text||"";state.boxes=r.data.words||[];await worker.terminate();
+  showText();extract();status("OCR complete. Review highlighted/uncertain fields before acceptance.",100);
+ }catch(e){console.error(e);status("OCR failed: "+e.message)}finally{$("run").disabled=false;$("engineState").textContent="Engine ready"}
+}
+$("run").onclick=runOCR;
+
+function showText(){$("text").textContent=state.ocr||"No text captured yet."}
+function norm(s){return s.replace(/[\\u2018\\u2019]/g,"'").replace(/[\\u201C\\u201D]/g,'"').replace(/[|]/g,"I")}
+function lines(){return norm(state.ocr||"").split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean)}
+function find(re){const s=state.ocr||"";const m=s.match(re);return m?m[1]||m[0]:"";}
+function ic(s){return s?escapeHtml(s):"<span style='color:#8a969f'>Not confidently detected</span>"}
+function confidenceReason(label,val){
+ if(!val)return "Not detected. The OCR engine did not find a sufficiently clear matching pattern.";
+ if(["IC Number","Passport Number"].includes(label)&&/[68]/.test(val))return "Numeric field found. Verify every 6/8 visually because OCR can confuse similar glyphs.";
+ if(["Gender / Sex","Gender"].includes(label)&&/[PF]/i.test(val))return "Gender marker found. Verify P/F visually; the application does not silently swap them.";
+ return "Pattern/text evidence found in the uploaded content; verify against the original image before acceptance.";
+}
+function put(arr,label,val,extra=""){arr.push({label,val,extra})}
+function extract(){
+ const s=norm(state.ocr||"");const l=lines();const arr=[];
+ const type=$("docType").value==="auto"?detectType(s):$("docType").value;
+ put(arr,"Document Type",type);
+ // Passport / MRZ
+ put(arr,"Type / Jenis",find(/\\b(?:TYPE|JENIS)\\s*[:\\-]?\\s*([A-Z])/i));
+ put(arr,"Country Code / Kod Negara",find(/(?:COUNTRY CODE|KOD NEGARA|NATIONALITY CODE)\\s*[:\\-]?\\s*([A-Z]{3})/i));
+ put(arr,"Passport Number / Nombor Pasport",find(/(?:PASSPORT(?:\\s*(?:NO|NUMBER))?|NOMBOR PASPORT)\\s*[:\\-]?\\s*([A-Z][0-9]{8})\\b/i)||find(/\\b([A-Z][0-9]{8})\\b/));
+ put(arr,"Full Name / Nama",find(/(?:FULL NAME|NAME|NAMA)\\s*[:\\-]?\\s*([^\\n]{2,80})/i));
+ put(arr,"Nationality / Warganegara",find(/(?:NATIONALITY|WARGANEGARA|CITIZENSHIP)\\s*[:\\-]?\\s*([^\\n]{2,50})/i)||detectNationality(s));
+ put(arr,"Date of Birth / Tarikh Lahir",find(/(?:DATE OF BIRTH|DOB|TARIKH LAHIR)\\s*[:\\-]?\\s*([0-9]{1,2}[\\/\\-.][0-9]{1,2}[\\/\\-.][0-9]{2,4})/i));
+ put(arr,"Identity Card Number / MyKad",find(/\\b([0-9]{6}[- ]?[0-9]{2}[- ]?[0-9]{4})\\b/));
+ put(arr,"Gender / Jantina",find(/(?:SEX|GENDER|JANTINA)\\s*[:\\-]?\\s*(M|F|MALE|FEMALE|LELAKI|PEREMPUAN)\\b/i)||genderFromIC(s));
+ put(arr,"Place of Birth / Tempat Lahir",find(/(?:PLACE OF BIRTH|TEMPAT LAHIR)\\s*[:\\-]?\\s*([^\\n]{2,80})/i));
+ put(arr,"Date of Issue / Tarikh Dikeluarkan",find(/(?:DATE OF ISSUE|ISSUE DATE|TARIKH DIKELUARKAN)\\s*[:\\-]?\\s*([0-9]{1,2}[\\/\\-.][0-9]{1,2}[\\/\\-.][0-9]{2,4})/i));
+ put(arr,"Date of Expiry / Tarikh Luput",find(/(?:DATE OF EXPIRY|EXPIRY DATE|TARIKH LUPUT|TARIKH KEPUPUSAN)\\s*[:\\-]?\\s*([0-9]{1,2}[\\/\\-.][0-9]{1,2}[\\/\\-.][0-9]{2,4})/i));
+ put(arr,"Issuing Authority / Pihak Berkuasa",find(/(?:ISSUING AUTHORITY|PIHAK BERKUASA)\\s*[:\\-]?\\s*([^\\n]{3,100})/i));
+ const mrz=l.filter(x=>/[<]{2,}/.test(x)&&/[A-Z0-9<]{20,}/.test(x));put(arr,"MRZ",mrz.join("\\n"));
+ put(arr,"Holder Signature",find(/(?:HOLDER'?S SIGNATURE|SIGNATURE)\\s*[:\\-]?\\s*([^\\n]{1,100})/i));
+ put(arr,"Observations / Endorsements",find(/(?:OBSERVATIONS|ENDORSEMENTS|OBSERVATION|ENDORSEMENT)\\s*[:\\-]?\\s*([^\\n].{0,300})/i));
+
+ // NRIC / PR / licence / SSM / CIDB
+ put(arr,"Residential / Registered / Business Address",extractAddress(s));
+ put(arr,"Race",find(/(?:RACE|BANGSA)\\s*[:\\-]?\\s*([^\\n]{2,40})/i));
+ put(arr,"Original Nationality",find(/(?:ORIGINAL NATIONALITY|NATIONALITY OF ORIGIN)\\s*[:\\-]?\\s*([^\\n]{2,60})/i)||detectNationality(s));
+ put(arr,"Entry Permit Number",find(/(?:ENTRY PERMIT|NOMBOR PERMIT MASUK)\\s*[:\\-]?\\s*([A-Z0-9\\-\\/]+)/i));
+ put(arr,"Licence Class / Category",find(/(?:CATEGORY|CLASS|KELAS|KATEGORI)\\s*[:\\-]?\\s*([^\\n]{1,100})/i));
+ put(arr,"Licence / Serial Number",find(/(?:LICEN[CS]E(?:\\s*\\/\\s*SERIAL)?|SERIAL NUMBER|SERIAL NO)\\s*[:\\-]?\\s*([A-Z0-9\\-\\/]+)/i));
+ put(arr,"Company Name / Nama Syarikat",find(/(?:COMPANY NAME|NAMA SYARIKAT|Perniagaan yang dijalankan dengan nama)\\s*[:\\-]?\\s*([^\\n]{2,150})/i));
+ put(arr,"Company Old Name / Nama Syarikat Lama",find(/(?:COMPANY OLD NAME|NAMA SYARIKAT LAMA)\\s*[:\\-]?\\s*([^\\n]{2,150})/i));
+ put(arr,"Registration No. / No. Pendaftaran",find(/(?:REGISTRATION(?:\\s*NO| NUMBER)?|NO\\.\\s*PENDAFTARAN|NO\\s*SYARIKAT)\\s*[:\\-]?\\s*([A-Z0-9\\-\\/]{4,40})/i));
+ put(arr,"Incorporation / Registration Date",find(/(?:INCORPORATION(?:\\s*DATE)?|REGISTRATION(?:\\s*DATE)?|TARIKH PERBADANAN|BERTARIKH DI SISTEM EZBIZ PADA)\\s*[:\\-]?\\s*([0-9]{1,2}[\\/\\-.][0-9]{1,2}[\\/\\-.][0-9]{2,4})/i));
+ put(arr,"Business Type / Structure",find(/(?:BUSINESS TYPE|BUSINESS STRUCTURE|JENIS PERNIAGAAN)\\s*[:\\-]?\\s*([^\\n]{2,100})/i));
+ put(arr,"Business Status & Expiry",find(/(?:BUSINESS STATUS|STATUS|DIDAFTARKAN DARI HARI INI SEHINGGA)\\s*[:\\-]?\\s*([^\\n]{2,100})/i));
+ put(arr,"Nature of Business / Jenis Perniagaan",find(/(?:NATURE OF BUSINESS|JENIS PERNIAGAAN)\\s*[:\\-]?\\s*([^\\n]{2,200})/i));
+ put(arr,"Tarikh Pertukaran",find(/(?:TARIKH PERTUKARAN|CHANGE DATE)\\s*[:\\-]?\\s*([0-9]{1,2}[\\/\\-.][0-9]{1,2}[\\/\\-.][0-9]{2,4})/i));
+ put(arr,"Owner / Director Details",find(/(?:OWNER|DIRECTOR|PEMILIK|PENGARAH)\\s*[:\\-]?\\s*([^\\n]{2,300})/i));
+ put(arr,"Shareholder Information",find(/(?:SHAREHOLDER|PEMEGANG SAHAM|SHARE CAPITAL)\\s*[:\\-]?\\s*([^\\n]{2,300})/i));
+ put(arr,"Branch Information / Bil. Cawangan",find(/(?:BRANCH|BIL\\.\\s*CAWANGAN|CAWANGAN)\\s*[:\\-]?\\s*([^\\n]{2,200})/i));
+ put(arr,"Financial Data & Charges",find(/(?:FINANCIAL|CHARGES|MORTGAGE|CAJ|KEWANGAN)\\s*[:\\-]?\\s*([^\\n]{2,300})/i));
+ put(arr,"CIDB Grade / Gred",find(/(?:GRADE|GRED)\\s*[:\\-]?\\s*(G[1-7])\\b/i));
+ put(arr,"CIDB Categories / Kategori",find(/(?:CATEGORIES|KATEGORI)\\s*[:\\-]?\\s*([^\\n]{1,120})/i));
+ put(arr,"CIDB Specializations / Pengkhususan",find(/(?:SPECIALIZATIONS|PENGKHUSUSAN)\\s*[:\\-]?\\s*([^\\n]{1,300})/i));
+ put(arr,"CIDB Validity Period",find(/(?:VALIDITY|TARIKH HABIS TEMPOH PERAKUAN)\\s*[:\\-]?\\s*([^\\n]{1,100})/i));
+ put(arr,"Tarikh Mula Berkuatkuasa",find(/TARIKH MULA BERKUATKUASA\\s*[:\\-]?\\s*([0-9]{1,2}[\\/\\-.][0-9]{1,2}[\\/\\-.][0-9]{2,4})/i));
+ put(arr,"CIDB Status",find(/(?:CIDB\\s*)?STATUS\\s*[:\\-]?\\s*(ACTIVE|AKTIF|SUSPENDED|DORMANT|DORMAN|TIDAK AKTIF)\\b/i));
+
+ renderFields(arr);renderReview(arr);
+}
+function detectType(s){if(/CIDB|PERAKUAN PENDAFTARAN KONTRAKTOR|PPK/.test(s))return "CIDB PPK Certificate";if(/SSM|SURUHANJAYA SYARIKAT MALAYSIA|COMPANIES COMMISSION/.test(s))return "SSM Certificate";if(/MYKAD|KAD PENGENALAN MALAYSIA/.test(s))return "Malaysian NRIC / MyKad";if(/PEMASTAUTIN TETAP|PERMANENT RESIDENT/.test(s))return "Malaysia Permanent Resident";if(/PASSPORT|PASPORT/.test(s))return /MYS|MALAYSIA/.test(s)?"Malaysian Passport":"International Passport";if(/JPJ|DRIVING LICEN[CS]E|LESEN MEMANDU/.test(s))return "Malaysian Driving Licence";return "Other document"}
+function detectNationality(s){
+ if(/WARGANEGARA(?: MALAYSIA)?/i.test(s)||/MALAYSIAN|MYS|MALAYSIA/i.test(s))return "Malaysia (detected from document text)";
+ const countries=["Singapore","Indonesia","Thailand","Brunei","Philippines","Vietnam","China","India","Bangladesh","Pakistan","Nepal","Myanmar","United Kingdom","United States","Australia","Japan","Korea","Canada","Germany","France"];
+ const c=countries.find(x=>new RegExp("\\\\b"+x.replace(" ","\\\\s+")+"\\\\b","i").test(s));return c?c+" (detected from document text)":"";
+}
+function genderFromIC(s){const m=s.match(/\\b\\d{6}[- ]?\\d{2}[- ]?\\d{3}([0-9])\\b/);if(!m)return "";const n=+m[1];return n%2?"M (derived from odd final digit)":"F (derived from even final digit)"}
+function extractAddress(s){
+ const ls=lines();const keys=/ADDRESS|ALAMAT|BERALAMAT|RESIDENCE|RESIDENTIAL/i;
+ let i=ls.findIndex(x=>keys.test(x));if(i<0)return "";
+ let a=ls.slice(i,Math.min(ls.length,i+5)).join(", ");
+ return a.replace(/^(ADDRESS|ALAMAT|RESIDENTIAL ADDRESS|REGISTERED ADDRESS)\\s*[:\\-]?\\s*/i,"").trim();
+}
+function renderFields(arr){
+ $("fields").innerHTML=arr.map(o=>`<div class="field"><b>${escapeHtml(o.label)}</b><div class="value">${ic(o.val)}</div><div class="conf">${escapeHtml(confidenceReason(o.label,o.val))}</div></div>`).join("");
+}
+function renderReview(arr){
+ const risky=arr.filter(o=>o.val&&(/Passport Number|IC Number|Gender|MRZ|Date|Registration No/.test(o.label)));
+ $("review").innerHTML=`<div class="reason"><b>Accuracy gate</b><br>Values below are extracted candidates, not guaranteed facts. A value is accepted only after visual comparison with the source. The OCR layer does not intentionally convert 6↔8 or P↔F.</div><div style="height:8px"></div>`+
+ risky.map(o=>`<div class="field"><b>${escapeHtml(o.label)}</b><div class="value">${ic(o.val)}</div><div class="reason">${escapeHtml(confidenceReason(o.label,o.val))}</div></div>`).join("")+
+ `<div class="field"><b>Editable review overlays</b><div class="value">${state.edits.length} overlay(s)</div><div class="reason">These are annotations only; the original OCR/document data remains unchanged.</div></div>`;
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));t.classList.add("active");["fields","text","review"].forEach(id=>$(id).hidden=id!==t.dataset.tab)});
+
+window.addEventListener("resize",fit);setSide("Front");$("fields").innerHTML="<div class='empty'>No extraction yet.</div>";
 </script>
 </body>
 </html>
