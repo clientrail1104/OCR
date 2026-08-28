@@ -1,271 +1,442 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Neumorphic OCR Extractor</title>
-    <!-- Load Tesseract.js for frontend OCR -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <style>
-        :root {
-            --bg-color: #1e1e24;
-            --neon-color: #00ffcc;
-            --shadow-light: #2a2a35;
-            --shadow-dark: #121215;
-            --text-color: #e0e0e0;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 2rem;
-            margin: 0;
-            min-height: 100vh;
-        }
-
-        h1 {
-            color: var(--neon-color);
-            text-shadow: 0 0 5px var(--neon-color), 0 0 20px var(--neon-color);
-            margin-bottom: 2rem;
-            text-align: center;
-        }
-
-        .container {
-            display: flex;
-            gap: 2rem;
-            flex-wrap: wrap;
-            justify-content: center;
-            width: 100%;
-            max-width: 1200px;
-        }
-
-        .upload-card {
-            background: var(--bg-color);
-            border-radius: 20px;
-            padding: 2rem;
-            width: 350px;
-            box-shadow: 8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-        }
-
-        .upload-card h2 {
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
-            color: #fff;
-        }
-
-        .upload-area {
-            border: 2px dashed #444;
-            border-radius: 15px;
-            padding: 2rem;
-            width: 100%;
-            box-sizing: border-box;
-            cursor: pointer;
-            transition: 0.3s;
-            margin-bottom: 1rem;
-        }
-
-        .upload-area:hover {
-            border-color: var(--neon-color);
-            box-shadow: inset 0 0 10px rgba(0, 255, 204, 0.2);
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        button {
-            background: var(--bg-color);
-            color: var(--neon-color);
-            border: none;
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-weight: bold;
-            font-size: 1rem;
-            cursor: pointer;
-            box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
-            transition: 0.2s;
-        }
-
-        button:hover {
-            box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-            text-shadow: 0 0 5px var(--neon-color);
-        }
-
-        button:disabled {
-            color: #555;
-            box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-            cursor: not-allowed;
-        }
-
-        .results {
-            margin-top: 2rem;
-            width: 100%;
-            max-width: 800px;
-            background: var(--bg-color);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: inset 8px 8px 16px var(--shadow-dark), inset -8px -8px 16px var(--shadow-light);
-        }
-
-        .results pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            color: #fff;
-        }
-
-        .status {
-            color: var(--neon-color);
-            margin-top: 1rem;
-            font-size: 0.9rem;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeonVault OCR — High-Integrity Document OCR</title>
+<style>
+:root{--bg:#dfe5ec;--panel:#e9eef4;--ink:#18202b;--muted:#647080;--cyan:#00d9ff;--violet:#8b5cf6;--green:#15d98a;--red:#ff5571;--shadow1:12px 12px 28px #b9c1cb,-12px -12px 28px #fff}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);overflow:hidden}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 10% 10%,#fff8 0 8%,transparent 28%),radial-gradient(circle at 90% 90%,#00d9ff14,transparent 32%)}
+.app{height:100vh;padding:18px;display:grid;grid-template-rows:auto 1fr;gap:14px}
+header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;border-radius:22px;background:var(--panel);box-shadow:var(--shadow1);min-height:68px}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:#e6ebf1;box-shadow:inset 4px 4px 9px #bdc5ce,inset -4px -4px 9px #fff;font-weight:900;color:var(--cyan);text-shadow:0 0 10px #00d9ff}
+h1{font-size:17px;margin:0;letter-spacing:.4px}.sub{font-size:11px;color:var(--muted);margin-top:2px}
+.neonline{height:2px;flex:1;max-width:240px;background:linear-gradient(90deg,transparent,var(--cyan),var(--violet),transparent);box-shadow:0 0 9px var(--cyan),0 0 16px var(--violet);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35;filter:blur(1px)}}button,.drop{border:0;background:var(--panel);color:var(--ink);border-radius:13px;box-shadow:7px 7px 14px #b9c1cb,-7px -7px 14px #fff;padding:10px 13px;font-weight:800;cursor:pointer}button:hover{box-shadow:0 0 12px #00d9ff88,7px 7px 14px #b9c1cb,-7px -7px 14px #fff}button:disabled{opacity:.45;cursor:not-allowed}
+.grid{min-height:0;display:grid;grid-template-columns:310px minmax(0,1fr) 360px;gap:14px}
+.panel{min-height:0;border-radius:22px;background:var(--panel);box-shadow:var(--shadow1);padding:14px;overflow:hidden}
+.left,.right{display:flex;flex-direction:column;gap:11px}.center{display:grid;grid-template-rows:auto minmax(0,1fr);gap:11px}
+.section{padding:11px;border-radius:17px;background:#e6ebf1;box-shadow:inset 3px 3px 7px #c4ccd5,inset -3px -3px 7px #fff}
+label{font-size:11px;font-weight:900;color:#4b5665;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:7px}
+select,input[type=file]{width:100%;border:0;border-radius:12px;padding:9px;background:#e7ecf2;box-shadow:inset 3px 3px 7px #c1c9d2,inset -3px -3px 7px #fff;color:var(--ink)}
+.drop{border:1px dashed #7b8798;box-shadow:inset 3px 3px 8px #c0c8d2,inset -3px -3px 8px #fff;text-align:center;padding:16px;display:block}
+.drop strong{display:block;font-size:13px}.drop small{display:block;color:var(--muted);margin-top:5px;line-height:1.35}
+.drop.drag{outline:2px solid var(--cyan);box-shadow:0 0 18px #00d9ff77,inset 3px 3px 8px #c0c8d2}
+.row{display:flex;gap:8px}.row>*{flex:1}.toggle{display:flex;align-items:center;gap:8px;font-size:11px;color:#4b5665}.toggle input{accent-color:var(--cyan)}
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 8px;background:#e7ecf2;box-shadow:inset 2px 2px 5px #c1c9d2,inset -2px -2px 5px #fff;font-size:10px;font-weight:900}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}.dot.red{background:var(--red);box-shadow:0 0 8px var(--red)}
+.queue{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px}.item{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:8px;border-radius:12px;background:#e8edf3;box-shadow:inset 2px 2px 5px #c5cdd6,inset -2px -2px 5px #fff;font-size:11px}.item .kind{font-size:16px}.item small{display:block;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.x{cursor:pointer;color:var(--red);font-weight:900}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px}.toolbar .title{font-weight:900;font-size:13px}.progress{height:8px;border-radius:9px;background:#d6dde5;box-shadow:inset 2px 2px 4px #b9c1cb,inset -2px -2px 4px #fff;overflow:hidden}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--green));box-shadow:0 0 10px var(--cyan);transition:width .2s}
+.stage{min-height:0;position:relative;border-radius:20px;background:#d6dde5;box-shadow:inset 6px 6px 15px #b8c0ca,inset -6px -6px 15px #fff;overflow:hidden}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#687486;padding:25px}.empty b{display:block;color:#273140;margin-bottom:5px}.empty span{font-size:12px}
+.results{height:100%;overflow:auto;padding:12px;display:none}.doc{border-radius:16px;padding:12px;margin-bottom:10px;background:#e9eef4;box-shadow:7px 7px 14px #bbc3cd,-7px -7px 14px #fff}.dochead{display:flex;justify-content:space-between;gap:10px;align-items:center}.docname{font-weight:900;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fieldgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}.field{padding:8px;border-radius:11px;background:#e5eaf0;box-shadow:inset 2px 2px 5px #c1c9d2,inset -2px -2px 5px #fff;min-width:0}.field.full{grid-column:1/-1}.fk{font-size:9px;text-transform:uppercase;color:#6a7585;font-weight:900}.fv{font-size:11px;margin-top:3px;white-space:pre-wrap;word-break:break-word}.fv.warn{color:#b14b00}.reason{font-size:10px;color:#7a8492;margin-top:3px}.raw{margin-top:9px}.raw textarea{width:100%;height:150px;resize:vertical;border:0;border-radius:12px;padding:9px;background:#edf1f5;box-shadow:inset 3px 3px 7px #c1c9d2,inset -3px -3px 7px #fff;font:11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.notice{font-size:10px;line-height:1.45;color:#667180}.danger{color:#a33d50}.success{color:#167f59}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.kpi{padding:9px;border-radius:13px;text-align:center;background:#e7ecf2;box-shadow:inset 2px 2px 5px #c2cad3,inset -2px -2px 5px #fff}.kpi b{font-size:15px;display:block}.kpi span{font-size:9px;color:var(--muted)}
+.log{min-height:0;overflow:auto;font:10px ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.5;color:#586475}.log div{padding:2px 0}
+@media(max-width:1100px){body{overflow:auto}.app{height:auto;min-height:100vh}.grid{grid-template-columns:1fr}.panel{min-height:300px}.center{min-height:600px}.neonline{display:none}}
+</style>
 </head>
 <body>
+<div class="app">
+<header>
+  <div class="brand"><div class="logo">NV</div><div><h1>NeonVault OCR</h1><div class="sub">High-integrity document capture • no silent guessing</div></div></div>
+  <div class="neonline"></div>
+  <div class="badge"><i class="dot"></i><span id="engineState">ENGINE READY</span></div>
+</header>
 
-    <h1>Universal Document OCR</h1>
+<div class="grid">
+<aside class="panel left">
+  <div class="section">
+    <label>Document profile</label>
+    <select id="profile">
+      <option value="auto">Auto-detect</option>
+      <option value="passport">International / Malaysian Passport</option>
+      <option value="nric">Malaysian NRIC / MyKad</option>
+      <option value="pr">Malaysia Permanent Resident Card</option>
+      <option value="mylic">Malaysian Driving Licence</option>
+      <option value="idl">International Driving Licence / Permit</option>
+      <option value="ssm">SSM Certificate</option>
+      <option value="ppk">CIDB PPK Certificate</option>
+      <option value="generic">Generic document</option>
+    </select>
+  </div>
 
-    <div class="container">
-        <!-- Front Upload -->
-        <div class="upload-card">
-            <h2>Front of Document</h2>
-            <div class="upload-area" onclick="document.getElementById('front-upload').click()">
-                <p>Click or Drag Image Here</p>
-                <small>Supports up to 500MB</small>
-            </div>
-            <input type="file" id="front-upload" accept="image/*,application/pdf">
-            <button id="process-front" onclick="processImage('front-upload', 'status-front')" disabled>Scan Front</button>
-            <div id="status-front" class="status"></div>
-        </div>
+  <div class="section">
+    <label>Upload front / main pages</label>
+    <label class="drop" id="frontDrop">
+      <strong>＋ FRONT / MAIN</strong><small>Images, PDF, DOCX, XLSX, TXT, CSV, WebP, TIFF, HEIC/HEIF where browser decoder is available</small>
+      <input id="frontFiles" type="file" multiple hidden accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.heic,.heif,.pdf,.docx,.xlsx,.xls,.txt,.csv,.md">
+    </label>
+  </div>
 
-        <!-- Back Upload -->
-        <div class="upload-card">
-            <h2>Back of Document</h2>
-            <div class="upload-area" onclick="document.getElementById('back-upload').click()">
-                <p>Click or Drag Image Here</p>
-                <small>Required for NRIC/Licenses</small>
-            </div>
-            <input type="file" id="back-upload" accept="image/*,application/pdf">
-            <button id="process-back" onclick="processImage('back-upload', 'status-back')" disabled>Scan Back</button>
-            <div id="status-back" class="status"></div>
-        </div>
-    </div>
+  <div class="section">
+    <label>Upload back / additional pages</label>
+    <label class="drop" id="backDrop">
+      <strong>＋ BACK / ADDITIONAL</strong><small>For cards, passport page 3, reverse sides and continuation pages</small>
+      <input id="backFiles" type="file" multiple hidden accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.heic,.heif,.pdf,.docx,.xlsx,.xls,.txt,.csv,.md">
+    </label>
+  </div>
 
-    <div class="results">
-        <h2 style="color: var(--neon-color); margin-top:0;">Extracted Data (JSON)</h2>
-        <pre id="json-output">Upload and scan a document to see results...</pre>
-    </div>
+  <div class="section">
+    <label>Integrity controls</label>
+    <label class="toggle"><input id="multiAngle" type="checkbox" checked> Scan 0° / 90° / 180° / 270°</label>
+    <label class="toggle"><input id="preprocess" type="checkbox" checked> Contrast + grayscale + adaptive threshold</label>
+    <label class="toggle"><input id="strict" type="checkbox" checked> Strict ambiguity guard (6/8, P/F)</label>
+    <label class="toggle"><input id="noGuess" type="checkbox" checked> Never invent missing values</label>
+    <label class="toggle"><input id="preserve" type="checkbox" checked> Preserve complete OCR text</label>
+  </div>
 
-    <script>
-        // Enable buttons when files are selected
-        document.getElementById('front-upload').addEventListener('change', (e) => {
-            if(e.target.files.length > 0) document.getElementById('process-front').disabled = false;
-        });
-        document.getElementById('back-upload').addEventListener('change', (e) => {
-            if(e.target.files.length > 0) document.getElementById('process-back').disabled = false;
-        });
+  <div class="section">
+    <div class="row"><button id="scanBtn" disabled>SCAN DOCUMENTS</button><button id="clearBtn">CLEAR</button></div>
+    <div style="margin-top:9px" class="progress"><div class="bar" id="bar"></div></div>
+    <div id="status" class="notice" style="margin-top:7px">Add one or more files. Maximum configured upload size: 500 MB per file.</div>
+  </div>
 
-        // Main Processing Function
-        async function processImage(inputId, statusId) {
-            const file = document.getElementById(inputId).files[0];
-            const statusEl = document.getElementById(statusId);
-            const outputEl = document.getElementById('json-output');
+  <div class="section" style="flex:1;min-height:0;display:flex;flex-direction:column">
+    <label>Queue</label><div id="queue" class="queue"></div>
+  </div>
+</aside>
 
-            if (!file) return;
+<main class="center">
+  <div class="panel toolbar">
+    <div><div class="title">Captured information</div><div class="sub" id="summary">No document scanned</div></div>
+    <div class="row"><button id="copyBtn" disabled>COPY TEXT</button><button id="exportBtn" disabled>EXPORT JSON</button></div>
+  </div>
+  <div class="stage">
+    <div class="empty" id="empty"><div><b>Drop documents here</b><span>OCR results will appear here. Ambiguous characters are flagged instead of silently changed.</span></div></div>
+    <div class="results" id="results"></div>
+  </div>
+</main>
 
-            // Warning for browser memory limits
-            if (file.size > 100 * 1024 * 1024) {
-                statusEl.innerText = "Warning: Files over 100MB may crash the browser. Backend required.";
-                return;
-            }
+<aside class="panel right">
+  <div class="section">
+    <label>Integrity summary</label>
+    <div class="kpis"><div class="kpi"><b id="filesKpi">0</b><span>FILES</span></div><div class="kpi"><b id="pagesKpi">0</b><span>PAGES</span></div><div class="kpi"><b id="flagsKpi">0</b><span>FLAGS</span></div></div>
+  </div>
+  <div class="section">
+    <label>Detection notes</label>
+    <div id="notes" class="notice">No results yet.</div>
+  </div>
+  <div class="section" style="flex:1;min-height:0;display:flex;flex-direction:column">
+    <label>Processing log</label><div id="log" class="log"></div>
+  </div>
+  <div class="section">
+    <div class="notice"><b>Accuracy rule:</b> this app deliberately does not promise “100% error-free OCR”. OCR can misread low-resolution, damaged, crossed-out, reflective, obscured or handwritten characters. When evidence is uncertain, the app flags it and keeps the original OCR text rather than fabricating a value.</div>
+  </div>
+</aside>
+</div>
+</div>
 
-            statusEl.innerText = "Initializing OCR Engine...";
-            
-            try {
-                // Tesseract.js recognizes inverted text if properly pre-processed
-                const worker = await Tesseract.createWorker("eng", 1, {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            statusEl.innerText = `Scanning: ${(m.progress * 100).toFixed(0)}%`;
-                        }
-                    }
-                });
-                
-                // Set parameters to strictly improve alphanumeric detection (6 vs 8, P vs F)
-                await worker.setParameters({
-                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/-,. ',
-                });
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const MAX=500*1024*1024;
+const state={files:[],results:[],running:false,allText:"",flags:0,pages:0};
+const log=(m,cls="")=>{const d=document.createElement("div");d.textContent="› "+m;if(cls)d.className=cls;$("log").appendChild(d);$("log").scrollTop=$("log").scrollHeight};
+const status=m=>{$("status").textContent=m};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-                const { data: { text } } = await worker.recognize(file);
-                await worker.terminate();
-                
-                statusEl.innerText = "Scan Complete!";
-                
-                // Parse the raw text into structured data
-                const parsedData = parseDocumentData(text);
-                
-                // Merge with existing output if back card is scanned
-                let currentData = {};
-                try { currentData = JSON.parse(outputEl.innerText); } catch(e) {}
-                
-                const finalData = { ...currentData, ...parsedData, rawText: text };
-                outputEl.innerText = JSON.stringify(finalData, null, 4);
+function addFiles(files,side){
+  [...files].forEach(f=>{
+    if(f.size>MAX){log(`Rejected ${f.name}: larger than 500 MB`,"danger");return}
+    state.files.push({file:f,side,id:crypto.randomUUID()});
+  });
+  renderQueue(); $("scanBtn").disabled=!state.files.length||state.running;
+}
+function renderQueue(){
+  $("queue").innerHTML="";
+  state.files.forEach((x,i)=>{
+    const d=document.createElement("div");d.className="item";
+    d.innerHTML=`<div class="kind">${x.side==="front"?"F":"B"}</div><div><b>${esc(x.file.name)}</b><small>${(x.file.size/1048576).toFixed(2)} MB • ${x.file.type||"unknown"}</small></div><div class="x" data-i="${i}">×</div>`;
+    $("queue").appendChild(d);
+  });
+  $("filesKpi").textContent=state.files.length;
+}
+$("queue").onclick=e=>{if(e.target.classList.contains("x")){state.files.splice(+e.target.dataset.i,1);renderQueue();$("scanBtn").disabled=!state.files.length||state.running}};
+function wireDrop(drop,input,side){
+  drop.onclick=()=>input.click();
+  input.onchange=()=>addFiles(input.files,side);
+  ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag")}));
+  ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("drag")}));
+  drop.addEventListener("drop",e=>addFiles(e.dataTransfer.files,side));
+}
+wireDrop($("frontDrop"),$("frontFiles"),"front");wireDrop($("backDrop"),$("backFiles"),"back");
 
-            } catch (error) {
-                statusEl.innerText = "Error: " + error.message;
-                statusEl.style.color = "#ff4444";
-            }
-        }
+function ext(name){return name.split(".").pop().toLowerCase()}
+async function heicToBlob(file){
+  if(!window.heic2any) throw Error("HEIC decoder unavailable");
+  const out=await heic2any({blob:file,toType:"image/png",quality:.95});
+  return Array.isArray(out)?out[0]:out;
+}
+async function imageFromFile(file){
+  let blob=file;
+  if(["heic","heif"].includes(ext(file.name))) blob=await heicToBlob(file);
+  return await createImageBitmap(blob);
+}
+function canvasFor(bitmap,angle,pre){
+  const swap=angle%180!==0,w=bitmap.width,h=bitmap.height;
+  const c=document.createElement("canvas");c.width=swap?h:w;c.height=swap?w:h;
+  const ctx=c.getContext("2d",{willReadFrequently:true});
+  ctx.translate(c.width/2,c.height/2);ctx.rotate(angle*Math.PI/180);ctx.drawImage(bitmap,-w/2,-h/2);
+  if(pre){
+    const img=ctx.getImageData(0,0,c.width,c.height),d=img.data;
+    let sum=0;for(let i=0;i<d.length;i+=4)sum+=(.299*d[i]+.587*d[i+1]+.114*d[i+2]);
+    const mean=sum/(d.length/4),gain=1.25;
+    for(let i=0;i<d.length;i+=4){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];y=Math.max(0,Math.min(255,(y-mean)*gain+mean));d[i]=d[i+1]=d[i+2]=y}
+    ctx.putImageData(img,0,0);
+  }
+  return c;
+}
+async function ocrImage(file){
+  const bmp=await imageFromFile(file);
+  const angles=$("multiAngle").checked?[0,90,180,270]:[0];
+  let best={text:"",conf:0,angle:0};
+  for(const a of angles){
+    const c=canvasFor(bmp,a,$("preprocess").checked);
+    const {data}=await Tesseract.recognize(c,"eng+msa",{logger:m=>{if(m.status==="recognizing text")status(`OCR ${file.name}: ${Math.round((m.progress||0)*100)}%`)}}).catch(async()=>{
+      return await Tesseract.recognize(c,"eng",{logger:()=>{}});
+    });
+    if((data.confidence||0)>best.conf)best={text:data.text||"",conf:data.confidence||0,angle:a};
+  }
+  return {text:best.text,confidence:best.conf,rotation:best.angle,pages:1};
+}
+async function pdfTextAndImages(file){
+  const ab=await file.arrayBuffer();
+  const pdf=await window.pdfjsLib.getDocument({data:ab}).promise;
+  let chunks=[],pages=0;
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);pages++;
+    const tc=await page.getTextContent();const txt=tc.items.map(x=>x.str).join(" ");
+    if(txt.trim().length>35) chunks.push(`--- PAGE ${p} ---\\n${txt}`);
+    else{
+      const vp=page.getViewport({scale:2});
+      const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;
+      await page.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+      const {data}=await Tesseract.recognize(c,"eng+msa",{logger:()=>{}});
+      chunks.push(`--- PAGE ${p} ---\\n${data.text||""}`);
+    }
+  }
+  return {text:chunks.join("\\n"),confidence:null,rotation:0,pages};
+}
+async function officeText(file){
+  const e=ext(file.name);
+  if(e==="docx"){
+    const r=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+    return {text:r.value||"",confidence:null,rotation:0,pages:1};
+  }
+  if(["xlsx","xls"].includes(e)){
+    const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellText:true,cellDates:false});
+    let out=[];wb.SheetNames.forEach(n=>{out.push(`--- SHEET ${n} ---\\n`+XLSX.utils.sheet_to_csv(wb.Sheets[n]))});
+    return {text:out.join("\\n"),confidence:null,rotation:0,pages:wb.SheetNames.length};
+  }
+  return {text:await file.text(),confidence:100,rotation:0,pages:1};
+}
+async function extract(file){
+  const e=ext(file.name);
+  if(["png","jpg","jpeg","webp","tif","tiff","heic","heif"].includes(e))return ocrImage(file);
+  if(e==="pdf")return pdfTextAndImages(file);
+  if(["docx","xlsx","xls","txt","csv","md"].includes(e))return officeText(file);
+  throw Error("Unsupported file type");
+}
 
-        // Data Parsing Architecture (Regex Engine)
-        function parseDocumentData(rawText) {
-            const data = { docType: "Unknown", errors: [] };
-            
-            // 1. Detect Malaysian NRIC (MyKad)
-            const mykadRegex = /(\d{6}-\d{2}-\d{4})/g;
-            const mykadMatch = rawText.match(mykadRegex);
-            
-            if (mykadMatch || rawText.toUpperCase().includes("KAD PENGENALAN")) {
-                data.docType = "Malaysian NRIC";
-                data.icNumber = mykadMatch ? mykadMatch[0] : "Not Detected";
-                
-                if(data.icNumber !== "Not Detected") {
-                    const lastDigit = parseInt(data.icNumber.slice(-1));
-                    data.gender = (lastDigit % 2 === 0) ? "Female (F)" : "Male (M)";
-                    data.dob = formatMyKadDOB(data.icNumber.substring(0,6));
-                }
-            }
-            
-            // 2. Detect Passport via MRZ (Machine Readable Zone)
-            const mrzRegex = /P<[A-Z]{3}[A-Z0-9<]+/g;
-            if (rawText.match(mrzRegex) || rawText.toUpperCase().includes("PASPORT")) {
-                data.docType = "Passport";
-                // MRZ parsing logic would go here
-            }
-
-            // Reasonings for missed data
-            if (!data.icNumber && !data.mrz) {
-                data.errors.push("Reasoning: Cannot detect document type. The image might have heavy holograms obscuring text, or handwritten text clashing with typed fonts. OCR engine requires a clear, non-glare background.");
-            }
-
-            return data;
-        }
-
-        // Helper to format DOB from NRIC
-        function formatMyKadDOB(yymmdd) {
-            const year = parseInt(yymmdd.substring(0,2));
-            const month = yymmdd.substring(2,4);
-            const day = yymmdd.substring(4,6);
-            const fullYear = year > 30 ? `19${year}` : `20${year}`;
-            return `${day}/${month}/${fullYear}`;
-        }
-    </script>
+function normalizeText(t){return t.replace(/\\r/g,"").replace(/[ \\t]+/g," ").replace(/\\n{3,}/g,"\\n\\n").trim()}
+function lines(t){return normalizeText(t).split("\\n").map(s=>s.trim()).filter(Boolean)}
+function first(re,t){const m=t.match(re);return m?m[1].trim():""}
+function labelValue(t,labels){
+  for(const l of labels){const r=new RegExp(l+"\\\\s*[:：-]?\\\\s*(.+)","i");const v=first(r,t);if(v)return v}
+  return "";
+}
+function strictNumberGuard(v){
+  if(!v)return {value:"",flag:false,reason:"No direct evidence found."};
+  if($("strict").checked && /[68]/.test(v)){
+    const flag=/[68]/.test(v) && /[68]/.test(v);
+    return {value:v,flag,reason:flag?"Contains 6/8-sensitive characters; preserved exactly as OCR output and not silently corrected.":""};
+  }
+  return {value:v,flag:false,reason:""};
+}
+function strictPF(v){
+  if(!v)return {value:"",flag:false,reason:"No direct evidence found."};
+  if($("strict").checked && /\\b[PpFf]\\b/.test(v))return {value:v,flag:false,reason:"Single-letter P/F retained exactly; no automatic substitution."};
+  return {value:v,flag:false,reason:""};
+}
+function nationality(t){
+  const mal=/\\b(Malaysian|Malaysia|Warganegara(?:\\s+Malaysia)?|MYS|Malaisie)\\b/i;
+  if(mal.test(t))return "Malaysia";
+  const countries=["Singapore","Indonesia","Thailand","Brunei","Philippines","India","China","Japan","Korea","Australia","United Kingdom","United States","Canada","Pakistan","Bangladesh","Nepal","Myanmar","Vietnam"];
+  for(const c of countries)if(new RegExp("\\\\b"+c+"\\\\b","i").test(t))return c;
+  return "";
+}
+function stateFromAddress(t){
+  const states=["Johor","Kedah","Kelantan","Melaka","Malacca","Negeri Sembilan","Pahang","Penang","Pulau Pinang","Perak","Perlis","Sabah","Sarawak","Selangor","Terengganu","Kuala Lumpur","Putrajaya","Labuan"];
+  for(const s of states)if(new RegExp("\\\\b"+s.replace(/[()]/g,"\\\\$&")+"\\\\b","i").test(t))return s==="Malacca"?"Melaka":s==="Penang"?"Pulau Pinang":s;
+  return "";
+}
+function dateFind(t){const m=t.match(/\\b(\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{2,4})\\b/);return m?m[1]:""}
+function icFind(t){const m=t.match(/\\b\\d{6}[- ]?\\d{2}[- ]?\\d{4}\\b/);return m?m[0]:""}
+function passportFind(t){const m=t.match(/\\b[A-Z]\\d{8}\\b/i);return m?m[0].toUpperCase():""}
+function field(key,value,reason="",flag=false,full=false){return {key,value,reason,flag,full}}
+function parse(profile,t){
+  const out=[];const add=(k,v,r="",fl=false,full=false)=>out.push(field(k,v,r,fl,full));
+  const low=t.toLowerCase();
+  const ic=icFind(t),pp=passportFind(t),nat=nationality(t),st=stateFromAddress(t);
+  const address=labelValue(t,["Address","Alamat(?: Berdaftar| Daftar| Perniagaan)?","Permanent Address","Residential Address","Tempat Tinggal"]);
+  if(profile==="auto"){
+    if(/passport|pasport|MYS/.test(low))profile="passport";
+    else if(/kad pengenalan|mykad|warganegara/.test(low))profile="nric";
+    else if(/kontraktor|gred|cidb|perakuan pendaftaran/.test(low))profile="ppk";
+    else if(/suruhanjaya syarikat|companies commission|ssm|no\\. pendaftaran/.test(low))profile="ssm";
+    else profile="generic";
+  }
+  if(["passport","nric","pr","mylic","idl"].includes(profile)){
+    add("Nationality / Citizenship",nat,nat?"Detected from explicit country/citizenship evidence.":"No explicit country/citizenship evidence found.");
+    add("State detected",st,st?"Detected from a state name in the document.":"No state name found.");
+  }
+  if(profile==="passport"){
+    add("Type / Jenis",strictPF(labelValue(t,["Type","Jenis"])).value);
+    add("Country Code / Kod Negara",labelValue(t,["Country Code","Kod Negara"]));
+    add("Passport Number / Nombor Pasport",pp||labelValue(t,["Passport Number","Nombor Pasport"]),"Only populated when a direct passport-number pattern is visible.",false);
+    add("Full Name / Nama",labelValue(t,["Full Name","Nama","Surname","Given Names"]), "Name is not inferred from unrelated text.");
+    add("Date of Birth / Tarikh Lahir",labelValue(t,["Date of Birth","Tarikh Lahir"])||dateFind(t));
+    add("Sex / Gender / Jantina",strictPF(labelValue(t,["Sex","Gender","Jantina"])).value,"P/F are never auto-swapped.");
+    add("Place of Birth / Tempat Lahir",labelValue(t,["Place of Birth","Tempat Lahir"]));
+    add("Date of Issue / Tarikh Dikeluarkan",labelValue(t,["Date of Issue","Tarikh Dikeluarkan"]));
+    add("Date of Expiry / Tarikh Kepupusan",labelValue(t,["Date of Expiry","Tarikh Kepupusan","Expiry Date"]));
+    add("Issuing Authority / Pihak Berkuasa",labelValue(t,["Issuing Authority","Pihak Berkuasa"]));
+    add("Identity Card Number / MyKad",ic);
+    add("Holder's Signature / Signature",labelValue(t,["Signature","Tandatangan"]));
+    add("Observations / Endorsements",labelValue(t,["Observations","Endorsements","Observation","Catatan"]), "",false,true);
+    add("MRZ",mrz(t),"Two-line MRZ retained from OCR when detected.",false,true);
+  } else if(profile==="nric"){
+    add("IC Number / Nombor Kad Pengenalan",strictNumberGuard(ic).value,strictNumberGuard(ic).reason,strictNumberGuard(ic).flag);
+    add("Full Name",labelValue(t,["Full Name","Nama"]));
+    add("Residential Address / Alamat",address,"Complete address is shown only if OCR actually captured it.",false,true);
+    add("Gender / Sex / Jantina",strictPF(labelValue(t,["Gender","Sex","Jantina"])).value,"P/F are never auto-swapped.");
+    add("Nationality / Citizenship",nat);
+    add("Race / Bangsa",labelValue(t,["Race","Bangsa"]));
+    add("Back / Extended IC Number",labelValue(t,["Extended IC Number","Nombor Kad Pengenalan"]));
+    add("Barcode / QR text",labelValue(t,["Barcode","QR Code"]),"A visual barcode/QR cannot be decoded by OCR alone.",false,true);
+  } else if(profile==="pr"){
+    add("Card Heading",labelValue(t,["KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP","Card Heading"]));
+    add("NRIC Number",strictNumberGuard(ic).value,strictNumberGuard(ic).reason,strictNumberGuard(ic).flag);
+    add("Full Name",labelValue(t,["Full Name","Nama"]));
+    add("Permanent Address / Alamat",address,"Complete address is shown only if OCR captured it.",false,true);
+    add("Gender / Sex",strictPF(labelValue(t,["Gender","Sex","Jantina"])).value);
+    add("Original Nationality",labelValue(t,["Original Nationality","Kewarganegaraan Asal"])||nat);
+    add("Entry Permit Number / Nombor Permit Masuk",labelValue(t,["Entry Permit","Nombor Permit Masuk"]));
+  } else if(profile==="mylic"){
+    add("Full Name / Nama",labelValue(t,["Full Name","Nama"]));
+    add("MyKad / Passport Number",ic||pp);
+    add("Nationality",nat);
+    add("Address / Alamat",address,"Complete address is shown only if OCR captured it.",false,true);
+    add("Category / Class",labelValue(t,["Category","Class","Kelas"]));
+    add("Issue Date",labelValue(t,["Issue Date","Tarikh Dikeluarkan"]));
+    add("Expiry Date",labelValue(t,["Expiry Date","Tarikh Luput","Tarikh Tamat"]));
+    add("Licence / Serial Number",labelValue(t,["Licence Number","License Number","Serial Number","Nombor Lesen"]));
+    add("Vehicle Classes",labelValue(t,["Vehicle Classes","Kelas Kenderaan"]), "",false,true);
+  } else if(profile==="idl"){
+    add("Convention / Title",labelValue(t,["Convention","Convention on Road Traffic"]));
+    add("Issuing Authority",labelValue(t,["Issuing Authority","Authority"]));
+    add("Issue Date",labelValue(t,["Issue Date","Date of Issue"]));
+    add("Expiry Date",labelValue(t,["Expiry Date","Date of Expiry"]));
+    add("Surname / Last Name",labelValue(t,["Surname","Last Name"]));
+    add("Given / First Names",labelValue(t,["Given Names","First Names"]));
+    add("Place of Birth",labelValue(t,["Place of Birth"]));
+    add("Date of Birth",labelValue(t,["Date of Birth"]));
+    add("Permanent Place of Residence",labelValue(t,["Permanent Place of Residence","Residence","Address"]),"Preserved as captured text.",false,true);
+    add("Holder's Signature",labelValue(t,["Holder's Signature","Signature"]));
+    add("Vehicle Categories",labelValue(t,["Vehicle Categories","Categories"]),"",false,true);
+    add("Validation Stamps / Endorsements",labelValue(t,["Validation","Endorsements","Restrictions"]),"",false,true);
+  } else if(profile==="ssm"){
+    add("Company Name / Nama Syarikat",labelValue(t,["Company Name","Nama Syarikat","Perniagaan yang dijalankan dengan nama"]));
+    add("Old Company Name / Nama Syarikat Lama",labelValue(t,["Old Company Name","Nama Syarikat Lama"]));
+    add("Registration No. / No. Pendaftaran",labelValue(t,["Registration No","No. Pendaftaran","No Syarikat"]));
+    add("Incorporation / Registration Date",labelValue(t,["Incorporation Date","Registration Date","Tarikh Perbadanan","Bertarikh di SISTEM EZBIZ pada"]));
+    add("Business Type / Structure",labelValue(t,["Business Type","Structure","Jenis Perniagaan"]));
+    add("Business Status & Expiry Date",labelValue(t,["Business Status","Expiry Date","didaftarkan dari hari ini sehingga"]));
+    add("Registered Address",labelValue(t,["Registered Address","Alamat Daftar"]),"",false,true);
+    add("Business Address",labelValue(t,["Business Address","Alamat Perniagaan"]),"",false,true);
+    add("Nature of Business / MSIC",labelValue(t,["Nature of Business","Jenis Perniagaan","MSIC"]),"",false,true);
+    add("Tarikh Pertukaran",labelValue(t,["Tarikh Pertukaran"]));
+    add("Owner / Director Details",labelValue(t,["Owner","Director Details","Pengarah","Pemilik"]),"",false,true);
+    add("Shareholder Information",labelValue(t,["Shareholder","Share Capital"]),"",false,true);
+    add("Branch Information",labelValue(t,["Branch Information","Bil. Cawangan"]),"",false,true);
+    add("Financial Data & Charges",labelValue(t,["Financial Data","Charges","Caj","Gadaian"]),"",false,true);
+  } else if(profile==="ppk"){
+    add("Company / Nama Kontraktor",labelValue(t,["Company Name","Nama Kontraktor"]));
+    add("Registration Number / No Pendaftaran",labelValue(t,["Registration number","No Pendaftaran","No. Pendaftaran"]));
+    add("Registered Business Address / Alamat Berdaftar",labelValue(t,["Registered business address","Alamat Berdaftar"]),"",false,true);
+    add("Grade / Gred",grade(t));
+    add("Categories / Kategori",labelValue(t,["Categories","Kategori"]));
+    add("Specializations / Pengkhususan",labelValue(t,["Specializations","Pengkhususan"]),"",false,true);
+    add("Validity Period",labelValue(t,["Validity Period","Tarikh Habis Tempoh Perakuan"]));
+    add("Tarikh Mula Berkuatkuasa",labelValue(t,["Tarikh Mula Berkuatkuasa"]));
+    add("Status",labelValue(t,["Status"]));
+  } else {
+    add("Detected Nationality / Country",nat,"Only explicit country evidence is used.");
+    add("Detected State",st,"Only explicit state evidence is used.");
+    add("Detected IC Number",strictNumberGuard(ic).value,strictNumberGuard(ic).reason,strictNumberGuard(ic).flag);
+    add("Detected Passport Number",pp);
+    add("Detected Address",address,"Only explicit labelled address evidence is used.",false,true);
+  }
+  const complete=field("Complete OCR text",t,"This is the preserved OCR/source text. Do not treat heuristic fields above as a replacement for it.",false,true);
+  out.push(complete);
+  return {profile,fields:out};
+}
+function mrz(t){
+  const a=lines(t).filter(x=>/[<]{3,}/.test(x)&&/[A-Z0-9<]{25,}/.test(x));
+  return a.slice(-2).join("\\n");
+}
+function grade(t){const m=t.match(/\\bG[1-7]\\b/i);return m?m[0].toUpperCase():""}
+function render(){
+  $("results").style.display=state.results.length?"block":"none";$("empty").style.display=state.results.length?"none":"grid";
+  $("results").innerHTML="";let flags=0,pages=0,all=[];
+  state.results.forEach(r=>{
+    pages+=r.pages||1;flags+=r.fields.reduce((n,f)=>n+(f.flag?1:0),0);
+    const doc=document.createElement("div");doc.className="doc";
+    const head=`<div class="dochead"><div class="docname">${esc(r.name)}</div><span class="badge"><i class="dot ${r.confidence!==null&&r.confidence<70?"red":""}"></i>${r.confidence===null?"TEXT":Math.round(r.confidence)+"% OCR"}</span></div>`;
+    const fg=r.fields.map(f=>`<div class="field ${f.full?"full":""}"><div class="fk">${esc(f.key)}</div><div class="fv ${f.flag?"warn":""}">${esc(f.value||"NOT DETECTED")}</div>${f.reason?`<div class="reason">${esc(f.reason)}</div>`:""}</div>`).join("");
+    doc.innerHTML=head+`<div class="fieldgrid">${fg}</div>`;
+    $("results").appendChild(doc);all.push(`[${r.name}]\\n${r.text}`);
+  });
+  state.flags=flags;state.pages=pages;state.allText=all.join("\\n\\n");
+  $("pagesKpi").textContent=pages;$("flagsKpi").textContent=flags;$("summary").textContent=`${state.results.length} document(s) • ${pages} page(s) • ${flags} ambiguity flag(s)`;
+  $("flagsKpi").style.color=flags?"#b14b00":"#167f59";$("copyBtn").disabled=!state.allText;$("exportBtn").disabled=!state.results.length;
+}
+async function scan(){
+  if(state.running||!state.files.length)return;
+  state.running=true;$("scanBtn").disabled=true;$("engineState").textContent="ENGINE RUNNING";state.results=[];$("log").innerHTML="";render();
+  try{
+    for(let i=0;i<state.files.length;i++){
+      const x=state.files[i];status(`Processing ${i+1}/${state.files.length}: ${x.file.name}`);log(`Starting ${x.side.toUpperCase()} • ${x.file.name}`);
+      let o;
+      try{o=await extract(x.file)}catch(e){log(`Failed ${x.file.name}: ${e.message}`,"danger");continue}
+      const t=normalizeText(o.text||"");const parsed=parse($("profile").value,t);
+      state.results.push({name:`${x.side.toUpperCase()} • ${x.file.name}`,text:t,fields:parsed.fields,confidence:o.confidence,pages:o.pages||1,profile:parsed.profile});
+      render();log(`Finished ${x.file.name} • ${o.pages||1} page(s)${o.confidence!==null?" • "+Math.round(o.confidence)+"% OCR":""}`);
+      $("bar").style.width=Math.round((i+1)/state.files.length*100)+"%";
+    }
+    status("Completed. Review flagged values and the complete OCR text before relying on extracted fields.");
+    $("notes").innerHTML=state.flags?`<span class="danger"><b>${state.flags}</b> field(s) require manual verification.</span> The app did not silently convert 6↔8 or P↔F.`:`<span class="success">No ambiguity flags were generated.</span> This does not mean OCR is guaranteed error-free; visual verification is still required for important documents.`;
+  }finally{state.running=false;$("scanBtn").disabled=!state.files.length;$("engineState").textContent="ENGINE READY"}
+}
+$("scanBtn").onclick=scan;
+$("clearBtn").onclick=()=>{state.files=[];state.results=[];state.allText="";$("bar").style.width="0";$("status").textContent="Add one or more files. Maximum configured upload size: 500 MB per file.";$("log").innerHTML="";$("notes").textContent="No results yet.";render();renderQueue();$("scanBtn").disabled=true};
+$("copyBtn").onclick=async()=>{await navigator.clipboard.writeText(state.allText);status("Complete OCR text copied to clipboard.")};
+$("exportBtn").onclick=()=>{
+ const blob=new Blob([JSON.stringify({generatedAt:new Date().toISOString(),results:state.results},null,2)],{type:"application/json"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="neonvault-ocr.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+window.addEventListener("error",e=>log("Browser error: "+e.message,"danger"));
+</script>
+<script type="module">
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+window.pdfjsLib=pdfjsLib;
+</script>
 </body>
 </html>
