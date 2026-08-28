@@ -1,901 +1,206 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Production Neumorphic OCR Engine</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <style>
-        :root {
-            --bg-color: #e0e5ec;
-            --text-main: #2d3748;
-            --text-muted: #718096;
-            --primary: #3182ce;
-            --primary-shadow: rgba(49, 130, 206, 0.4);
-            --danger: #e53e3e;
-            --success: #38a169;
-            --shadow-light: #ffffff;
-            --shadow-dark: #a3b1c6;
-            
-            --neu-outset: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light);
-            --neu-outset-sm: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
-            --neu-inset: inset 6px 6px 10px var(--shadow-dark), inset -6px -6px 10px var(--shadow-light);
-            --neu-inset-sm: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-            --neu-button: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
-            --neu-button-active: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Poppins', sans-serif;
-            color: var(--text-main);
-        }
-
-        body {
-            background-color: var(--bg-color);
-            min-height: 100vh;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
-
-        header {
-            text-align: center;
-            padding: 1.5rem;
-            background: var(--bg-color);
-            border-radius: 20px;
-            box-shadow: var(--neu-outset);
-        }
-
-        header h1 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-
-        header p {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            margin-top: 5px;
-        }
-
-        .container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            width: 100%;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        @media (max-width: 1024px) {
-            .container { grid-template-columns: 1fr; }
-        }
-
-        .card {
-            background: var(--bg-color);
-            border-radius: 20px;
-            padding: 1.8rem;
-            box-shadow: var(--neu-outset);
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .card-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 2px solid rgba(163, 177, 198, 0.2);
-            padding-bottom: 10px;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        select {
-            width: 100%;
-            padding: 14px 18px;
-            border: none;
-            outline: none;
-            background: var(--bg-color);
-            border-radius: 12px;
-            box-shadow: var(--neu-inset);
-            font-size: 0.95rem;
-            color: var(--text-main);
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .dropzone-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        @media (max-width: 600px) {
-            .dropzone-container { grid-template-columns: 1fr; }
-        }
-
-        .dropzone {
-            border: 2px dashed #a3b1c6;
-            border-radius: 16px;
-            padding: 1.5rem 1rem;
-            text-align: center;
-            cursor: pointer;
-            background: var(--bg-color);
-            box-shadow: var(--neu-outset-sm);
-            transition: all 0.3s ease;
-            position: relative;
-            min-height: 190px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .dropzone:hover, .dropzone.dragover {
-            box-shadow: var(--neu-inset-sm);
-            border-color: var(--primary);
-        }
-
-        .dropzone i {
-            font-size: 2.2rem;
-            color: var(--primary);
-            margin-bottom: 10px;
-        }
-
-        .dropzone p {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .dropzone input[type="file"] { display: none; }
-
-        .preview-img {
-            max-width: 100%;
-            max-height: 120px;
-            border-radius: 8px;
-            object-fit: contain;
-            box-shadow: var(--neu-outset-sm);
-        }
-
-        .file-info {
-            font-size: 0.75rem;
-            color: var(--primary);
-            margin-top: 6px;
-            font-weight: 600;
-            word-break: break-all;
-        }
-
-        .btn {
-            padding: 14px 28px;
-            border: none;
-            border-radius: 12px;
-            background: var(--bg-color);
-            box-shadow: var(--neu-button);
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: var(--primary);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .btn:hover { color: #2b6cb0; }
-        .btn:active {
-            box-shadow: var(--neu-button-active);
-            transform: translateY(1px);
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: #ffffff !important;
-            box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .progress-wrapper {
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .progress-bar-bg {
-            width: 100%;
-            height: 14px;
-            border-radius: 10px;
-            background: var(--bg-color);
-            box-shadow: var(--neu-inset-sm);
-            overflow: hidden;
-            padding: 2px;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: var(--primary);
-            border-radius: 8px;
-            transition: width 0.3s ease;
-        }
-
-        .progress-status {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .results-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            max-height: 520px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-
-        @media (max-width: 600px) {
-            .results-grid { grid-template-columns: 1fr; }
-        }
-
-        .results-grid::-webkit-scrollbar { width: 6px; }
-        .results-grid::-webkit-scrollbar-track {
-            background: var(--bg-color);
-            box-shadow: var(--neu-inset-sm);
-            border-radius: 10px;
-        }
-        .results-grid::-webkit-scrollbar-thumb {
-            background: #a3b1c6;
-            border-radius: 10px;
-        }
-
-        .data-field {
-            background: var(--bg-color);
-            box-shadow: var(--neu-outset-sm);
-            border-radius: 12px;
-            padding: 10px 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .data-field.full-width { grid-column: span 2; }
-        @media (max-width: 600px) {
-            .data-field.full-width { grid-column: span 1; }
-        }
-
-        .data-field label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .data-field .value {
-            font-size: 0.88rem;
-            font-weight: 600;
-            color: var(--text-main);
-            word-break: break-word;
-        }
-
-        .data-field .value.failed {
-            color: var(--danger);
-            font-weight: 500;
-            font-size: 0.82rem;
-            font-style: italic;
-        }
-
-        .json-viewer {
-            display: none;
-            background: var(--bg-color);
-            box-shadow: var(--neu-inset);
-            border-radius: 12px;
-            padding: 1rem;
-            font-family: monospace;
-            font-size: 0.8rem;
-            white-space: pre-wrap;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-
-        .tab-menu {
-            display: flex;
-            gap: 10px;
-        }
-
-        .tab-btn {
-            padding: 6px 14px;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            background: var(--bg-color);
-            box-shadow: var(--neu-button);
-            border: none;
-        }
-
-        .tab-btn.active {
-            box-shadow: var(--neu-inset-sm);
-            color: var(--primary);
-            font-weight: 600;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuroOCR — Evidence-First Document OCR</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+<script type="module">
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
+window.pdfjsLib=pdfjsLib;
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+window.dispatchEvent(new Event("pdfjs-ready"));
+</script>
+<style>
+:root{--bg:#e8edf3;--ink:#17212b;--muted:#657487;--blue:#3f72ef;--green:#16865e;--amber:#b87912;--red:#c44747;--line:#c7d0dc;--s1:10px 10px 22px rgba(163,174,189,.72);--s2:-10px -10px 22px rgba(255,255,255,.92);--in:inset 5px 5px 12px rgba(163,174,189,.55),inset -5px -5px 12px rgba(255,255,255,.9)}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
+.app{height:100vh;padding:12px 15px;display:grid;grid-template-rows:68px 1fr 28px;gap:12px}header,.panel,.drop,.card,.stat,.field,.log,.notice{background:var(--bg);border-radius:20px;box-shadow:var(--s1),var(--s2)}
+header{padding:10px 17px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;align-items:center;gap:12px}.logo{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#628eff,#345de0);color:#fff;font-weight:950;box-shadow:6px 6px 12px #b4bfce,-5px -5px 12px #fff}h1{font-size:19px;margin:0}.sub{font-size:10px;color:var(--muted)}.actions{display:flex;gap:8px;align-items:center}
+.btn{border:0;padding:10px 13px;border-radius:13px;background:var(--bg);color:var(--ink);font-weight:800;box-shadow:6px 6px 12px #c2cbd6,-5px -5px 10px #fff;cursor:pointer}.btn:active{box-shadow:var(--in)}.primary{background:var(--blue);color:#fff}.pill{padding:7px 10px;border-radius:12px;box-shadow:var(--in);font-size:9px;font-weight:900;color:var(--muted)}
+.main{min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr) 375px;gap:14px}.panel{padding:13px;min-height:0;overflow:hidden}.left,.right{display:flex;flex-direction:column;gap:10px}.center{min-height:0;display:grid;grid-template-rows:155px 1fr;gap:12px}
+.drop{height:155px;border:2px dashed #b9c4d1;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:15px}.drop.drag{border-color:var(--blue)}.drop b{font-size:16px}.drop span{font-size:10px;color:var(--muted);max-width:700px;margin:5px 0 11px}.drop input{display:none}
+.title{font-size:10px;font-weight:950;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:2px 3px 6px}.control label{display:block;font-size:10px;font-weight:800;color:var(--muted);margin:0 0 5px 3px}.control select,.control input{width:100%;border:0;padding:9px;border-radius:12px;background:var(--bg);box-shadow:var(--in);color:var(--ink);outline:0}
+.toggle{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:12px;box-shadow:var(--in);font-size:10px;font-weight:800}.switch{width:37px;height:20px;border-radius:20px;background:#c6cfd9;position:relative}.switch i{position:absolute;width:14px;height:14px;top:3px;left:3px;border-radius:50%;background:#fff;transition:.2s}.switch.on{background:var(--blue)}.switch.on i{left:20px}
+.filelist{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px}.file{padding:9px;border-radius:12px;box-shadow:var(--in);font-size:10px}.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file small{color:var(--muted)}.side{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.workspace{display:grid;grid-template-rows:40px 1fr;gap:9px}.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.tab{border:0;border-radius:12px;background:var(--bg);box-shadow:var(--s1),var(--s2);font-size:10px;font-weight:900;color:var(--muted)}.tab.active{color:var(--blue);box-shadow:var(--in)}.output{min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:10px}.view{min-height:0;overflow:auto;padding:12px;border-radius:18px;box-shadow:var(--in)}.empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:11px;padding:20px}
+.previewimg{max-width:100%;display:block;margin:auto;border-radius:12px}.text{white-space:pre-wrap;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.fields{display:grid;grid-template-columns:1fr 1fr;gap:7px}.field{padding:9px;box-shadow:var(--in);min-width:0}.field.full{grid-column:1/-1}.field .key{font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:950}.field .value{font-size:11px;font-weight:750;word-break:break-word;margin-top:3px}.status{font-size:8px;display:inline-block;margin-top:5px;padding:3px 6px;border-radius:7px}.detected{background:#dcefe8;color:var(--green)}.notdetected{background:#f2e7d0;color:var(--amber)}.verify{background:#f3dddd;color:var(--red)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}.stat{padding:9px;box-shadow:var(--in)}.stat .n{font-size:18px;font-weight:950}.stat .l{font-size:8px;color:var(--muted);text-transform:uppercase}.progress{padding:9px;box-shadow:var(--in);border-radius:14px}.track{height:7px;border-radius:8px;background:#cbd4df;box-shadow:inset 2px 2px 4px #aeb8c4;overflow:hidden}.bar{height:100%;width:0;background:var(--blue)}#state{font-size:9px;color:var(--muted);margin-top:5px}.notice{padding:9px;box-shadow:var(--in);font-size:9px;line-height:1.35}.log{height:95px;box-shadow:var(--in);padding:9px;overflow:auto;font:9px/1.4 ui-monospace,monospace;color:#475564}
+footer{font-size:8px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;padding:0 7px}
+@media(max-width:1050px){body{overflow:auto}.app{height:auto;min-height:100vh}.main{grid-template-columns:1fr}.center{min-height:650px}.output{grid-template-columns:1fr}.app{grid-template-rows:68px auto 28px}}
+</style>
 </head>
 <body>
-
-    <header>
-        <h1><i class="fa-solid fa-eye"></i> Production Neumorphic OCR Engine</h1>
-        <p>Strict Multi-Document Verification System • Max File Capacity: 500MB</p>
-    </header>
-
-    <div class="container">
-        <div class="card">
-            <div class="card-title">
-                <i class="fa-solid fa-sliders"></i> Selection & Upload
-            </div>
-
-            <div class="input-group">
-                <label for="docType"><i class="fa-solid fa-id-card"></i> Target Document Format</label>
-                <select id="docType" onchange="handleDocTypeChange()">
-                    <option value="intl_passport">International Passport</option>
-                    <option value="my_passport">Malaysian Passport</option>
-                    <option value="my_nric" selected>Malaysian NRIC (MyKad)</option>
-                    <option value="my_pr">Malaysian Permanent Resident (MyPR)</option>
-                    <option value="my_dl">Malaysian Driving Licence</option>
-                    <option value="intl_dl">International Driving License</option>
-                    <option value="ssm_cert">SSM Certificate (Suruhanjaya Syarikat Malaysia)</option>
-                    <option value="cidb_ppk">CIDB PPK Contractor Certificate</option>
-                </select>
-            </div>
-
-            <div class="dropzone-container" id="dropzoneContainer">
-                <div class="dropzone" id="dzFront" onclick="document.getElementById('fileFront').click()">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <p id="labelFront"><strong>Upload Front / Page 2</strong></p>
-                    <p style="font-size: 0.7rem; margin-top: 4px;">PNG, JPG, WEBP, PDF up to 500MB</p>
-                    <input type="file" id="fileFront" accept="image/*,.pdf" onchange="handleFileSelect(event, 'front')">
-                    <div id="previewContainerFront"></div>
-                </div>
-
-                <div class="dropzone" id="dzBack" onclick="document.getElementById('fileBack').click()">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <p id="labelBack"><strong>Upload Back / Page 3</strong></p>
-                    <p style="font-size: 0.7rem; margin-top: 4px;">PNG, JPG, WEBP, PDF up to 500MB</p>
-                    <input type="file" id="fileBack" accept="image/*,.pdf" onchange="handleFileSelect(event, 'back')">
-                    <div id="previewContainerBack"></div>
-                </div>
-            </div>
-
-            <div class="progress-wrapper" id="progressWrapper">
-                <div class="progress-status">
-                    <span id="progressText">Initializing OCR Engine...</span>
-                    <span id="progressPercent">0%</span>
-                </div>
-                <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" id="progressBarFill"></div>
-                </div>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-primary" style="flex: 2;" onclick="processOCR()">
-                    <i class="fa-solid fa-microchip"></i> Run Strict Analysis
-                </button>
-                <button class="btn" style="flex: 1;" onclick="resetForm()">
-                    <i class="fa-solid fa-rotate-right"></i> Reset
-                </button>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title" style="justify-content: space-between;">
-                <span><i class="fa-solid fa-list-check"></i> Analysis Parameters</span>
-                <div class="tab-menu">
-                    <button class="tab-btn active" id="tabFormatted" onclick="switchTab('formatted')">Parsed</button>
-                    <button class="tab-btn" id="tabJson" onclick="switchTab('json')">JSON View</button>
-                </div>
-            </div>
-
-            <div class="results-grid" id="resultsGrid">
-                <div class="data-field full-width" style="text-align: center; padding: 2.5rem 1rem;">
-                    <i class="fa-solid fa-magnifying-glass" style="font-size: 2.2rem; color: var(--text-muted); margin-bottom: 12px;"></i>
-                    <p class="value" style="color: var(--text-muted);">Upload document scans to perform strict OCR analysis.</p>
-                </div>
-            </div>
-
-            <div class="json-viewer" id="jsonViewer">{}</div>
-
-            <div class="btn-group" style="margin-top: auto;">
-                <button class="btn" style="flex: 1;" onclick="exportData('json')">
-                    <i class="fa-solid fa-download"></i> Export JSON
-                </button>
-                <button class="btn" style="flex: 1;" onclick="exportData('csv')">
-                    <i class="fa-solid fa-file-csv"></i> Export CSV
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
-        let files = { front: null, back: null };
-        let extractedDataStore = {};
-
-        // Configure Drag and Drop
-        ['dzFront', 'dzBack'].forEach(id => {
-            const dz = document.getElementById(id);
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => dz.addEventListener(evt, preventDefaults, false));
-            ['dragenter', 'dragover'].forEach(evt => dz.addEventListener(evt, () => dz.classList.add('dragover'), false));
-            ['dragleave', 'drop'].forEach(evt => dz.addEventListener(evt, () => dz.classList.remove('dragover'), false));
-            dz.addEventListener('drop', (e) => {
-                const type = id === 'dzFront' ? 'front' : 'back';
-                if (e.dataTransfer.files.length) validateAndSetFile(e.dataTransfer.files[0], type);
-            });
-        });
-
-        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-
-        function handleFileSelect(e, type) {
-            if (e.target.files.length) validateAndSetFile(e.target.files[0], type);
-        }
-
-        function validateAndSetFile(file, type) {
-            if (file.size > MAX_FILE_SIZE) {
-                alert(`File size exceeds 500MB limit. Selected size: ${(file.size / (1024 * 1024)).toFixed(2)} MB`);
-                return;
-            }
-
-            files[type] = file;
-            const container = document.getElementById(type === 'front' ? 'previewContainerFront' : 'previewContainerBack');
-            const label = document.getElementById(type === 'front' ? 'labelFront' : 'labelBack');
-            
-            label.style.display = 'none';
-            container.innerHTML = '';
-
-            if (file.type.startsWith('image/')) {
-                const img = document.createElement('img');
-                img.src = URL.createObjectURL(file);
-                img.className = 'preview-img';
-                container.appendChild(img);
-            } else {
-                const icon = document.createElement('i');
-                icon.className = 'fa-solid fa-file-pdf';
-                icon.style.fontSize = '2.5rem';
-                icon.style.color = 'var(--primary)';
-                container.appendChild(icon);
-            }
-
-            const info = document.createElement('div');
-            info.className = 'file-info';
-            info.innerText = `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)`;
-            container.appendChild(info);
-        }
-
-        function handleDocTypeChange() {
-            const docType = document.getElementById('docType').value;
-            const dzBack = document.getElementById('dzBack');
-            const labelFront = document.getElementById('labelFront');
-            const labelBack = document.getElementById('labelBack');
-
-            if (docType === 'ssm_cert' || docType === 'cidb_ppk') {
-                dzBack.style.display = 'none';
-                labelFront.innerHTML = '<strong>Upload Certificate Page</strong>';
-            } else {
-                dzBack.style.display = 'flex';
-                labelFront.innerHTML = docType.includes('passport') ? '<strong>Upload Page 2 (Bio Data)</strong>' : '<strong>Upload Card Front</strong>';
-                labelBack.innerHTML = docType.includes('passport') ? '<strong>Upload Page 3 (Signatures)</strong>' : '<strong>Upload Card Back</strong>';
-            }
-        }
-
-        async function processOCR() {
-            if (!files.front && !files.back) {
-                alert('Please select or drop at least one document image first.');
-                return;
-            }
-
-            const progressWrapper = document.getElementById('progressWrapper');
-            const progressBarFill = document.getElementById('progressBarFill');
-            const progressText = document.getElementById('progressText');
-            const progressPercent = document.getElementById('progressPercent');
-
-            progressWrapper.style.display = 'flex';
-            progressBarFill.style.width = '0%';
-            progressText.innerText = 'Initializing OCR Machine...';
-
-            try {
-                let textFront = '';
-                let textBack = '';
-
-                const worker = await Tesseract.createWorker('eng', 1, {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            const pct = Math.round(m.progress * 100);
-                            progressBarFill.style.width = `${pct}%`;
-                            progressText.innerText = `Analyzing layout: ${m.status}`;
-                            progressPercent.innerText = `${pct}%`;
-                        }
-                    }
-                });
-
-                if (files.front) {
-                    progressText.innerText = 'Analyzing Front Scan / Primary Page...';
-                    const ret = await worker.recognize(files.front);
-                    textFront = ret.data.text || '';
-                }
-
-                if (files.back) {
-                    progressText.innerText = 'Analyzing Back Scan / Secondary Page...';
-                    const ret = await worker.recognize(files.back);
-                    textBack = ret.data.text || '';
-                }
-
-                await worker.terminate();
-
-                progressText.innerText = 'Applying verification rules...';
-                const docType = document.getElementById('docType').value;
-                extractedDataStore = parseDocumentStrict(docType, textFront, textBack);
-
-                renderResults(extractedDataStore);
-                progressWrapper.style.display = 'none';
-
-            } catch (err) {
-                console.error(err);
-                alert('OCR Processing Error: ' + err.message);
-                progressWrapper.style.display = 'none';
-            }
-        }
-
-        // Strict Failure Justification Helper
-        function getReasoning(foundValue, sideUploaded, defaultReason = "Text unreadable, blurry, low resolution, or obstructed") {
-            if (!sideUploaded) {
-                return "Not Detected: Image page/side was not uploaded";
-            }
-            if (!foundValue || foundValue.trim() === '') {
-                return `Not Detected: ${defaultReason}`;
-            }
-            return foundValue;
-        }
-
-        // Strict Extraction Engine
-        function parseDocumentStrict(docType, frontText, backText) {
-            const combined = `${frontText}\n${backText}`;
-            const hasFront = !!files.front;
-            const hasBack = !!files.back;
-
-            let result = {};
-
-            switch (docType) {
-                case 'intl_passport':
-                    const pNoIntl = matchPattern(frontText, /[A-Z][0-9]{8}/);
-                    const pNameIntl = matchPattern(frontText, /NAME[\/\s:]*([A-Z\s<]{4,50})/i) || extractCapitalLine(frontText);
-                    const pDobIntl = matchPattern(frontText, /(?:DOB|DATE OF BIRTH)[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || matchPattern(frontText, /(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/);
-                    const mrzIntl = extractMRZLines(frontText);
-
-                    result = {
-                        "Holder Photo": hasFront ? "Detected on Page 2 Bio Data" : getReasoning("", false),
-                        "Type": matchPattern(combined, /Type[\/\s:]*([A-Z0-9]{1,2})/i) || (mrzIntl ? "P" : getReasoning("", hasFront)),
-                        "Country Code": matchPattern(combined, /Country Code[\/\s:]*([A-Z]{3})/i) || matchPattern(mrzIntl, /P<([A-Z]{3})/) || getReasoning("", hasFront),
-                        "Passport Number": pNoIntl || matchPattern(mrzIntl, /([A-Z0-9]{8,9})/) || getReasoning("", hasFront),
-                        "Full Name": pNameIntl || getReasoning("", hasFront),
-                        "Nationality": matchPattern(combined, /Nationality[\/\s:]*([A-Z\s]+)/i) || getReasoning("", hasFront),
-                        "Date of Birth": pDobIntl || getReasoning("", hasFront),
-                        "Sex / Gender": matchPattern(combined, /Sex[\/\s:]*([MF])/i) || getReasoning("", hasFront),
-                        "Place of Birth": matchPattern(combined, /Place of Birth[\/\s:]*([A-Z\s,]+)/i) || getReasoning("", hasFront),
-                        "Date of Issue": matchPattern(combined, /Issue[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || getReasoning("", hasFront),
-                        "Date of Expiry": matchPattern(combined, /Expiry[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || getReasoning("", hasFront),
-                        "Issuing Authority": matchPattern(combined, /Authority[\/\s:]*([A-Z\s]+)/i) || getReasoning("", hasFront),
-                        "Machine-Readable Zone (MRZ)": mrzIntl || getReasoning("", hasFront, "MRZ lines obscured or not present at bottom"),
-                        "Holder's Signature (Page 3)": hasBack ? "Captured from Page 3 Scan" : getReasoning("", false),
-                        "Observations / Endorsements": matchPattern(backText, /Endorsements[\/\s:]*([A-Z0-9\s]+)/i) || getReasoning("", hasBack, "No official endorsement notes found on Page 3")
-                    };
-                    break;
-
-                case 'my_passport':
-                    const mypNo = matchPattern(frontText, /[A-Z]\d{8}/);
-                    const mypName = extractCapitalLine(frontText);
-                    const mypIc = matchPattern(combined, /\d{6}-\d{2}-\d{4}/);
-                    const mrzMy = extractMRZLines(frontText);
-
-                    result = {
-                        "Page 2 Identity Window": hasFront ? "Polycarbonate Security Window Detected" : getReasoning("", false),
-                        "Type / Jenis": "P",
-                        "Country Code / Kod Negara": "MYS",
-                        "Passport Number / Nombor Pasport": mypNo || getReasoning("", hasFront),
-                        "Full Name / Nama": mypName || getReasoning("", hasFront),
-                        "Nationality / Warganegara": matchPattern(combined, /WARGANEGARA\s*([A-Z]+)/i) || "MALAYSIA",
-                        "Date of Birth / Tarikh Lahir": matchPattern(frontText, /(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/) || getReasoning("", hasFront),
-                        "Identity Card Number (MyKad)": mypIc || getReasoning("", hasFront),
-                        "Gender / Jantina": matchPattern(frontText, /Jantina[\/\s:]*([MF])/i) || getReasoning("", hasFront),
-                        "Place of Birth / Tempat Lahir": matchPattern(frontText, /Tempat Lahir[\/\s:]*([A-Z\s]+)/i) || getReasoning("", hasFront),
-                        "Date of Issue / Tarikh Dikeluarkan": matchPattern(frontText, /Dikeluarkan[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || getReasoning("", hasFront),
-                        "Date of Expiry / Tarikh Kepupusan": matchPattern(frontText, /Kepupusan[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || getReasoning("", hasFront),
-                        "Issuing Authority / Pihak Berkuasa": "JABATAN IMIGRESEN MALAYSIA",
-                        "Page 3 Signature": hasBack ? "Verified Digital Signature Facsimile" : getReasoning("", false),
-                        "Page 3 Observation Notes": matchPattern(backText, /Endorsement[\/\s:]*([A-Z0-9\s]+)/i) || getReasoning("", hasBack, "No endorsement details recorded")
-                    };
-                    break;
-
-                case 'my_nric':
-                    const icMatch = combined.match(/(\d{6}-\d{2}-\d{4})/) || combined.match(/(\d{12})/);
-                    let genderCalculated = getReasoning("", hasFront);
-                    
-                    if (icMatch) {
-                        const cleanIC = icMatch[0].replace(/-/g, '');
-                        const lastDigit = parseInt(cleanIC.slice(-1));
-                        if (!isNaN(lastDigit)) {
-                            genderCalculated = (lastDigit % 2 === 0) ? "F (Female / Perempuan)" : "M (Male / Lelaki)";
-                        }
-                    }
-
-                    const hasHeader = /KAD PENGENALAN|MALAYSIA/i.test(frontText);
-                    const addressParsed = extractAddress(frontText);
-
-                    result = {
-                        "Header and Logos": hasHeader ? 'Verified: "Kad Pengenalan Malaysia" & Crest' : getReasoning("", hasFront, "Header text unreadable or card inverted"),
-                        "Photograph": hasFront ? "Color Photo Verified" : getReasoning("", false),
-                        "IC Number": icMatch ? icMatch[0] : getReasoning("", hasFront, "12-digit IC format YYMMDD-PB-###G missing or blurry"),
-                        "Full Name": extractCapitalLine(frontText) || getReasoning("", hasFront),
-                        "Residential Address": addressParsed || getReasoning("", hasFront, "Address layout or postcode unreadable"),
-                        "Gender / Sex": genderCalculated,
-                        "Citizenship / Nationality": matchPattern(frontText, /(WARGANEGARA\s*MALAYSIA|WARGANEGARA)/i) || getReasoning("", hasFront),
-                        "Race": matchPattern(frontText, /(MELAYU|CINA|INDIAN|ISLAM|OTHERS)/i) || getReasoning("", hasFront, "Race parameter not clear or omitted"),
-                        "Smart Chip": hasFront ? "Gold-colored Microchip Verified" : getReasoning("", false),
-                        "Extended IC Number (Back)": matchPattern(backText, /\d{12}-\d{2}/) || (icMatch && hasBack ? `${icMatch[0]}-01` : getReasoning("", hasBack)),
-                        "Barcode or QR Code": hasBack ? "Scanned Security Code Matrix Verified" : getReasoning("", false),
-                        "Security Elements": hasBack ? "Bunga Raya & Ultraviolet Security Patterns Verified" : getReasoning("", false)
-                    };
-                    break;
-
-                case 'my_pr':
-                    const prIcMatch = combined.match(/(\d{6}-\d{2}-\d{4})/);
-                    let prGender = getReasoning("", hasFront);
-                    if (prIcMatch) {
-                        const last = parseInt(prIcMatch[0].slice(-1));
-                        if (!isNaN(last)) prGender = (last % 2 === 0) ? "F (Perempuan / Female)" : "M (Lelaki / Male)";
-                    }
-
-                    result = {
-                        "Background Color": hasFront ? "Distinctive Red Scheme Detected" : getReasoning("", false),
-                        "Card Heading": matchPattern(frontText, /PEMASTAUTIN TETAP/i) ? "KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP" : getReasoning("", hasFront),
-                        "Card Holder Photo": hasFront ? "Verified High-Resolution Photo" : getReasoning("", false),
-                        "NRIC Number": prIcMatch ? prIcMatch[0] : getReasoning("", hasFront),
-                        "Full Name": extractCapitalLine(frontText) || getReasoning("", hasFront),
-                        "Permanent Address": extractAddress(frontText) || getReasoning("", hasFront),
-                        "Gender / Sex": prGender,
-                        "Biometric Smart Chip": hasFront ? "Gold Contact Pad Detected" : getReasoning("", false),
-                        "Original Nationality (Back)": matchPattern(backText, /ORIGIN[\/\s:]*([A-Z]+)/i) || matchPattern(backText, /NATIONALITY[\/\s:]*([A-Z]+)/i) || getReasoning("", hasBack),
-                        "Entry Permit Details (Back)": matchPattern(backText, /(?:PERMIT|NO PERMIT)[\/\s:]*([A-Z0-9\/]+)/i) || getReasoning("", hasBack),
-                        "Embedded Microchip Data": hasBack ? "Fingerprint Biometric Microchip Verified" : getReasoning("", false),
-                        "Security Features": hasBack ? "Holographic Crest & Anti-Forgery Microtext Verified" : getReasoning("", false)
-                    };
-                    break;
-
-                case 'my_dl':
-                    const dlCategory = frontText.match(/(?:CLASS|KELAS)?\s*([B][2]?|[D][A]?|[E])/g);
-                    
-                    result = {
-                        "Background Design": hasFront ? "Sultan Abdul Samad Motifs Verified" : getReasoning("", false),
-                        "Holder Photo": hasFront ? "Passport-Style Photo Verified" : getReasoning("", false),
-                        "Full Name": extractCapitalLine(frontText) || getReasoning("", hasFront),
-                        "Identity Card / Passport": matchPattern(combined, /\d{6}-\d{2}-\d{4}/) || matchPattern(combined, /[A-Z]\d{8}/) || getReasoning("", hasFront),
-                        "Nationality": "MALAYSIA",
-                        "Address": extractAddress(frontText) || getReasoning("", hasFront),
-                        "Category / Class of License": dlCategory ? dlCategory.join(', ') : getReasoning("", hasFront, "Vehicle classes (B2, D, DA) unreadable"),
-                        "Validity Dates": matchPattern(frontText, /\d{2}[\/\.-]\d{2}[\/\.-]\d{4}\s*-\s*\d{2}[\/\.-]\d{2}[\/\.-]\d{4}/) || getReasoning("", hasFront),
-                        "License / Serial Number (Back)": matchPattern(backText, /[A-Z0-9]{8,12}/) || getReasoning("", hasBack, "JPJ verification serial obscured"),
-                        "Vehicle Classes Table": hasBack ? "Detailed Entitlement Breakdown Present" : getReasoning("", false),
-                        "Signature": hasBack ? "Director-General Facsimile Signature Verified" : getReasoning("", false),
-                        "Security Features": hasBack ? "Holographic 10-Year Lifespan Pattern Verified" : getReasoning("", false)
-                    };
-                    break;
-
-                case 'intl_dl':
-                    result = {
-                        "Emblem & Title": matchPattern(combined, /CONVENTION ON ROAD TRAFFIC/i) ? "UN Convention on Road Traffic (1949/1968) Verified" : getReasoning("", hasFront),
-                        "Issuing Authority": matchPattern(combined, /ISSUING AUTHORITY[\/\s:]*([A-Z\s]+)/i) || getReasoning("", hasFront),
-                        "Validity Dates": matchPattern(combined, /\d{2}[\/\.-]\d{2}[\/\.-]\d{4}/) || getReasoning("", hasFront),
-                        "Holder's Surname / Given Name": extractCapitalLine(frontText) || getReasoning("", hasFront),
-                        "Place of Birth": matchPattern(frontText, /BIRTH[\/\s:]*([A-Z\s,]+)/i) || getReasoning("", hasFront),
-                        "Date of Birth": matchPattern(frontText, /(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/) || getReasoning("", hasFront),
-                        "Permanent Residence": extractAddress(frontText) || getReasoning("", hasFront),
-                        "Photograph & Signature": hasFront ? "Official Embossed Photo & Signature Present" : getReasoning("", false),
-                        "Vehicle Categories (A-E)": matchPattern(backText, /[A-E]\s*-\s*[A-Z\s]+/g) || getReasoning("", hasBack, "Category icons (A, B, C, D, E) unreadable"),
-                        "Validation Stamps": matchPattern(backText, /STAMP[\/\s:]*([A-Z0-9\s]+)/i) || getReasoning("", hasBack, "No category stamps detected"),
-                        "Territorial Validity List": hasBack ? "Recognized Contracting States List Verified" : getReasoning("", false)
-                    };
-                    break;
-
-                case 'ssm_cert':
-                    result = {
-                        "Company / Entity Name": extractCapitalLine(frontText) || getReasoning("", hasFront),
-                        "Registration / Incorporation Number": matchPattern(frontText, /\d{12}/) || matchPattern(frontText, /\d{6}-[A-Z]/) || getReasoning("", hasFront),
-                        "Registration Date": matchPattern(frontText, /(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/) || getReasoning("", hasFront),
-                        "Business Type / Structure": matchPattern(frontText, /(SENDIRIAN\s*BERHAD|SDN\.\s*BHD\.|BERHAD|ENTERPRISE|PERKONGSIAN)/i) || getReasoning("", hasFront),
-                        "Business Status & Expiry Date": matchPattern(frontText, /STATUS[\/\s:]*([A-Z0-9\s\/-]+)/i) || getReasoning("", hasFront),
-                        "Registered and Business Address": extractAddress(frontText) || getReasoning("", hasFront),
-                        "Nature of Business & MSIC Codes": matchPattern(frontText, /\d{5}\s*-\s*[A-Z\s]+/i) || getReasoning("", hasFront, "MSIC activity code not detected"),
-                        "Owner / Director Details": matchPattern(frontText, /(?:DIRECTOR|PEMILIK)[\/\s:]*([A-Z\s]+)/i) || getReasoning("", hasFront),
-                        "Shareholder Information": matchPattern(frontText, /CAPITAL[\/\s:]*([A-Z0-9\s,\.]+)/i) || getReasoning("", hasFront, "Share breakdown unavailable"),
-                        "Branch Information": matchPattern(frontText, /BRANCH[\/\s:]*([A-Z0-9\s]+)/i) || getReasoning("", hasFront, "No branches recorded"),
-                        "Financial Data & Charges": matchPattern(frontText, /CHARGE[\/\s:]*([A-Z0-9\s]+)/i) || getReasoning("", hasFront, "No corporate charge details found")
-                    };
-                    break;
-
-                case 'cidb_ppk':
-                    const gradeMatch = frontText.match(/G[1-7]/);
-                    let gradeLimit = getReasoning("", hasFront);
-                    if (gradeMatch) {
-                        const limits = {
-                            "G1": "Projects up to RM200,000",
-                            "G2": "Projects up to RM500,000",
-                            "G3": "Projects up to RM1,000,000",
-                            "G4": "Projects up to RM3,000,000",
-                            "G5": "Projects up to RM5,000,000",
-                            "G6": "Projects up to RM10,000,000",
-                            "G7": "No Limit / Unlimited Tender Value"
-                        };
-                        gradeLimit = `${gradeMatch[0]} (${limits[gradeMatch[0]] || 'Standard'})`;
-                    }
-
-                    result = {
-                        "Company Name": extractCapitalLine(frontText) || getReasoning("", hasFront),
-                        "Registration Number (ROC/ROB)": matchPattern(frontText, /\d{12}|\d{6}-[A-Z]/) || getReasoning("", hasFront),
-                        "CIDB Registration ID / No": matchPattern(frontText, /01\d{12}/) || matchPattern(frontText, /NO[\/\s:]*([0-9-]{10,20})/) || getReasoning("", hasFront),
-                        "Grade (G1 to G7)": gradeLimit,
-                        "Categories of Construction": matchPattern(frontText, /(?:KATEGORI|CATEGORY)[\/\s:]*([B|CE|ME\s,]+)/i) || getReasoning("", hasFront, "Category codes B/CE/ME unreadable"),
-                        "Specializations": matchPattern(frontText, /(?:PENGKHUSUSAN|SPECIALIZATION)[\/\s:]*([A-Z0-9\s,]+)/i) || getReasoning("", hasFront),
-                        "Validity Period": matchPattern(frontText, /\d{2}[\/\.-]\d{2}[\/\.-]\d{4}\s*(?:TO|SEHINGGA|-)\s*\d{2}[\/\.-]\d{2}[\/\.-]\d{4}/i) || getReasoning("", hasFront),
-                        "Operational Status": matchPattern(frontText, /AKTIF|ACTIVE/i) ? "ACTIVE / CERTIFIED UNDER ACT 520" : getReasoning("", hasFront)
-                    };
-                    break;
-            }
-
-            return result;
-        }
-
-        // Parsing Utilities
-        function matchPattern(text, regex) {
-            if (!text) return null;
-            const m = text.match(regex);
-            return m ? (m[1] ? m[1].trim() : m[0].trim()) : null;
-        }
-
-        function extractCapitalLine(text) {
-            if (!text) return null;
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-            for (let line of lines) {
-                if (/^[A-Z\s\/]{5,50}$/.test(line) && 
-                    !line.includes('MALAYSIA') && 
-                    !line.includes('PENGENALAN') && 
-                    !line.includes('PASPORT') && 
-                    !line.includes('PEREMPUAN') && 
-                    !line.includes('LELAKI')) {
-                    return line;
-                }
-            }
-            return null;
-        }
-
-        function extractAddress(text) {
-            if (!text) return null;
-            const match = text.match(/(NO|LOT|LEVEL|SUITE|JALAN|BLOCK)[\s\S]+?\d{5}[\s\S]+?(SELANGOR|KUALA LUMPUR|JOHOR|PENANG|PERAK|PAHANG|MELAKA|SABAH|SARAWAK|KEDAH|NEGERI SEMBILAN|KELANTAN|TERENGGANU)/i);
-            return match ? match[0].replace(/\n/g, ' ').trim() : null;
-        }
-
-        function extractMRZLines(text) {
-            if (!text) return null;
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l.includes('<'));
-            if (lines.length >= 2) return lines.slice(-2).join('\n');
-            return null;
-        }
-
-        function renderResults(data) {
-            const resultsGrid = document.getElementById('resultsGrid');
-            const jsonViewer = document.getElementById('jsonViewer');
-
-            resultsGrid.innerHTML = '';
-            jsonViewer.innerText = JSON.stringify(data, null, 4);
-
-            for (const [key, value] of Object.entries(data)) {
-                const fieldDiv = document.createElement('div');
-                fieldDiv.className = 'data-field';
-                
-                const isFailed = value.startsWith('Not Detected:');
-                if (value.length > 35 || key.includes('Address') || key.includes('MRZ') || isFailed) {
-                    fieldDiv.classList.add('full-width');
-                }
-
-                fieldDiv.innerHTML = `
-                    <label>${escapeHtml(key)}</label>
-                    <div class="value ${isFailed ? 'failed' : ''}">${escapeHtml(value)}</div>
-                `;
-                resultsGrid.appendChild(fieldDiv);
-            }
-        }
-
-        function escapeHtml(text) {
-            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        }
-
-        function switchTab(tab) {
-            document.getElementById('tabFormatted').classList.toggle('active', tab === 'formatted');
-            document.getElementById('tabJson').classList.toggle('active', tab === 'json');
-            
-            document.getElementById('resultsGrid').style.display = tab === 'formatted' ? 'grid' : 'none';
-            document.getElementById('jsonViewer').style.display = tab === 'json' ? 'block' : 'none';
-        }
-
-        function resetForm() {
-            files = { front: null, back: null };
-            extractedDataStore = {};
-            document.getElementById('fileFront').value = '';
-            document.getElementById('fileBack').value = '';
-            document.getElementById('previewContainerFront').innerHTML = '';
-            document.getElementById('previewContainerBack').innerHTML = '';
-            document.getElementById('labelFront').style.display = 'block';
-            document.getElementById('labelBack').style.display = 'block';
-            document.getElementById('resultsGrid').innerHTML = `
-                <div class="data-field full-width" style="text-align: center; padding: 2.5rem 1rem;">
-                    <i class="fa-solid fa-magnifying-glass" style="font-size: 2.2rem; color: var(--text-muted); margin-bottom: 12px;"></i>
-                    <p class="value" style="color: var(--text-muted);">Upload document scans to perform strict OCR analysis.</p>
-                </div>`;
-            document.getElementById('jsonViewer').innerText = '{}';
-        }
-
-        function exportData(format) {
-            if (!Object.keys(extractedDataStore).length) {
-                alert('No OCR extracted parameters available to export.');
-                return;
-            }
-
-            let dataStr = "";
-            let filename = `strict_ocr_export_${new Date().getTime()}`;
-
-            if (format === 'json') {
-                dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(extractedDataStore, null, 4));
-                filename += ".json";
-            } else if (format === 'csv') {
-                let csvContent = "Parameter Field,Extracted Value / Justification\n";
-                for (const [k, v] of Object.entries(extractedDataStore)) {
-                    csvContent += `"${k}","${v.replace(/"/g, '""')}"\n`;
-                }
-                dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
-                filename += ".csv";
-            }
-
-            const dlAnchor = document.createElement('a');
-            dlAnchor.setAttribute("href", dataStr);
-            dlAnchor.setAttribute("download", filename);
-            document.body.appendChild(dlAnchor);
-            dlAnchor.click();
-            dlAnchor.remove();
-        }
-    </script>
+<div class="app">
+<header>
+ <div class="brand"><div class="logo">N</div><div><h1>NeuroOCR</h1><div class="sub">Evidence-first OCR • never invents missing information</div></div></div>
+ <div class="actions"><span class="pill" id="engine">READY</span><button class="btn" id="clear">Clear</button><button class="btn primary" id="run">Run OCR</button></div>
+</header>
+
+<div class="main">
+<aside class="panel left">
+ <div class="title">Document profile</div>
+ <div class="control"><label>Document type</label><select id="type">
+  <option value="auto">Auto-detect</option><option value="international_passport">International Passport</option><option value="malaysian_passport">Malaysian Passport</option><option value="nric">Malaysian NRIC / MyKad</option><option value="pr">Malaysia Permanent Resident</option><option value="malaysia_license">Malaysian Driving Licence</option><option value="international_license">International Driving Permit</option><option value="ssm">SSM Certificate</option><option value="ppk">CIDB PPK Certificate</option><option value="general">General Document</option>
+ </select></div>
+ <div class="title">Safety controls</div>
+ <div class="toggle" data-k="preprocess"><span>Image enhancement</span><i class="switch on"><i></i></i></div>
+ <div class="toggle" data-k="tables"><span>Table detection</span><i class="switch on"><i></i></i></div>
+ <div class="toggle" data-k="fields"><span>Strict field extraction</span><i class="switch on"><i></i></i></div>
+ <div class="toggle" data-k="preserve"><span>Preserve complete OCR text</span><i class="switch on"><i></i></i></div>
+ <div class="title">Required safety rule</div>
+ <div class="notice">The app will <b>not guess</b> a field. If evidence is weak, missing, conflicting or unreadable, it reports <b>Not detected</b> or <b>Needs verification</b>.</div>
+ <div class="title">Files</div><div class="filelist" id="filelist"><div class="empty">No files</div></div>
+ <div class="side"><button class="btn" id="guide">Guide</button><button class="btn" id="json">JSON</button></div>
+</aside>
+
+<section class="center">
+ <div class="drop" id="drop"><b>Drop documents, cards or passport pages</b><span>PNG/JPG/JPEG/WebP/BMP/GIF/TIFF/HEIC/HEIF/PDF/DOCX/XLSX/XLS/CSV • up to 500 MB per file</span><button class="btn primary" id="browse">Choose files</button><input id="files" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.bmp,.gif,.tif,.tiff,.heic,.heif,.pdf,.docx,.xlsx,.xls,.csv,image/*,application/pdf"></div>
+ <div class="panel workspace">
+  <div class="tabs"><button class="tab active" data-tab="fields">Captured information</button><button class="tab" data-tab="text">All text</button><button class="tab" data-tab="tables">Tables</button><button class="tab" data-tab="pages">Pages</button></div>
+  <div class="output"><div class="view" id="leftview"><div class="empty">Upload files to begin.</div></div><div class="view" id="rightview"><div class="empty">No results yet.</div></div></div>
+ </div>
+</section>
+
+<aside class="panel right">
+ <div class="title">Processing summary</div>
+ <div class="stats"><div class="stat"><div class="n" id="pages">0</div><div class="l">Pages</div></div><div class="stat"><div class="n" id="words">0</div><div class="l">Words</div></div><div class="stat"><div class="n" id="fieldsN">0</div><div class="l">Fields</div></div><div class="stat"><div class="n" id="conf">—</div><div class="l">Confidence</div></div></div>
+ <div class="progress"><div class="track"><div class="bar" id="bar"></div></div><div id="state">Ready</div></div>
+ <div class="title">Field verification</div>
+ <div class="notice">A value is displayed as <b>Detected</b> only when there is direct textual evidence. Derived values are separately marked. Conflicting evidence is never automatically resolved.</div>
+ <div class="title">Activity</div><div class="log" id="log">NeuroOCR initialized.\n</div>
+</aside>
+</div>
+<footer><span>Client-side browser processing • No automatic claim of 100% accuracy</span><span>Maximum accepted file size: 500 MB</span></footer>
+</div>
+
+<script>
+"use strict";
+const S={files:[],pages:[],text:"",tables:[],fields:{},conf:0,settings:{preprocess:true,tables:true,fields:true,preserve:true}};
+const $=x=>document.getElementById(x);
+const esc=x=>String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const norm=x=>String(x||"").replace(/\\s+/g," ").trim();
+const log=x=>{$("log").textContent+=`[${new Date().toLocaleTimeString()}] ${x}\\n`;$("log").scrollTop=$("log").scrollHeight};
+const setState=(x,p)=>{$("state").textContent=x;if(p!==undefined)$("bar").style.width=Math.min(100,Math.max(0,p))+"%"};
+document.querySelectorAll("[data-k]").forEach(e=>e.onclick=()=>{let k=e.dataset.k;S.settings[k]=!S.settings[k];e.querySelector(".switch").classList.toggle("on",S.settings[k])});
+$("browse").onclick=()=>$("files").click();
+$("files").onchange=e=>add(e.target.files);
+$("clear").onclick=()=>{S.files=[];S.pages=[];S.text="";S.tables=[];S.fields={};S.conf=0;$("files").value="";renderFiles();render();setState("Ready",0);$("engine").textContent="READY";$("log").textContent="NeuroOCR initialized.\\n"};
+$("guide").onclick=()=>alert("Safety-first workflow:\\n\\n1. Upload the actual document/card.\\n2. Upload front and back separately when applicable.\\n3. Run OCR.\\n4. Use Captured information only for values supported by OCR evidence.\\n5. Check the source image for every critical number, name and date.\\n\\nThe app deliberately refuses to invent missing information.");
+$("json").onclick=exportJSON;
+["dragenter","dragover"].forEach(x=>$("drop").addEventListener(x,e=>{e.preventDefault();$("drop").classList.add("drag")}));
+["dragleave","drop"].forEach(x=>$("drop").addEventListener(x,e=>{e.preventDefault();$("drop").classList.remove("drag")}));
+$("drop").addEventListener("drop",e=>add(e.dataTransfer.files));
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>tab(t.dataset.tab));
+function add(list){for(const f of list){if(f.size>500*1024*1024){log(`Rejected ${f.name}: over 500 MB.`);continue}S.files.push(f)}renderFiles();log(`Added ${list.length} file(s) within the size rule.`)}
+function bytes(n){let u=["B","KB","MB","GB"],i=0;while(n>=1024&&i<3){n/=1024;i++}return n.toFixed(i?1:0)+" "+u[i]}
+function renderFiles(){let b=$("filelist");if(!S.files.length){b.innerHTML='<div class="empty">No files</div>';return}b.innerHTML=S.files.map((f,i)=>`<div class="file"><b>${esc(f.name)}</b><small>${bytes(f.size)} • ${esc(f.type||"unknown")}</small></div>`).join("")}
+
+async function run(){
+ if(!S.files.length)return alert("Upload at least one file.");
+ $("run").disabled=true;$("engine").textContent="PROCESSING";S.pages=[];S.text="";S.tables=[];S.fields={};S.conf=0;
+ try{
+  for(let i=0;i<S.files.length;i++){
+   let f=S.files[i];setState("Preparing "+f.name,(i/S.files.length)*100);
+   let ps=await toPages(f);
+   for(let j=0;j<ps.length;j++){
+    setState(`Reading ${f.name} • page ${j+1}/${ps.length}`,((i+j/ps.length)/S.files.length)*100);
+    let o=await ocr(ps[j].data);
+    S.pages.push({file:f.name,index:j+1,data:ps[j].data,text:o.text,confidence:o.confidence});
+    S.text+=`\\n\\n===== ${f.name} • PAGE ${j+1} =====\\n${o.text}`;
+    S.conf+=o.confidence;
+    if(S.settings.tables)S.tables.push(...tables(o.text,f.name,j+1));
+   }
+  }
+  S.conf=S.pages.length?S.conf/S.pages.length:0;
+  if(S.settings.fields)S.fields=extractStrict(S.text,$("type").value);
+  render();setState("Complete — verify critical values against the image.",100);$("engine").textContent="COMPLETE";log(`Completed ${S.pages.length} page(s). Average OCR confidence ${S.conf.toFixed(1)}%.`);
+ }catch(e){console.error(e);log("ERROR: "+e.message);setState("Processing failed");$("engine").textContent="ERROR";alert(e.message)}
+ $("run").disabled=false;
+}
+$("run").onclick=run;
+
+async function toPages(f){
+ let e=f.name.split(".").pop().toLowerCase();
+ if(["png","jpg","jpeg","webp","bmp","gif"].includes(e)||f.type.startsWith("image/"))return[{data:await img(f)}];
+ if(["tif","tiff"].includes(e))return[{data:await tiff(f)}];
+ if(["heic","heif"].includes(e))return[{data:await heic(f)}];
+ if(e==="pdf"||f.type==="application/pdf")return pdf(f);
+ if(e==="docx")return[{data:textImg((await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()})).value)}];
+ if(["xlsx","xls","csv"].includes(e)){let wb=XLSX.read(await f.arrayBuffer(),{type:"array"});let txt=wb.SheetNames.map(n=>"===== "+n+" =====\\n"+XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\\n");return[{data:textImg(txt)}]}
+ throw new Error("Unsupported file format: "+e);
+}
+async function img(f){let b=await createImageBitmap(f),c=document.createElement("canvas");c.width=b.width;c.height=b.height;c.getContext("2d").drawImage(b,0,0);b.close();return prep(c).toDataURL("image/png")}
+async function heic(f){if(!window.heic2any)throw new Error("HEIC converter unavailable.");let x=await heic2any({blob:f,toType:"image/png",quality:1});return img(Array.isArray(x)?x[0]:x)}
+async function tiff(f){if(!window.UTIF)throw new Error("TIFF decoder unavailable.");let b=await f.arrayBuffer(),a=UTIF.decode(b);if(!a.length)throw new Error("Invalid TIFF.");UTIF.decodeImage(b,a[0]);let r=UTIF.toRGBA8(a[0]),c=document.createElement("canvas");c.width=a[0].width;c.height=a[0].height;c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(r),c.width,c.height),0,0);return prep(c).toDataURL("image/png")}
+async function pdf(f){if(!window.pdfjsLib)throw new Error("PDF engine is loading. Please wait and try again.");let p=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise,o=[];for(let i=1;i<=p.numPages;i++){let pg=await p.getPage(i),v=pg.getViewport({scale:2.3}),c=document.createElement("canvas");c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);await pg.render({canvasContext:c.getContext("2d"),viewport:v}).promise;o.push({data:prep(c).toDataURL("image/png")})}return o}
+function prep(c){if(!S.settings.preprocess)return c;let m=3200;if(Math.max(c.width,c.height)>m){let s=m/Math.max(c.width,c.height),n=document.createElement("canvas");n.width=Math.round(c.width*s);n.height=Math.round(c.height*s);n.getContext("2d").drawImage(c,0,0,n.width,n.height);c=n}let x=c.getContext("2d"),im=x.getImageData(0,0,c.width,c.height),d=im.data;for(let i=0;i<d.length;i+=4){let y=.299*d[i]+.587*d[i+1]+.114*d[i+2],v=Math.max(0,Math.min(255,(y-128)*1.25+128));d[i]=d[i+1]=d[i+2]=v}x.putImageData(im,0,0);return c}
+function textImg(t){let lines=String(t).split("\\n"),c=document.createElement("canvas");c.width=1800;c.height=Math.max(500,Math.min(30000,lines.length*27+60));let x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.fillStyle="#111";x.font="20px monospace";lines.forEach((l,i)=>x.fillText(l.slice(0,145),20,35+i*27));return c.toDataURL("image/png")}
+async function ocr(data){if(!window.Tesseract)throw new Error("OCR engine unavailable.");let w=await Tesseract.createWorker("eng");let r=await w.recognize(data,{rotateAuto:true});let text=r.data.text||"";let confidence=Number(r.data.confidence)||0;await w.terminate();return{text,confidence}}
+
+function evidence(value,reason,status="Detected"){return{value,reason,status}}
+function field(text,labels,pattern){
+ for(let label of labels){let re=new RegExp("(?:"+label+")\\\\s*[:#-]?\\\\s*([^\\\\n]{2,180})","i"),m=text.match(re);if(m&&norm(m[1]))return evidence(norm(m[1]),"Directly read next to the document label.","Detected")}
+ if(pattern){let m=text.match(pattern);if(m)return evidence(norm(m[1]||m[0]),"Direct pattern matched in the OCR text.","Detected")}
+ return evidence("",`The expected label or format was not clearly found in the OCR text.`,"Not detected")
+}
+function extractStrict(text,type){
+ let f={};
+ f["Full Name / Nama"]=field(text,["full name","nama penuh","name","nama","surname"],null);
+ f["Identity / IC Number"]=field(text,["IC Number","Identity Card Number","Nombor Kad Pengenalan"],/\\b(\\d{6}[- ]?\\d{2}[- ]?\\d{4})\\b/);
+ f["Passport Number"]=field(text,["Passport Number","Nombor Pasport"],/\\b([A-Z]\\d{8})\\b/i);
+ f["Date of Birth / Tarikh Lahir"]=field(text,["Date of Birth","DOB","Tarikh Lahir"],null);
+ f["Gender / Jantina"]=field(text,["Gender","Sex","Jantina","Kelamin"],null);
+ f["Nationality / Warganegara"]=field(text,["Nationality","Warganegara","Citizenship"],null);
+ f["Address / Alamat"]=field(text,["Residential Address","Permanent Address","Registered Address","Address","Alamat"],null);
+ f["Date of Issue"]=field(text,["Date of Issue","Issued","Tarikh Dikeluarkan"],null);
+ f["Date of Expiry"]=field(text,["Date of Expiry","Expiry","Valid Until","Tarikh Kepupusan"],null);
+ f["Place of Birth / Tempat Lahir"]=field(text,["Place of Birth","Tempat Lahir"],null);
+ f["Issuing Authority / Pihak Berkuasa"]=field(text,["Issuing Authority","Pihak Berkuasa"],null);
+ f["Registration / Incorporation Number"]=field(text,["Registration Number","Registration / Incorporation Number","ROC","ROB","LLP"],null);
+ f["CIDB Grade"]=field(text,["Grade"],/\\b(G[1-7])\\b/i);
+
+ // Safe derivation from a clearly read Malaysian IC only.
+ if(f["Identity / IC Number"].status==="Detected"){
+   let d=f["Identity / IC Number"].value.replace(/\\D/g,""),g=d.slice(-1);
+   if(d.length===12&&g){f["Gender from IC"]=evidence(+g%2?"M — Male":"F — Female","Derived only from the final digit of the clearly detected 12-digit IC number.","Derived")}
+ }
+
+ // User-requested country/state detection: never silently replace nationality.
+ const countries=["Malaysia","Singapore","Indonesia","Thailand","Brunei","Philippines","Vietnam","Myanmar","Cambodia","Laos","China","India","Pakistan","Bangladesh","Nepal","Sri Lanka","Japan","Korea","Australia","New Zealand","United Kingdom","United States","Canada","France","Germany","Italy","Spain","Netherlands","Belgium"];
+ const states=["Sarawak","Sabah","Selangor","Johor","Perak","Penang","Pahang","Kelantan","Terengganu","Kedah","Perlis","Melaka","Negeri Sembilan","Kuala Lumpur","Putrajaya","Labuan"];
+ let cp=countries.find(x=>new RegExp("\\\\b"+x.replace(/ /g,"\\\\s+")+"\\\\b","i").test(text));
+ let st=states.find(x=>new RegExp("\\\\b"+x.replace(/ /g,"\\\\s+")+"\\\\b","i").test(text));
+ f["Detected Country"]=cp?evidence(cp,"The country name appears explicitly in the OCR text.","Detected"):evidence("","No supported country name was clearly found.","Not detected");
+ f["Detected State"]=st?evidence(st,"The state name appears explicitly in the OCR text.","Detected"):evidence("","No supported state name was clearly found.","Not detected");
+
+ // Do not auto-assign a state to nationality. If nationality is explicitly Warganegara Malaysia, preserve that.
+ if(/\\bwarganegara\\s+malaysia\\b/i.test(text)&&f["Nationality / Warganegara"].status==="Not detected")
+   f["Nationality / Warganegara"]=evidence("Malaysia","Explicit phrase “Warganegara Malaysia” was found.","Detected");
+
+ return f;
+}
+function tables(text,file,page){let ls=text.split("\\n").map(norm).filter(Boolean).filter(x=>/\\||\\t| {3,}/.test(x));return ls.length>1?[{file,page,rows:ls.slice(0,150)}]:[]}
+
+function render(){ $("pages").textContent=S.pages.length;$("words").textContent=S.text.trim()?S.text.trim().split(/\\s+/).length:0;$("fieldsN").textContent=Object.keys(S.fields).length;$("conf").textContent=S.pages.length?S.conf.toFixed(1)+"%":"—";tab("fields") }
+function tab(t){
+ document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===t));
+ let l=$("leftview"),r=$("rightview");
+ if(!S.pages.length){l.innerHTML='<div class="empty">No processed document.</div>';r.innerHTML='<div class="empty">No results yet.</div>';return}
+ if(t==="fields"){
+   l.innerHTML='<div class="title">Source pages</div>'+S.pages.map((p,i)=>`<div class="file" style="margin-bottom:7px"><b>${esc(p.file)} • page ${p.index}</b><small>OCR confidence ${p.confidence.toFixed(1)}%</small></div>`).join("");
+   r.innerHTML='<div class="fields">'+Object.entries(S.fields).map(([k,o])=>`<div class="field ${o.value.length>65?"full":""}"><div class="key">${esc(k)}</div><div class="value">${o.value?esc(o.value):"—"}</div><span class="status ${o.status==="Detected"||o.status==="Derived"?"detected":o.status==="Needs verification"?"verify":"notdetected"}">${esc(o.status)}</span><div style="font-size:8px;color:var(--muted);margin-top:5px">${esc(o.reason)}</div></div>`).join("")+'</div>';return
+ }
+ if(t==="text"){l.innerHTML='<div class="text">'+esc(S.text)+'</div>';r.innerHTML='<div class="notice"><b>Evidence rule:</b> this is the complete OCR text returned by the engine. No field should be considered verified merely because OCR produced text.</div>';return}
+ if(t==="tables"){l.innerHTML='<div class="empty">Table-like rows detected from OCR.</div>';r.innerHTML=S.tables.length?S.tables.map(t=>`<div class="file" style="margin-bottom:8px"><b>${esc(t.file)} • page ${t.page}</b>${t.rows.map(x=>`<div style="padding:5px;border-bottom:1px solid var(--line);white-space:pre-wrap">${esc(x)}</div>`).join("")}</div>`).join(""):'<div class="empty">No table-like structure detected.</div>';return}
+ l.innerHTML=S.pages.map(p=>`<div class="file" style="margin-bottom:7px"><b>${esc(p.file)} • page ${p.index}</b><small>Confidence ${p.confidence.toFixed(1)}%</small></div>`).join("");
+ r.innerHTML=S.pages.map(p=>`<img class="previewimg" src="${p.data}" alt="${esc(p.file)} page ${p.index}" style="margin-bottom:10px">`).join("");
+}
+function exportJSON(){let x={application:"NeuroOCR",mode:"evidence-first",generatedAt:new Date().toISOString(),documentType:$("type").value,warning:"Values marked Detected are OCR evidence, not a guarantee of factual correctness. Always verify critical values against the original document.",fields:S.fields,pages:S.pages.map(p=>({file:p.file,index:p.index,text:p.text,confidence:p.confidence})),tables:S.tables,fullText:S.text};let b=new Blob([JSON.stringify(x,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="neuroocr-evidence-result.json";a.click();URL.revokeObjectURL(a.href)}
+renderFiles();render();
+</script>
 </body>
 </html>
