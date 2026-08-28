@@ -1,883 +1,578 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neumorphic OCR Engine</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <style>
-        :root {
-            --bg-color: #e0e5ec;
-            --text-main: #3d4b64;
-            --text-muted: #7e8e9f;
-            --primary: #4d7cfe;
-            --primary-shadow: rgba(77, 124, 254, 0.4);
-            --danger: #ff5252;
-            --success: #00c853;
-            --shadow-light: #ffffff;
-            --shadow-dark: #a3b1c6;
-            
-            /* Neumorphic Shadows */
-            --neu-outset: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light);
-            --neu-outset-sm: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
-            --neu-inset: inset 6px 6px 10px var(--shadow-dark), inset -6px -6px 10px var(--shadow-light);
-            --neu-inset-sm: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-            --neu-button: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
-            --neu-button-active: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
-        }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuroOCR — Universal Document Intelligence</title>
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Poppins', sans-serif;
-            color: var(--text-main);
-        }
+<!--
+  NeuroOCR is a browser-only OCR workstation.
+  Supported input families:
+    PNG/JPG/JPEG/WebP/BMP/GIF/TIFF/TIF/HEIC/HEIF
+    PDF
+    DOCX
+    XLSX/XLS/CSV
+  Large files are processed locally in the browser. The UI accepts files up to 500 MB.
+  OCR quality depends on image quality and the selected OCR language/model.
+-->
 
-        body {
-            background-color: var(--bg-color);
-            min-height: 100vh;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs" type="module" id="pdfjs-module"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
 
-        header {
-            text-align: center;
-            padding: 1.5rem;
-            background: var(--bg-color);
-            border-radius: 20px;
-            box-shadow: var(--neu-outset);
-        }
-
-        header h1 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-
-        header p {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            margin-top: 5px;
-        }
-
-        .container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            width: 100%;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        @media (max-width: 1024px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .card {
-            background: var(--bg-color);
-            border-radius: 20px;
-            padding: 1.8rem;
-            box-shadow: var(--neu-outset);
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .card-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 2px solid rgba(163, 177, 198, 0.2);
-            padding-bottom: 10px;
-        }
-
-        /* Form Control / Select Styling */
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-muted);
-        }
-
-        select, input {
-            width: 100%;
-            padding: 14px 18px;
-            border: none;
-            outline: none;
-            background: var(--bg-color);
-            border-radius: 12px;
-            box-shadow: var(--neu-inset);
-            font-size: 0.95rem;
-            color: var(--text-main);
-            transition: all 0.3s ease;
-        }
-
-        select:focus, input:focus {
-            box-shadow: var(--neu-inset-sm), 0 0 5px var(--primary-shadow);
-        }
-
-        /* Upload Dropzones */
-        .dropzone-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        @media (max-width: 600px) {
-            .dropzone-container {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .dropzone {
-            border: 2px dashed #a3b1c6;
-            border-radius: 16px;
-            padding: 1.5rem 1rem;
-            text-align: center;
-            cursor: pointer;
-            background: var(--bg-color);
-            box-shadow: var(--neu-outset-sm);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            min-height: 180px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .dropzone:hover, .dropzone.dragover {
-            box-shadow: var(--neu-inset-sm);
-            border-color: var(--primary);
-        }
-
-        .dropzone i {
-            font-size: 2rem;
-            color: var(--primary);
-            margin-bottom: 10px;
-        }
-
-        .dropzone p {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .dropzone input[type="file"] {
-            display: none;
-        }
-
-        .preview-img {
-            max-width: 100%;
-            max-height: 140px;
-            border-radius: 8px;
-            object-fit: contain;
-            box-shadow: var(--neu-outset-sm);
-        }
-
-        .file-info {
-            font-size: 0.75rem;
-            color: var(--primary);
-            margin-top: 6px;
-            font-weight: 600;
-            word-break: break-all;
-        }
-
-        /* Neumorphic Buttons */
-        .btn {
-            padding: 14px 28px;
-            border: none;
-            border-radius: 12px;
-            background: var(--bg-color);
-            box-shadow: var(--neu-button);
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: var(--primary);
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .btn:hover {
-            color: #3b62d6;
-        }
-
-        .btn:active {
-            box-shadow: var(--neu-button-active);
-            transform: translateY(1px);
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: #ffffff !important;
-            box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light), inset 0 0 0 transparent;
-        }
-
-        .btn-primary:active {
-            box-shadow: inset 3px 3px 6px rgba(0,0,0,0.3);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 1rem;
-        }
-
-        /* Progress Bar */
-        .progress-wrapper {
-            display: none;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .progress-bar-bg {
-            width: 100%;
-            height: 14px;
-            border-radius: 10px;
-            background: var(--bg-color);
-            box-shadow: var(--neu-inset-sm);
-            overflow: hidden;
-            padding: 2px;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: var(--primary);
-            border-radius: 8px;
-            transition: width 0.3s ease;
-        }
-
-        .progress-status {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            display: flex;
-            justify-content: space-between;
-        }
-
-        /* OCR Data Results Grid */
-        .results-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            max-height: 520px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-
-        @media (max-width: 600px) {
-            .results-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .results-grid::-webkit-scrollbar {
-            width: 6px;
-        }
-        .results-grid::-webkit-scrollbar-track {
-            background: var(--bg-color);
-            box-shadow: var(--neu-inset-sm);
-            border-radius: 10px;
-        }
-        .results-grid::-webkit-scrollbar-thumb {
-            background: #a3b1c6;
-            border-radius: 10px;
-        }
-
-        .data-field {
-            background: var(--bg-color);
-            box-shadow: var(--neu-outset-sm);
-            border-radius: 12px;
-            padding: 10px 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .data-field.full-width {
-            grid-column: span 2;
-        }
-
-        @media (max-width: 600px) {
-            .data-field.full-width {
-                grid-column: span 1;
-            }
-        }
-
-        .data-field label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .data-field .value {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--text-main);
-            word-break: break-word;
-        }
-
-        /* JSON Raw Viewer */
-        .json-viewer {
-            display: none;
-            background: var(--bg-color);
-            box-shadow: var(--neu-inset);
-            border-radius: 12px;
-            padding: 1rem;
-            font-family: monospace;
-            font-size: 0.8rem;
-            white-space: pre-wrap;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-
-        .tab-menu {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        .tab-btn {
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            background: var(--bg-color);
-            box-shadow: var(--neu-button);
-            border: none;
-        }
-
-        .tab-btn.active {
-            box-shadow: var(--neu-inset-sm);
-            color: var(--primary);
-            font-weight: 600;
-        }
-    </style>
+<style>
+:root{
+  --bg:#e8edf3;--surface:#e8edf3;--ink:#17202a;--muted:#687585;
+  --accent:#4778ff;--good:#15946b;--warn:#d48b1f;--bad:#c94a4a;
+  --shadow1:10px 10px 22px rgba(163,174,189,.72);
+  --shadow2:-10px -10px 22px rgba(255,255,255,.92);
+  --inset:inset 5px 5px 12px rgba(163,174,189,.55),inset -5px -5px 12px rgba(255,255,255,.85);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
+button,input,select{font:inherit}
+button{border:0;cursor:pointer}
+.app{height:100vh;display:grid;grid-template-rows:72px 1fr 34px;gap:12px;padding:12px 16px}
+header,.panel,.drop,.stat,.field,.preview,.log,.chip,.progressbox{
+  background:var(--surface);box-shadow:var(--shadow1),var(--shadow2);border-radius:22px
+}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 18px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;color:white;font-weight:900;background:linear-gradient(145deg,#628eff,#345de0);box-shadow:6px 6px 12px #b4bfce,-5px -5px 12px #fff}
+h1{font-size:20px;margin:0;letter-spacing:.2px}
+.sub{font-size:11px;color:var(--muted)}
+.header-actions{display:flex;gap:9px;align-items:center}
+.btn{padding:10px 14px;border-radius:14px;background:var(--surface);box-shadow:6px 6px 12px #c2cbd6,-5px -5px 10px #fff;color:var(--ink);font-weight:700}
+.btn:active{box-shadow:var(--inset);transform:translateY(1px)}
+.btn.primary{background:var(--accent);color:white;box-shadow:6px 6px 12px #b1bfd8,-5px -5px 10px #fff}
+.btn.danger{color:var(--bad)}
+.main{min-height:0;display:grid;grid-template-columns:280px minmax(0,1fr) 370px;gap:14px}
+.panel{min-height:0;padding:14px;overflow:hidden}
+.left,.right{display:flex;flex-direction:column;gap:12px}
+.center{display:grid;grid-template-rows:170px minmax(0,1fr);gap:12px}
+.drop{height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border:2px dashed #b7c2d0;box-shadow:var(--inset);padding:20px}
+.drop.drag{border-color:var(--accent);transform:scale(1.005)}
+.drop-icon{font-size:34px;margin-bottom:5px}
+.drop strong{font-size:17px}
+.drop span{font-size:12px;color:var(--muted);max-width:680px;margin:5px 0 12px}
+.drop input{display:none}
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:var(--muted);font-weight:900;margin:2px 4px 8px}
+.control{margin-bottom:10px}
+label{display:block;font-size:11px;font-weight:800;color:var(--muted);margin:0 0 6px 4px}
+select,input[type=text]{width:100%;padding:10px 11px;border:0;border-radius:13px;background:var(--surface);box-shadow:var(--inset);outline:0;color:var(--ink)}
+.toggle{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:14px;box-shadow:var(--inset);font-size:12px;font-weight:700;margin-bottom:8px}
+.switch{width:40px;height:22px;border-radius:20px;background:#c5ced9;position:relative;box-shadow:inset 2px 2px 5px #aeb8c4}
+.switch i{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+.switch.on{background:var(--accent)} .switch.on i{left:21px}
+.file-list{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.file-item{padding:10px;border-radius:15px;box-shadow:var(--inset);font-size:11px}
+.file-item .top{display:flex;justify-content:space-between;gap:6px}
+.file-name{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:9px;padding:3px 6px;border-radius:8px;background:#dce4ee;color:#526173}
+.file-meta{color:var(--muted);margin-top:4px}
+.side-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto}
+.workspace{min-height:0;display:grid;grid-template-rows:44px minmax(0,1fr);gap:10px}
+.tabs{display:flex;gap:8px}
+.tab{flex:1;border-radius:14px;background:var(--surface);box-shadow:var(--shadow1),var(--shadow2);font-size:11px;font-weight:900;color:var(--muted)}
+.tab.active{color:var(--accent);box-shadow:var(--inset)}
+.output{min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.preview{min-height:0;overflow:auto;padding:14px}
+.preview img{max-width:100%;display:block;margin:auto;border-radius:12px;box-shadow:0 5px 16px #bac4d0}
+.preview iframe{width:100%;height:100%;border:0;border-radius:14px}
+.textout{white-space:pre-wrap;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;color:#263442}
+.tablewrap{overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th,td{padding:7px;border-bottom:1px solid #ccd5df;text-align:left;vertical-align:top}
+th{position:sticky;top:0;background:var(--surface);z-index:1}
+.fieldgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;overflow:auto}
+.field{padding:10px;box-shadow:var(--inset)}
+.field.full{grid-column:1/-1}
+.field .k{font-size:9px;color:var(--muted);font-weight:900;text-transform:uppercase;letter-spacing:.6px}
+.field .v{font-size:12px;font-weight:750;margin-top:4px;word-break:break-word}
+.conf{font-size:9px;color:var(--good);float:right}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{padding:10px;box-shadow:var(--inset)}
+.stat .n{font-size:20px;font-weight:900}.stat .l{font-size:9px;color:var(--muted);text-transform:uppercase}
+.progressbox{padding:10px;box-shadow:var(--inset)}
+.progressline{height:8px;border-radius:8px;background:#cdd5df;overflow:hidden;box-shadow:inset 2px 2px 4px #aeb8c3}
+.bar{height:100%;width:0;background:var(--accent);transition:.2s}
+.status{font-size:10px;color:var(--muted);margin-top:6px}
+.log{height:105px;overflow:auto;padding:10px;box-shadow:var(--inset);font:10px/1.45 ui-monospace,monospace}
+footer{font-size:9px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;padding:0 8px}
+.empty{height:100%;display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center;padding:30px}
+.hidden{display:none!important}
+@media(max-width:1100px){
+  body{overflow:auto}.app{height:auto;min-height:100vh}.main{grid-template-columns:1fr}.left,.right{min-height:260px}.center{min-height:650px}.output{grid-template-columns:1fr}.app{grid-template-rows:72px auto 34px}
+}
+</style>
 </head>
+
 <body>
+<div class="app">
+<header>
+  <div class="brand">
+    <div class="logo">N</div>
+    <div><h1>NeuroOCR</h1><div class="sub">Universal document & card intelligence • local browser processing</div></div>
+  </div>
+  <div class="header-actions">
+    <span class="chip" id="engineChip" style="padding:8px 11px;font-size:10px;font-weight:800">ENGINE: READY</span>
+    <button class="btn" id="clearBtn">Clear</button>
+    <button class="btn primary" id="runBtn">Run OCR</button>
+  </div>
+</header>
 
-    <header>
-        <h1><i class="fa-solid fa-microchip"></i> Neumorphic Multi-Document OCR System</h1>
-        <p>Enterprise AI Document Parsing & Extraction Platform • Maximum File Capacity: 500MB</p>
-    </header>
-
-    <div class="container">
-        <div class="card">
-            <div class="card-title">
-                <i class="fa-solid fa-file-arrow-up"></i> Document Configuration & Upload
-            </div>
-
-            <div class="input-group">
-                <label for="docType"><i class="fa-solid fa-id-card"></i> Select Target Document Format</label>
-                <select id="docType" onchange="handleDocTypeChange()">
-                    <option value="intl_passport">International Passport</option>
-                    <option value="my_passport">Malaysian Passport</option>
-                    <option value="my_nric" selected>Malaysian NRIC (MyKad)</option>
-                    <option value="my_pr">Malaysian Permanent Resident (MyPR)</option>
-                    <option value="my_dl">Malaysian Driving Licence</option>
-                    <option value="intl_dl">International Driving License</option>
-                    <option value="ssm_cert">SSM Certificate (Suruhanjaya Syarikat Malaysia)</option>
-                    <option value="cidb_ppk">CIDB PPK Contractor Registration Certificate</option>
-                </select>
-            </div>
-
-            <div class="dropzone-container" id="dropzoneContainer">
-                <div class="dropzone" id="dzFront" onclick="document.getElementById('fileFront').click()">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <p id="labelFront"><strong>Upload Front / Page 2</strong></p>
-                    <p style="font-size: 0.7rem; margin-top: 4px;">PNG, JPG, WEBP, PDF up to 500MB</p>
-                    <input type="file" id="fileFront" accept="image/*,.pdf" onchange="handleFileSelect(event, 'front')">
-                    <div id="previewContainerFront"></div>
-                </div>
-
-                <div class="dropzone" id="dzBack" onclick="document.getElementById('fileBack').click()">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <p id="labelBack"><strong>Upload Back / Page 3</strong></p>
-                    <p style="font-size: 0.7rem; margin-top: 4px;">PNG, JPG, WEBP, PDF up to 500MB</p>
-                    <input type="file" id="fileBack" accept="image/*,.pdf" onchange="handleFileSelect(event, 'back')">
-                    <div id="previewContainerBack"></div>
-                </div>
-            </div>
-
-            <div class="progress-wrapper" id="progressWrapper">
-                <div class="progress-status">
-                    <span id="progressText">Initializing Tesseract Engine...</span>
-                    <span id="progressPercent">0%</span>
-                </div>
-                <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" id="progressBarFill"></div>
-                </div>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-primary" style="flex: 2;" onclick="processOCR()">
-                    <i class="fa-solid fa-bolt"></i> Extract Document Data
-                </button>
-                <button class="btn" style="flex: 1;" onclick="resetForm()">
-                    <i class="fa-solid fa-rotate-right"></i> Reset
-                </button>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title" style="justify-content: space-between;">
-                <span><i class="fa-solid fa-square-poll-vertical"></i> Extracted Parameters</span>
-                <div class="tab-menu" style="margin-bottom:0;">
-                    <button class="tab-btn active" id="tabFormatted" onclick="switchTab('formatted')">Parsed</button>
-                    <button class="tab-btn" id="tabJson" onclick="switchTab('json')">JSON View</button>
-                </div>
-            </div>
-
-            <div class="results-grid" id="resultsGrid">
-                <div class="data-field full-width" style="text-align: center; padding: 2rem;">
-                    <i class="fa-solid fa-magnifying-glass" style="font-size: 2rem; color: var(--text-muted); margin-bottom: 10px;"></i>
-                    <p class="value" style="color: var(--text-muted);">Upload document scans and click "Extract Document Data" to populate structured information.</p>
-                </div>
-            </div>
-
-            <div class="json-viewer" id="jsonViewer">{}</div>
-
-            <div class="btn-group" style="margin-top: auto;">
-                <button class="btn" style="flex: 1;" onclick="exportData('json')">
-                    <i class="fa-solid fa-download"></i> Export JSON
-                </button>
-                <button class="btn" style="flex: 1;" onclick="exportData('csv')">
-                    <i class="fa-solid fa-file-csv"></i> Export CSV
-                </button>
-            </div>
-        </div>
+<main class="main">
+  <aside class="panel left">
+    <div class="section-title">Document profile</div>
+    <div class="control">
+      <label>Document type</label>
+      <select id="docType">
+        <option value="auto">Auto-detect</option>
+        <option value="international_passport">International Passport</option>
+        <option value="malaysian_passport">Malaysian Passport</option>
+        <option value="nric">Malaysian NRIC / MyKad</option>
+        <option value="pr">Malaysia Permanent Resident</option>
+        <option value="malaysia_license">Malaysian Driving Licence</option>
+        <option value="international_license">International Driving Permit</option>
+        <option value="ssm">SSM Certificate</option>
+        <option value="ppk">CIDB PPK Certificate</option>
+        <option value="general">General Document</option>
+      </select>
     </div>
 
-    <script>
-        const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500MB Limit
-        let files = { front: null, back: null };
-        let extractedDataStore = {};
+    <div class="section-title">OCR controls</div>
+    <div class="control">
+      <label>OCR language</label>
+      <select id="lang">
+        <option value="eng">English</option>
+        <option value="eng+msa">English + Malay (requires trained language assets)</option>
+      </select>
+    </div>
+    <div class="toggle" data-toggle="preprocess"><span>Auto image enhancement</span><div class="switch on"><i></i></div></div>
+    <div class="toggle" data-toggle="deskew"><span>Deskew / rotate correction</span><div class="switch on"><i></i></div></div>
+    <div class="toggle" data-toggle="tables"><span>Detect table-like structure</span><div class="switch on"><i></i></div></div>
+    <div class="toggle" data-toggle="heuristics"><span>Identity & field extraction</span><div class="switch on"><i></i></div></div>
 
-        // Setup Drag & Drop Handlers
-        ['dzFront', 'dzBack'].forEach(id => {
-            const dz = document.getElementById(id);
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dz.addEventListener(eventName, preventDefaults, false);
-            });
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dz.addEventListener(eventName, () => dz.classList.add('dragover'), false);
-            });
-            ['dragleave', 'drop'].forEach(eventName => {
-                dz.addEventListener(eventName, () => dz.classList.remove('dragover'), false);
-            });
-            dz.addEventListener('drop', (e) => handleDrop(e, id === 'dzFront' ? 'front' : 'back'), false);
-        });
+    <div class="section-title">Card sides</div>
+    <div class="toggle" data-toggle="front"><span>Front / page 1</span><div class="switch on"><i></i></div></div>
+    <div class="toggle" data-toggle="back"><span>Back / page 2+</span><div class="switch on"><i></i></div></div>
 
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
+    <div class="side-actions">
+      <button class="btn" id="sampleBtn">Sample guide</button>
+      <button class="btn" id="exportBtn">Export JSON</button>
+    </div>
+  </aside>
 
-        function handleDrop(e, type) {
-            const dt = e.dataTransfer;
-            const droppedFiles = dt.files;
-            if (droppedFiles.length > 0) {
-                validateAndSetFile(droppedFiles[0], type);
-            }
-        }
+  <section class="center">
+    <div class="drop" id="drop">
+      <div class="drop-icon">⌁</div>
+      <strong>Drop documents, cards or passport pages here</strong>
+      <span>PNG, JPG, JPEG, WebP, BMP, GIF, TIFF, HEIC/HEIF, PDF, DOCX, XLSX/XLS and CSV • maximum 500 MB per file</span>
+      <button class="btn primary" id="browseBtn">Choose files</button>
+      <input id="fileInput" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.bmp,.gif,.tif,.tiff,.heic,.heif,.pdf,.docx,.xlsx,.xls,.csv,image/*,application/pdf">
+    </div>
 
-        function handleFileSelect(e, type) {
-            if (e.target.files.length > 0) {
-                validateAndSetFile(e.target.files[0], type);
-            }
-        }
+    <div class="panel workspace">
+      <div class="tabs">
+        <button class="tab active" data-tab="fields">Captured information</button>
+        <button class="tab" data-tab="text">All text</button>
+        <button class="tab" data-tab="tables">Tables</button>
+        <button class="tab" data-tab="pages">Pages</button>
+      </div>
+      <div class="output">
+        <div class="preview" id="visual"><div class="empty">Upload a document to begin.<br>Front and back files can be uploaded together.</div></div>
+        <div class="preview" id="result"><div class="empty">Captured information will appear here.</div></div>
+      </div>
+    </div>
+  </section>
 
-        function validateAndSetFile(file, type) {
-            if (file.size > MAX_FILE_SIZE_BYTES) {
-                alert(`File size exceeds 500MB capacity limit. Current file size: ${(file.size / (1024*1024)).toFixed(2)} MB`);
-                return;
-            }
+  <aside class="panel right">
+    <div class="section-title">Processing</div>
+    <div class="stats">
+      <div class="stat"><div class="n" id="pageCount">0</div><div class="l">Pages</div></div>
+      <div class="stat"><div class="n" id="wordCount">0</div><div class="l">Words</div></div>
+      <div class="stat"><div class="n" id="fieldCount">0</div><div class="l">Fields</div></div>
+      <div class="stat"><div class="n" id="confidence">—</div><div class="l">OCR confidence</div></div>
+    </div>
+    <div class="progressbox">
+      <div class="progressline"><div class="bar" id="bar"></div></div>
+      <div class="status" id="status">Ready</div>
+    </div>
 
-            files[type] = file;
-            const container = document.getElementById(type === 'front' ? 'previewContainerFront' : 'previewContainerBack');
-            const label = document.getElementById(type === 'front' ? 'labelFront' : 'labelBack');
-            
-            label.style.display = 'none';
-            container.innerHTML = '';
+    <div class="section-title">Detected identity fields</div>
+    <div class="fieldgrid" id="fields">
+      <div class="empty" style="grid-column:1/-1">No extracted fields yet.</div>
+    </div>
 
-            if (file.type.startsWith('image/')) {
-                const img = document.createElement('img');
-                img.src = URL.createObjectURL(file);
-                img.className = 'preview-img';
-                container.appendChild(img);
-            } else {
-                const icon = document.createElement('i');
-                icon.className = 'fa-solid fa-file-pdf';
-                icon.style.fontSize = '3rem';
-                icon.style.color = 'var(--primary)';
-                container.appendChild(icon);
-            }
+    <div class="section-title">Activity</div>
+    <div class="log" id="log">NeuroOCR initialized.\n</div>
+  </aside>
+</main>
 
-            const info = document.createElement('div');
-            info.className = 'file-info';
-            info.innerText = `${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)`;
-            container.appendChild(info);
-        }
+<footer>
+  <span>Client-side processing • No document is uploaded by this HTML application</span>
+  <span>500 MB acceptance limit</span>
+</footer>
+</div>
 
-        function handleDocTypeChange() {
-            const docType = document.getElementById('docType').value;
-            const dzBack = document.getElementById('dzBack');
-            const labelFront = document.getElementById('labelFront');
-            const labelBack = document.getElementById('labelBack');
+<script>
+"use strict";
 
-            if (docType === 'ssm_cert' || docType === 'cidb_ppk') {
-                dzBack.style.display = 'none';
-                labelFront.innerHTML = '<strong>Upload Certificate Document</strong>';
-            } else {
-                dzBack.style.display = 'flex';
-                labelFront.innerHTML = docType.includes('passport') ? '<strong>Upload Page 2 (Bio Data)</strong>' : '<strong>Upload Card Front</strong>';
-                labelBack.innerHTML = docType.includes('passport') ? '<strong>Upload Page 3 (Signatures)</strong>' : '<strong>Upload Card Back</strong>';
-            }
-        }
+const state = {
+  files: [], pages: [], text: "", tables: [], fields: {}, confidence: 0,
+  settings: {preprocess:true,deskew:true,tables:true,heuristics:true,front:true,back:true}
+};
 
-        async function processOCR() {
-            if (!files.front && !files.back) {
-                alert('Please upload at least one document image before running extraction.');
-                return;
-            }
+const $ = id => document.getElementById(id);
+const log = msg => { $("log").textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`; $("log").scrollTop = $("log").scrollHeight; };
+const status = (msg,p=null) => { $("status").textContent = msg; if(p!==null) $("bar").style.width = Math.max(0,Math.min(100,p))+"%"; };
+const esc = s => String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const norm = s => String(s||"").replace(/\s+/g," ").trim();
 
-            const progressWrapper = document.getElementById('progressWrapper');
-            const progressBarFill = document.getElementById('progressBarFill');
-            const progressText = document.getElementById('progressText');
-            const progressPercent = document.getElementById('progressPercent');
+document.querySelectorAll("[data-toggle]").forEach(el=>{
+  el.addEventListener("click",()=>{
+    const k=el.dataset.toggle; state.settings[k]=!state.settings[k];
+    el.querySelector(".switch").classList.toggle("on",state.settings[k]);
+  });
+});
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
+$("browseBtn").onclick=()=>$("fileInput").click();
+$("fileInput").onchange=e=>addFiles([...e.target.files]);
+$("clearBtn").onclick=clearAll;
+$("runBtn").onclick=runOCR;
+$("exportBtn").onclick=exportJSON;
+$("sampleBtn").onclick=()=>alert(
+"Recommended capture setup:\\n\\n"+
+"• MyKad / PR / driving licence / IDP: upload FRONT and BACK together.\\n"+
+"• Passport: upload the biographical page and, when available, page 3.\\n"+
+"• PPK / SSM: upload every page containing information or tables.\\n"+
+"• For best OCR: flat image, sharp focus, good lighting, minimal glare.\\n\\n"+
+"OCR cannot guarantee zero errors; always verify extracted identity, dates and numbers against the original document."
+);
 
-            progressWrapper.style.display = 'flex';
-            progressBarFill.style.width = '0%';
-            progressText.innerText = 'Initializing OCR Worker Engine...';
-            progressPercent.innerText = '0%';
+const drop=$("drop");
+["dragenter","dragover"].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.classList.add("drag")}));
+["dragleave","drop"].forEach(x=>drop.addEventListener(x,e=>{e.preventDefault();drop.classList.remove("drag")}));
+drop.addEventListener("drop",e=>addFiles([...e.dataTransfer.files]));
 
-            try {
-                let textFront = '';
-                let textBack = '';
+function addFiles(files){
+  const max=500*1024*1024;
+  const accepted=[];
+  for(const f of files){
+    if(f.size>max){log(`Rejected ${f.name}: larger than 500 MB.`);continue}
+    accepted.push(f);
+  }
+  state.files.push(...accepted);
+  renderFileList();
+  if(accepted.length) log(`Added ${accepted.length} file(s).`);
+}
+function renderFileList(){
+  const visual=$("visual");
+  visual.innerHTML="";
+  if(!state.files.length){visual.innerHTML='<div class="empty">Upload a document to begin.<br>Front and back files can be uploaded together.</div>';return}
+  const box=document.createElement("div"); box.className="file-list";
+  state.files.forEach((f,i)=>{
+    const d=document.createElement("div"); d.className="file-item";
+    d.innerHTML=`<div class="top"><span class="file-name">${esc(f.name)}</span><span class="badge">${esc(f.type||"file")}</span></div><div class="file-meta">${formatBytes(f.size)} • ${i%2===0?"front / page":"back / page"} candidate</div>`;
+    box.appendChild(d);
+  });
+  visual.appendChild(box);
+}
+function formatBytes(n){if(n<1024)return n+" B";let u=["KB","MB","GB"],i=-1;do{n/=1024;i++}while(n>=1024&&i<u.length-1);return n.toFixed(1)+" "+u[i]}
 
-                const worker = await Tesseract.createWorker('eng', 1, {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            const pct = Math.round(m.progress * 100);
-                            progressBarFill.style.width = `${pct}%`;
-                            progressText.innerText = `Processing Scan Logic: ${m.status}`;
-                            progressPercent.innerText = `${pct}%`;
-                        }
-                    }
-                });
+async function runOCR(){
+  if(!state.files.length){alert("Please upload at least one file.");return}
+  $("runBtn").disabled=true; $("engineChip").textContent="ENGINE: PROCESSING";
+  state.pages=[];state.text="";state.tables=[];state.fields={};state.confidence=0;
+  try{
+    for(let i=0;i<state.files.length;i++){
+      const f=state.files[i], pct=(i/state.files.length)*100;
+      status(`Preparing ${f.name}…`,pct);
+      const pages=await fileToPages(f);
+      for(let p=0;p<pages.length;p++){
+        const page=pages[p];
+        status(`OCR ${f.name} • page ${p+1}/${pages.length}`,pct+(p/pages.length)*(100/state.files.length));
+        const out=await ocrImage(page.data);
+        state.pages.push({file:f.name,index:p+1,data:page.data,text:out.text,confidence:out.confidence});
+        state.text += `\\n\\n===== ${f.name} • PAGE ${p+1} =====\\n${out.text}`;
+        state.confidence += out.confidence;
+        if(state.settings.tables) state.tables.push(...extractTables(out.text,f.name,p+1));
+      }
+    }
+    state.confidence = state.pages.length ? state.confidence/state.pages.length : 0;
+    if(state.settings.heuristics) state.fields=extractFields(state.text,$("docType").value);
+    renderResults();
+    status(`Complete • ${state.pages.length} page(s) processed`,100);
+    $("engineChip").textContent="ENGINE: COMPLETE";
+    log(`OCR completed. ${state.pages.length} page(s), average confidence ${state.confidence.toFixed(1)}%.`);
+  }catch(err){
+    console.error(err); log("ERROR: "+err.message); status("Processing error — see activity log"); alert("Processing failed: "+err.message);
+    $("engineChip").textContent="ENGINE: ERROR";
+  }finally{$("runBtn").disabled=false}
+}
 
-                if (files.front) {
-                    progressText.innerText = 'Extracting Text from Front / Primary Page...';
-                    const ret = await worker.recognize(files.front);
-                    textFront = ret.data.text;
-                }
+async function fileToPages(file){
+  const ext=file.name.split(".").pop().toLowerCase();
+  if(["png","jpg","jpeg","webp","bmp","gif"].includes(ext) || file.type.startsWith("image/")){
+    return [{data:await imageToCanvas(file),source:file.name}];
+  }
+  if(["tif","tiff"].includes(ext)) return [{data:await tiffToCanvas(file),source:file.name}];
+  if(["heic","heif"].includes(ext)) return [{data:await heicToCanvas(file),source:file.name}];
+  if(ext==="pdf" || file.type==="application/pdf") return await pdfToPages(file);
+  if(ext==="docx") return [{data:await textToCanvas(await docxToText(file)),source:file.name}];
+  if(["xlsx","xls","csv"].includes(ext)) return [{data:await textToCanvas(await spreadsheetToText(file)),source:file.name}];
+  throw new Error("Unsupported file format: "+ext);
+}
 
-                if (files.back) {
-                    progressText.innerText = 'Extracting Text from Back / Secondary Page...';
-                    const ret = await worker.recognize(files.back);
-                    textBack = ret.data.text;
-                }
+async function imageToCanvas(file){
+  const bmp=await createImageBitmap(file);
+  let c=document.createElement("canvas"),ctx=c.getContext("2d");
+  c.width=bmp.width;c.height=bmp.height;ctx.drawImage(bmp,0,0);bmp.close();
+  return preprocessCanvas(c).toDataURL("image/png");
+}
+async function heicToCanvas(file){
+  if(typeof heic2any==="undefined") throw new Error("HEIC converter did not load.");
+  const blob=await heic2any({blob:file,toType:"image/png",quality:1});
+  return imageToCanvas(Array.isArray(blob)?blob[0]:blob);
+}
+async function tiffToCanvas(file){
+  if(typeof UTIF==="undefined") throw new Error("TIFF decoder did not load.");
+  const buf=await file.arrayBuffer(), ifds=UTIF.decode(buf);
+  if(!ifds.length) throw new Error("Invalid TIFF.");
+  UTIF.decodeImage(buf,ifds[0]);
+  const rgba=UTIF.toRGBA8(ifds[0]);
+  const c=document.createElement("canvas"); c.width=ifds[0].width;c.height=ifds[0].height;
+  c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(rgba),c.width,c.height),0,0);
+  return preprocessCanvas(c).toDataURL("image/png");
+}
+async function pdfToPages(file){
+  const pdfjs=window.pdfjsLib;
+  if(!pdfjs) throw new Error("PDF engine is still loading. Try again in a moment.");
+  pdfjs.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+  const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;
+  const out=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i), vp=page.getViewport({scale:2.2});
+    const c=document.createElement("canvas");c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);
+    await page.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+    out.push({data:preprocessCanvas(c).toDataURL("image/png"),source:file.name});
+  }
+  return out;
+}
+async function docxToText(file){
+  if(!window.mammoth) throw new Error("DOCX engine did not load.");
+  const r=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+  return r.value;
+}
+async function spreadsheetToText(file){
+  if(!window.XLSX) throw new Error("Spreadsheet engine did not load.");
+  const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
+  return wb.SheetNames.map(n=>`===== SHEET: ${n} =====\\n`+XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\\n\\n");
+}
+function textToCanvas(text){
+  const lines=String(text).split("\\n"), width=1800, lineH=28, h=Math.max(500,Math.min(30000,lines.length*lineH+60));
+  const c=document.createElement("canvas");c.width=width;c.height=h;const ctx=c.getContext("2d");
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,width,h);ctx.fillStyle="#111";ctx.font="20px monospace";
+  lines.forEach((l,i)=>ctx.fillText(l.slice(0,145),20,35+i*lineH));
+  return c.toDataURL("image/png");
+}
+function preprocessCanvas(c){
+  if(!state.settings.preprocess) return c;
+  const max=3200;
+  if(Math.max(c.width,c.height)>max){
+    const s=max/Math.max(c.width,c.height),n=document.createElement("canvas");
+    n.width=Math.round(c.width*s);n.height=Math.round(c.height*s);n.getContext("2d").drawImage(c,0,0,n.width,n.height);c=n;
+  }
+  const ctx=c.getContext("2d"),im=ctx.getImageData(0,0,c.width,c.height),d=im.data;
+  for(let i=0;i<d.length;i+=4){
+    const y=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+    const v=Math.max(0,Math.min(255,(y-128)*1.28+128));
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  ctx.putImageData(im,0,0); return c;
+}
+async function ocrImage(data){
+  if(!window.Tesseract) throw new Error("Tesseract OCR did not load.");
+  const worker=await Tesseract.createWorker("eng");
+  const r=await worker.recognize(data,{rotateAuto:true});
+  const text=r.data.text||"";
+  const conf=r.data.confidence||0;
+  await worker.terminate();
+  return {text,confidence:conf};
+}
 
-                await worker.terminate();
+function extractFields(text,type){
+  const raw=text.replace(/\r/g,"\\n");
+  const clean=raw.replace(/[|]/g," ");
+  const fields={};
+  const put=(k,v,c="OCR")=>{v=norm(v);if(v)fields[k]={value:v,confidence:c}};
+  const firstMatch=(re)=>{const m=clean.match(re);return m?norm(m[1]||m[0]):""};
 
-                progressText.innerText = 'Executing Parser Heuristics...';
-                const docType = document.getElementById('docType').value;
-                extractedDataStore = parseDocumentData(docType, textFront, textBack);
+  // Generic identity/date/number patterns.
+  const ic=firstMatch(/\\b(\\d{6}[- ]?\\d{2}[- ]?\\d{4})\\b/);
+  if(ic) put("Identity / IC Number",ic);
+  const passport=firstMatch(/\\b([A-Z]\\d{8})\\b/i);
+  if(passport) put("Passport Number",passport);
+  const dates=[...clean.matchAll(/\\b(\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{2,4})\\b/g)].map(x=>x[1]);
+  if(dates[0]) put("Date 1",dates[0]); if(dates[1]) put("Date 2",dates[1]);
+  const postcode=firstMatch(/\\b(\\d{5})\\b/);
+  if(postcode) put("Postcode",postcode);
 
-                renderResults(extractedDataStore);
-                progressWrapper.style.display = 'none';
+  // Malaysian sex rule: IC final digit odd=male, even=female.
+  if(ic){
+    const digits=ic.replace(/\\D/g,"");
+    const g=digits.slice(-1);
+    if(g) put("Gender (from IC)",(+g%2)?"M — Male":"F — Female","Derived");
+  }
+  const sex=firstMatch(/(?:sex|gender|jantina|seks|kelamin)\\s*[:\\-]?\\s*(male|female|lelaki|perempuan|m|f)\\b/i);
+  if(sex) put("Gender / Jantina",/^m$|male|lelaki/i.test(sex)?"M — Male":"F — Female");
 
-            } catch (err) {
-                console.error(err);
-                alert('An error occurred during OCR extraction: ' + err.message);
-                progressWrapper.style.display = 'none';
-            }
-        }
+  const nationality=firstMatch(/(?:nationality|warganegara|citizenship|country)\\s*[:\\-]?\\s*([^\\n]{2,50})/i);
+  if(nationality) put("Nationality / Warganegara",nationality);
 
-        // Parsing Engines Customized Per Document Specifications
-        function parseDocumentData(docType, frontText, backText) {
-            const combinedText = `${frontText}\n${backText}`;
-            let result = {};
+  // Country/state recognition. User requested country names to be captured as nationality.
+  const places=[
+    "Malaysia","Singapore","Indonesia","Thailand","Brunei","Philippines","Vietnam","Myanmar","Cambodia","Laos",
+    "China","India","Pakistan","Bangladesh","Nepal","Sri Lanka","Japan","Korea","Australia","New Zealand",
+    "United Kingdom","United States","Canada","France","Germany","Italy","Spain","Netherlands","Belgium",
+    "Sarawak","Sabah","Selangor","Johor","Perak","Penang","Pahang","Kelantan","Terengganu","Kedah",
+    "Perlis","Melaka","Negeri Sembilan","Kuala Lumpur","Putrajaya","Labuan"
+  ];
+  for(const p of places){if(new RegExp("\\\\b"+p.replace(/ /g,"\\\\s+")+"\\\\b","i").test(clean)){put("Detected Country / State",p,"Detected");break}}
 
-            switch (docType) {
-                case 'intl_passport':
-                    result = {
-                        "Document Type": "International Passport",
-                        "Page 2 - Holder Photo": frontText ? "Detected & Validated" : "Missing",
-                        "Type": matchRegex(combinedText, /Type[\/\s:]*([A-Z0-9]{1,2})/i) || "P",
-                        "Country Code": matchRegex(combinedText, /Country Code[\/\s:]*([A-Z]{3})/i) || "MYS",
-                        "Passport Number": matchRegex(combinedText, /[A-Z][0-9]{8}/) || matchRegex(combinedText, /Passport No[\/\s:]*([A-Z0-9]+)/i) || "A00000000",
-                        "Full Name": extractName(combinedText) || "PASSPORT HOLDER NAME",
-                        "Nationality": matchRegex(combinedText, /Nationality[\/\s:]*([A-Z\s]+)/i) || "MALAYSIAN",
-                        "Date of Birth": matchRegex(combinedText, /(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/) || "01/01/1990",
-                        "Sex / Gender": matchRegex(combinedText, /Sex[\/\s:]*([MF])/i) || "M",
-                        "Place of Birth": matchRegex(combinedText, /Place of Birth[\/\s:]*([A-Z\s,]+)/i) || "KUALA LUMPUR",
-                        "Date of Issue": matchRegex(combinedText, /Date of Issue[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || "10/10/2022",
-                        "Date of Expiry": matchRegex(combinedText, /Date of Expiry[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || "10/10/2027",
-                        "Issuing Authority": matchRegex(combinedText, /Authority[\/\s:]*([A-Z\s]+)/i) || "IMMIGRATION DEPARTMENT",
-                        "Machine-Readable Zone (MRZ)": extractMRZ(combinedText) || "P<MYSSPECIMEN<<NAME<<<<<<<<<<<<<<<<<<<<<<\nA000000000MYS9001018M2710103<<<<<<<<<<<<<<04",
-                        "Page 3 - Signature": backText ? "Captured Signature Facsimile" : "Not Scanned",
-                        "Page 3 - Endorsements": matchRegex(backText, /Endorsements[\/\s:]*([A-Z0-9\s]+)/i) || "NONE / STAMPED REGULAR"
-                    };
-                    break;
+  const namePatterns=[
+    /(?:full name|nama penuh|name|nama|surname|last name)\\s*[:\\-]?\\s*([^\\n]{3,100})/i,
+    /(?:holder|bearer)\\s*(?:name)?\\s*[:\\-]?\\s*([^\\n]{3,100})/i
+  ];
+  for(const re of namePatterns){const n=firstMatch(re);if(n&&!/mykad|kad pengenalan|passport/i.test(n)){put("Full Name / Nama",n);break}}
 
-                case 'my_passport':
-                    result = {
-                        "Document Type": "Malaysian Passport (Polycarbonate Identity Page)",
-                        "Type / Jenis": "P",
-                        "Country Code / Kod Negara": "MYS",
-                        "Passport Number / Nombor Pasport": matchRegex(combinedText, /[A-Z]\d{8}/) || "A12345678",
-                        "Full Name / Nama": extractName(combinedText) || "KADIR BINTI ABDULLAH",
-                        "Nationality / Warganegara": "MALAYSIAN / WARGANEGARA",
-                        "Date of Birth / Tarikh Lahir": matchRegex(combinedText, /(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/) || "15/08/1992",
-                        "Identity Card Number (MyKad)": matchRegex(combinedText, /\d{6}-\d{2}-\d{4}/) || "920815-14-5531",
-                        "Gender / Jantina": matchRegex(combinedText, /Jantina[\/\s:]*([MF])/i) || "M",
-                        "Place of Birth / Tempat Lahir": matchRegex(combinedText, /Tempat Lahir[\/\s:]*([A-Z\s]+)/i) || "SELANGOR",
-                        "Date of Issue / Tarikh Dikeluarkan": matchRegex(combinedText, /Dikeluarkan[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || "12/01/2024",
-                        "Date of Expiry / Tarikh Kepupusan": matchRegex(combinedText, /Kepupusan[\/\s:]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || "12/01/2029 (5-Year)",
-                        "Issuing Authority / Pihak Berkuasa": "JABATAN IMIGRESEN MALAYSIA",
-                        "Page 3 Holder Signature": backText ? "Digitally Captured Signature" : "Validated",
-                        "Page 3 Administrative Notes": "NO OFFICIAL ENDORSEMENTS ATTACHED"
-                    };
-                    break;
+  const addr=firstMatch(/(?:address|alamat|residential address|permanent address|registered address)\\s*[:\\-]?\\s*([\\s\\S]{8,220}?)(?=\\n\\s*(?:postcode|nationality|warganegara|gender|jantina|date|tarikh|$))/i);
+  if(addr) put("Address / Alamat",addr);
 
-                case 'my_nric':
-                    const icMatch = combinedText.match(/(\d{6}-\d{2}-\d{4})/) || combinedText.match(/(\d{12})/);
-                    let genderVal = "Lelaki / Male (M)";
-                    if (icMatch) {
-                        const cleanIC = icMatch[0].replace(/-/g, '');
-                        const lastDigit = parseInt(cleanIC.slice(-1));
-                        if (!isNaN(lastDigit) && lastDigit % 2 === 0) {
-                            genderVal = "Perempuan / Female (F)";
-                        }
-                    }
-                    result = {
-                        "Header and Logos": "KAD PENGENALAN MALAYSIA (Flag & MyKad Logo Verified)",
-                        "IC Number": icMatch ? icMatch[0] : "950312-10-5234",
-                        "Full Name": extractName(frontText) || "TAN CHIN HOCK",
-                        "Residential Address": extractAddress(frontText) || "NO 42 JALAN UTAMA 3/2, TAMAN HARMONI, 47100 PUCHONG, SELANGOR",
-                        "Gender / Sex": genderVal,
-                        "Citizenship / Nationality": "WARGANEGARA MALAYSIA",
-                        "Race": matchRegex(frontText, /(CINA|MELAYU|INDIAN|ISLAM|OTHERS)/i) || "CINA",
-                        "Photograph & Smart Chip": "Front Gold-Chip & Color Photo Present",
-                        "Extended IC Number (Back)": matchRegex(backText, /\d{12}-\d{2}/) || (icMatch ? `${icMatch[0]}-01` : "950312105234-01"),
-                        "Barcode / QR Code": backText ? "Scanned Security Matrix Present" : "Missing Back Scan",
-                        "Security Features": "Hibiscus (Bunga Raya) Laser-Engraved Security Pattern Verified"
-                    };
-                    break;
+  const birth=firstMatch(/(?:date of birth|dob|tarikh lahir)\\s*[:\\-]?\\s*([^\\n]{4,30})/i);
+  if(birth) put("Date of Birth / Tarikh Lahir",birth);
 
-                case 'my_pr':
-                    const prIcMatch = combinedText.match(/(\d{6}-\d{2}-\d{4})/);
-                    let prGender = "Lelaki / Male";
-                    if (prIcMatch) {
-                        const last = parseInt(prIcMatch[0].slice(-1));
-                        if (!isNaN(last) && last % 2 === 0) prGender = "Perempuan / Female";
-                    }
-                    result = {
-                        "Background Color": "Distinctive Red Scheme Verified",
-                        "Card Heading": "KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP",
-                        "NRIC Number": prIcMatch ? prIcMatch[0] : "880520-71-5123",
-                        "Full Name": extractName(frontText) || "RAJ A/L RAMASAMY",
-                        "Permanent Address": extractAddress(frontText) || "LOT 102 JALAN AMPANG, 50450 KUALA LUMPUR",
-                        "Gender / Sex": prGender,
-                        "Biometric Features": "Embedded Microchip Interface Verified",
-                        "Original Nationality (Back)": matchRegex(backText, /Nationality[\/\s:]*([A-Z]+)/i) || "INDIA",
-                        "Entry Permit Details (Back)": matchRegex(backText, /Permit[\/\s:]*([A-Z0-9\/]+)/i) || "MY-PR/2015/99842",
-                        "Security Features": "Holographic Crest & Microtext Verified"
-                    };
-                    break;
+  const issue=firstMatch(/(?:date of issue|issued|tarikh dikeluarkan)\\s*[:\\-]?\\s*([^\\n]{4,30})/i);
+  if(issue) put("Date of Issue",issue);
+  const expiry=firstMatch(/(?:date of expiry|expiry|valid until|tarikh kepupusan)\\s*[:\\-]?\\s*([^\\n]{4,30})/i);
+  if(expiry) put("Date of Expiry",expiry);
 
-                case 'my_dl':
-                    result = {
-                        "Background Design": "Sultan Abdul Samad Building Wave Motifs Verified",
-                        "Full Name": extractName(frontText) || "AHMAD BIN ZULKIFLI",
-                        "Identity Card / Passport": matchRegex(combinedText, /\d{6}-\d{2}-\d{4}/) || "901104-08-6115",
-                        "Nationality": "MALAYSIA",
-                        "Address": extractAddress(frontText) || "NO 12 JALAN SG CHUA, 43000 KAJANG, SELANGOR",
-                        "Category / Class of License": matchRegex(frontText, /(B2|B|D|DA|E)/g)?.join(', ') || "B2, D",
-                        "Validity Dates": matchRegex(frontText, /\d{2}[\/\.-]\d{2}[\/\.-]\d{4}\s*-\s*\d{2}[\/\.-]\d{2}[\/\.-]\d{4}/) || "15/03/2023 - 15/03/2028",
-                        "License / Serial Number (Back)": matchRegex(backText, /JPJ[A-Z0-9]+/) || "JPJ984123847",
-                        "Vehicle Classes Table": "Detailed Bilingual Breakdown Present",
-                        "Director-General Signature": backText ? "Digital Signature Facsimile Verified" : "Not Provided"
-                    };
-                    break;
+  // Document-specific labels.
+  const rules={
+    international_passport:["Type","Country Code","Passport Number","Full Name","Nationality","Date of Birth","Sex / Gender","Place of Birth","Date of Issue","Date of Expiry","Issuing Authority","Machine-Readable Zone (MRZ)","Holder's Signature","Observations / Endorsements"],
+    malaysian_passport:["Type / Jenis","Country Code / Kod Negara","Passport Number / Nombor Pasport","Full Name / Nama","Nationality / Warganegara","Date of Birth / Tarikh Lahir","Identity Card Number / Nombor Kad Pengenalan (MyKad)","Gender / Jantina","Place of Birth / Tempat Lahir","Date of Issue / Tarikh Dikeluarkan","Date of Expiry / Tarikh Kepupusan","Issuing Authority / Pihak Berkuasa","Holder's Signature","Digital observation / administrative notes"],
+    nric:["Full Name","Residential Address","Gender/Sex","Citizenship/Nationality","Race","Extended IC Number","Barcode / QR Code"],
+    pr:["Full Name","Permanent Address","Gender/Sex","Original Nationality","Entry Permit Details"],
+    malaysia_license:["Full Name","Identity Card / Passport Number","Nationality","Address","Category / Class of License","Validity Dates","License / Serial Number","Vehicle Classes Table"],
+    international_license:["Issuing Authority","Validity Dates","Surname / Last Name","Given / First Names","Place of Birth","Date of Birth","Permanent Place of Residence","Holder's Signature","Vehicle Categories","Validation Stamps / Endorsements","Territorial Validity List"],
+    ssm:["Registration / Incorporation Number","Registration / Incorporation Date","Business Type / Structure","Business Status & Expiry Date","Registered and Business Address","Nature of Business","Owner / Director Details","Shareholder Information","Branch Information","Financial Data & Charges"],
+    ppk:["Company Details","Registration Number","Grade (G1 to G7)","Categories of Construction","Specializations","Validity Period","Status"]
+  };
+  const wanted=rules[type]||[];
+  for(const label of wanted){
+    const safe=label.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&");
+    const m=clean.match(new RegExp(safe+"\\\\s*[:\\-]?\\\\s*([^\\\\n]{2,180})","i"));
+    if(m) put(label,m[1]);
+  }
 
-                case 'intl_dl':
-                    result = {
-                        "Emblem & Title": "Convention on Road Traffic (1949/1968) - MALAYSIA",
-                        "Issuing Authority": matchRegex(combinedText, /Issuing Authority[\/\s:]*([A-Z\s]+)/i) || "AUTOMOBILE ASSOCIATION OF MALAYSIA / JPJ",
-                        "Validity Dates": matchRegex(combinedText, /\d{2}[\/\.-]\d{2}[\/\.-]\d{4}/) || "01/06/2025 - 01/06/2026 (Max 1 Year)",
-                        "Surname / Last Name": "SAMPLED NAME",
-                        "Place of Birth": "KUALA LUMPUR, MALAYSIA",
-                        "Date of Birth": "20/04/1988",
-                        "Holder Signature": "Stamped / Signed",
-                        "Vehicle Categories (A, B, C, D, E)": "A (Motorcycles), B (Passenger Cars)",
-                        "Validation Stamps / Endorsements": "Stamped Against Category A & B",
-                        "Territorial Validity": "Valid for all Contracting States listed in UN Convention"
-                    };
-                    break;
+  // MRZ: two-line passport zone, retain exact OCR characters as far as possible.
+  const mrz=clean.split("\\n").filter(l=>/[A-Z0-9<]{20,}/.test(l.replace(/\\s/g,""))).slice(-2).join("\\n");
+  if(mrz.length>30) put("Machine-Readable Zone (MRZ)",mrz);
 
-                case 'ssm_cert':
-                    result = {
-                        "Entity Name": extractName(frontText) || "TECHNO GLOBAL SDN. BHD.",
-                        "Registration / Incorporation Number": matchRegex(frontText, /\d{12}|\d{6}-[A-Z]/) || "202101098765 (1432100-X)",
-                        "Registration / Incorporation Date": matchRegex(frontText, /\d{2}[\/\.-]\d{2}[\/\.-]\d{4}/) || "12/04/2021",
-                        "Business Type / Structure": matchRegex(frontText, /(Sdn\.? Bhd\.?|Berhad|Enterprise|Perkongsian)/i) || "Sendirian Berhad (Private Limited)",
-                        "Business Status & Expiry Date": "ACTIVE (Renewal Expiry: 12/04/2027)",
-                        "Registered and Business Address": extractAddress(frontText) || "LEVEL 18, MENARA SSM, KL SENTRAL, 50470 KUALA LUMPUR",
-                        "Nature of Business & MSIC Codes": "62010 - COMPUTER PROGRAMMING ACTIVITIES AND IT CONSULTANCY",
-                        "Owner / Director Details": "1. ALICE TAN (IC: 850101-14-5222)\n2. ROBERT LEE (IC: 830303-10-6111)",
-                        "Shareholder Information": "Total Issued Capital: RM 100,000 (100,000 Ordinary Shares)",
-                        "Branch Information": "HEAD OFFICE ONLY"
-                    };
-                    break;
+  // PPK grade and common CIDB data.
+  const grade=firstMatch(/\\b(G[1-7])\\b/i);
+  if(grade) put("CIDB Grade",grade.toUpperCase());
+  const cats=[...clean.matchAll(/\\b(B|CE|ME)\\b/g)].map(x=>x[1]);
+  if(cats.length) put("Construction Categories",[...new Set(cats)].join(", "));
 
-                case 'cidb_ppk':
-                    result = {
-                        "Company Name": extractName(frontText) || "MEGA BINA CONSTRUCTION SDN BHD",
-                        "Registration Number (ROC/ROB)": matchRegex(frontText, /\d{12}|\d{6}-[A-Z]/) || "201801012345",
-                        "CIDB Registration ID / No": matchRegex(frontText, /01\d{12}/) || "0120190315-SL123456",
-                        "Grade (G1 to G7)": matchRegex(frontText, /G[1-7]/) || "G7 (Unlimited Tender Value Capacity)",
-                        "Categories of Construction": "B (Building Construction), CE (Civil Engineering Construction), ME (Mechanical & Electrical)",
-                        "Specializations": "B04 (Building Works), CE01 (Road & Pavement), ME01 (Air Conditioning)",
-                        "Validity Period": matchRegex(frontText, /\d{2}[\/\.-]\d{2}[\/\.-]\d{4}\s*to\s*\d{2}[\/\.-]\d{2}[\/\.-]\d{4}/) || "01/01/2024 to 31/12/2026",
-                        "Operational Status": "ACTIVE / CERTIFIED UNDER ACT 520"
-                    };
-                    break;
-            }
+  // Capture likely multi-line name if no label was detected.
+  if(!fields["Full Name / Nama"] && !fields["Full Name"]){
+    const candidates=clean.split("\\n").map(norm).filter(x=>/^[A-Za-z][A-Za-z .,'/-]{2,80}$/.test(x)&&x.split(" ").length>=2);
+    const candidate=candidates.find(x=>!/(malaysia|passport|pengenalan|road|transport|immigration|certificate|cidb|ssm)/i.test(x));
+    if(candidate) put("Full Name / Nama",candidate,"Heuristic");
+  }
 
-            return result;
-        }
+  // Preserve useful raw labelled lines so no requested information silently disappears.
+  const labels=["Type","Country Code","Passport Number","Nationality","Address","Race","Grade","Status","Specializations","Validity","Issuing Authority","Registration Number"];
+  labels.forEach(label=>{
+    const m=clean.match(new RegExp("\\\\b"+label+"\\\\b\\\\s*[:\\-]?\\\\s*([^\\\\n]{2,160})","i"));
+    if(m && !Object.keys(fields).some(k=>k.toLowerCase().includes(label.toLowerCase()))) put(label,m[1]);
+  });
+  return fields;
+}
 
-        // Helper Regex Extractors
-        function matchRegex(text, regex) {
-            const m = text.match(regex);
-            return m ? (m[1] ? m[1].trim() : m[0].trim()) : null;
-        }
+function extractTables(text,file,page){
+  const lines=text.split("\\n").map(x=>x.trim()).filter(Boolean);
+  const rows=lines.filter(l=>/[|\\t]{1}/.test(l)||/\\s{3,}/.test(l));
+  if(rows.length<2)return [];
+  return [{file,page,rows:rows.slice(0,100)}];
+}
 
-        function extractName(text) {
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-            for (let line of lines) {
-                if (/^[A-Z\s\/]{5,40}$/.test(line) && !line.includes('MALAYSIA') && !line.includes('PENGENALAN') && !line.includes('PASPORT')) {
-                    return line;
-                }
-            }
-            return null;
-        }
+function renderResults(){
+  $("pageCount").textContent=state.pages.length;
+  $("wordCount").textContent=state.text.trim()?state.text.trim().split(/\\s+/).length:0;
+  $("fieldCount").textContent=Object.keys(state.fields).length;
+  $("confidence").textContent=state.pages.length?state.confidence.toFixed(1)+"%":"—";
+  renderFields();
+  showTab("fields");
+}
+function renderFields(){
+  const box=$("fields");box.innerHTML="";
+  const entries=Object.entries(state.fields);
+  if(!entries.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">No structured fields confidently detected. Use “All text” to inspect the complete OCR result.</div>';return}
+  for(const [k,o] of entries){
+    const d=document.createElement("div");d.className="field "+(o.value.length>70?"full":"");
+    d.innerHTML=`<div class="k">${esc(k)} <span class="conf">${esc(o.confidence)}</span></div><div class="v">${esc(o.value)}</div>`;
+    box.appendChild(d);
+  }
+}
+function showTab(tab){
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.tab===tab));
+  const r=$("result");
+  if(tab==="fields"){r.innerHTML='<div class="fieldgrid" id="innerFields"></div>';const old=$("fields"),inner=$("innerFields");inner.innerHTML=old.innerHTML;return}
+  if(tab==="text"){r.innerHTML=`<div class="textout">${esc(state.text||"No OCR text yet.")}</div>`;return}
+  if(tab==="tables"){
+    if(!state.tables.length){r.innerHTML='<div class="empty">No table-like rows detected.</div>';return}
+    r.innerHTML='<div class="tablewrap">'+state.tables.map(t=>`<div style="font-weight:900;margin:8px 0">${esc(t.file)} • page ${t.page}</div><table><tbody>${t.rows.map(row=>`<tr>${row.split(/\\||\\t| {3,}/).map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`).join("")+'</div>';return
+  }
+  if(tab==="pages"){
+    if(!state.pages.length){r.innerHTML='<div class="empty">No processed pages.</div>';return}
+    r.innerHTML=state.pages.map((p,i)=>`<div class="file-item" style="margin-bottom:8px"><b>${esc(p.file)} • page ${p.index}</b><div class="file-meta">Confidence ${p.confidence.toFixed(1)}% • ${p.text.split(/\\s+/).filter(Boolean).length} words</div></div>`).join("");
+  }
+}
+function clearAll(){
+  state.files=[];state.pages=[];state.text="";state.tables=[];state.fields={};state.confidence=0;
+  $("fileInput").value="";renderFileList();renderResults();$("log").textContent="NeuroOCR initialized.\\n";status("Ready",0);$("engineChip").textContent="ENGINE: READY";
+}
+function exportJSON(){
+  const payload={application:"NeuroOCR",generatedAt:new Date().toISOString(),documentType:$("docType").value,fields:state.fields,pages:state.pages.map(p=>({file:p.file,index:p.index,text:p.text,confidence:p.confidence})),tables:state.tables,fullText:state.text};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="neuroocr-result.json";a.click();URL.revokeObjectURL(a.href);
+}
 
-        function extractAddress(text) {
-            const matches = text.match(/(NO|LOT|LEVEL|SUITE)[\s\S]+?\d{5}[\s\S]+?(SELANGOR|KUALA LUMPUR|JOHOR|PENANG|PERAK|PAHANG|MELAKA|SABAH|SARAWAK|KEDAH|NEGERI SEMBILAN|KELANTAN|TERENGGANU)/i);
-            return matches ? matches[0].replace(/\n/g, ' ') : null;
-        }
+window.addEventListener("load",()=>{
+  // pdfjs is an ES module; expose its namespace when loaded.
+  const s=document.getElementById("pdfjs-module");
+  if(s) s.addEventListener("load",()=>{});
+  log("OCR engine libraries loading…");
+});
+</script>
 
-        function extractMRZ(text) {
-            const lines = text.split('\n').filter(l => l.includes('<'));
-            if (lines.length >= 2) return lines.slice(0, 2).join('\n');
-            return null;
-        }
-
-        // Render UI Results
-        function renderResults(data) {
-            const resultsGrid = document.getElementById('resultsGrid');
-            const jsonViewer = document.getElementById('jsonViewer');
-
-            resultsGrid.innerHTML = '';
-            jsonViewer.innerText = JSON.stringify(data, null, 4);
-
-            for (const [key, value] of Object.entries(data)) {
-                const fieldDiv = document.createElement('div');
-                fieldDiv.className = 'data-field';
-                
-                if (value.length > 35 || key.includes('Address') || key.includes('MRZ') || key.includes('Details')) {
-                    fieldDiv.classList.add('full-width');
-                }
-
-                fieldDiv.innerHTML = `
-                    <label>${key}</label>
-                    <div class="value">${escapeHtml(value)}</div>
-                `;
-                resultsGrid.appendChild(fieldDiv);
-            }
-        }
-
-        function escapeHtml(text) {
-            return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        }
-
-        function switchTab(tab) {
-            document.getElementById('tabFormatted').classList.toggle('active', tab === 'formatted');
-            document.getElementById('tabJson').classList.toggle('active', tab === 'json');
-            
-            document.getElementById('resultsGrid').style.display = tab === 'formatted' ? 'grid' : 'none';
-            document.getElementById('jsonViewer').style.display = tab === 'json' ? 'block' : 'none';
-        }
-
-        function resetForm() {
-            files = { front: null, back: null };
-            extractedDataStore = {};
-            document.getElementById('fileFront').value = '';
-            document.getElementById('fileBack').value = '';
-            document.getElementById('previewContainerFront').innerHTML = '';
-            document.getElementById('previewContainerBack').innerHTML = '';
-            document.getElementById('labelFront').style.display = 'block';
-            document.getElementById('labelBack').style.display = 'block';
-            document.getElementById('resultsGrid').innerHTML = `
-                <div class="data-field full-width" style="text-align: center; padding: 2rem;">
-                    <i class="fa-solid fa-magnifying-glass" style="font-size: 2rem; color: var(--text-muted); margin-bottom: 10px;"></i>
-                    <p class="value" style="color: var(--text-muted);">Upload document scans and click "Extract Document Data" to populate structured information.</p>
-                </div>`;
-            document.getElementById('jsonViewer').innerText = '{}';
-        }
-
-        function exportData(format) {
-            if (Object.keys(extractedDataStore).length === 0) {
-                alert('No extracted data available to export.');
-                return;
-            }
-
-            let dataStr = "";
-            let filename = `extracted_ocr_${new Date().getTime()}`;
-
-            if (format === 'json') {
-                dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(extractedDataStore, null, 4));
-                filename += ".json";
-            } else if (format === 'csv') {
-                let csvContent = "Parameter,Extracted Value\n";
-                for (const [k, v] of Object.entries(extractedDataStore)) {
-                    csvContent += `"${k}","${v.replace(/"/g, '""')}"\n`;
-                }
-                dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
-                filename += ".csv";
-            }
-
-            const dlAnchor = document.createElement('a');
-            dlAnchor.setAttribute("href", dataStr);
-            dlAnchor.setAttribute("download", filename);
-            document.body.appendChild(dlAnchor);
-            dlAnchor.click();
-            dlAnchor.remove();
-        }
-    </script>
+<!--
+  IMPORTANT:
+  The PDF module above does not automatically expose pdfjsLib in every browser.
+  The following module imports PDF.js and publishes it for the main application.
+-->
+<script type="module">
+import * as pdfjsLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs";
+window.pdfjsLib=pdfjsLib;
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+window.dispatchEvent(new Event("pdfjs-ready"));
+</script>
 </body>
 </html>
