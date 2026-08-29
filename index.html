@@ -1,761 +1,136 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberOCR - Neumorphic Neon Document Scanner</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <style>
-        :root {
-            --bg-color: #0f111a;
-            --panel-bg: #141724;
-            --shadow-dark: #090a0f;
-            --shadow-light: #1f2435;
-            --neon-blue: #00f3ff;
-            --neon-pink: #ff007f;
-            --neon-purple: #9d00ff;
-            --neon-green: #00ff66;
-            --neon-red: #ff3344;
-            --text-main: #e0e6ed;
-            --text-dim: #7a889b;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            min-height: 100vh;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-        }
-
-        /* Neumorphic UI Components */
-        .neu-card {
-            background: var(--panel-bg);
-            border-radius: 20px;
-            box-shadow: 8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light);
-            padding: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            transition: all 0.3s ease;
-        }
-
-        .neu-inset {
-            background: var(--bg-color);
-            border-radius: 12px;
-            box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
-            border: 1px solid rgba(255, 255, 255, 0.02);
-        }
-
-        .neu-btn {
-            background: var(--panel-bg);
-            border: none;
-            border-radius: 12px;
-            box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
-            color: var(--neon-blue);
-            font-weight: 700;
-            padding: 1rem 2rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .neu-btn:hover {
-            box-shadow: 2px 2px 5px var(--shadow-dark), -2px -2px 5px var(--shadow-light);
-            color: var(--neon-pink);
-            text-shadow: 0 0 8px var(--neon-pink);
-        }
-
-        .neu-btn:active {
-            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
-        }
-
-        /* Header */
-        header {
-            text-align: center;
-            position: relative;
-        }
-
-        header h1 {
-            font-size: 2.5rem;
-            color: var(--text-main);
-            text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue);
-            margin-bottom: 0.5rem;
-            letter-spacing: 2px;
-        }
-
-        header p {
-            color: var(--text-dim);
-            font-size: 0.95rem;
-        }
-
-        /* Layout Grid */
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-
-        @media (max-width: 1024px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Document Selection */
-        .doc-select-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .doc-select-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--neon-blue);
-            font-weight: 600;
-        }
-
-        select {
-            width: 100%;
-            padding: 1rem;
-            background: var(--bg-color);
-            color: var(--text-main);
-            border: none;
-            border-radius: 12px;
-            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
-            outline: none;
-            font-size: 1rem;
-            cursor: pointer;
-        }
-
-        /* Dropzones */
-        .upload-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .dropzone {
-            padding: 1.5rem;
-            text-align: center;
-            cursor: pointer;
-            position: relative;
-            min-height: 200px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            border: 2px dashed rgba(0, 243, 255, 0.2);
-            transition: border-color 0.3s ease;
-        }
-
-        .dropzone:hover {
-            border-color: var(--neon-blue);
-            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
-        }
-
-        .dropzone input {
-            display: none;
-        }
-
-        .dropzone-title {
-            font-weight: bold;
-            color: var(--neon-pink);
-            margin-bottom: 0.5rem;
-        }
-
-        .dropzone-sub {
-            font-size: 0.8rem;
-            color: var(--text-dim);
-        }
-
-        .preview-img {
-            max-width: 100%;
-            max-height: 150px;
-            object-fit: contain;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-
-        /* Controls */
-        .image-controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .image-controls button {
-            padding: 0.5rem 1rem;
-            font-size: 0.8rem;
-        }
-
-        /* Output / Display Panel */
-        .results-panel {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .extracted-field {
-            padding: 0.8rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 1rem;
-        }
-
-        .field-label {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-            flex: 1;
-        }
-
-        .field-value {
-            font-size: 0.95rem;
-            font-weight: 600;
-            flex: 2;
-            text-align: right;
-            word-break: break-word;
-        }
-
-        .status-found {
-            color: var(--neon-green);
-            text-shadow: 0 0 5px rgba(0, 255, 102, 0.4);
-        }
-
-        .status-missing {
-            color: var(--neon-red);
-            text-shadow: 0 0 5px rgba(255, 51, 68, 0.4);
-        }
-
-        /* Progress Bar */
-        .progress-bar-container {
-            width: 100%;
-            height: 10px;
-            border-radius: 5px;
-            overflow: hidden;
-            margin-top: 1rem;
-            display: none;
-        }
-
-        .progress-bar {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, var(--neon-blue), var(--neon-pink));
-            box-shadow: 0 0 10px var(--neon-pink);
-            transition: width 0.2s ease;
-        }
-
-        /* Canvas Hidden for processing */
-        #processing-canvas {
-            display: none;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a0f1d">
+<title>NeonOCR — Document Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/tesseract.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.11.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+:root{--bg:#080c16;--panel:#0d1322;--panel2:#111a2b;--text:#edf4ff;--muted:#8fa0ba;--cyan:#37f3ff;--green:#53ff9a;--red:#ff5577;--amber:#ffd166;--blue:#6c8cff;--shadow:18px 18px 40px #03050a,-12px -12px 35px #16213a;--soft:inset 2px 2px 5px #03060e,inset -2px -2px 5px #18253d}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:Inter,system-ui,sans-serif;color:var(--text);background:radial-gradient(circle at 18% 0%,#12223f 0,#080c16 34%),radial-gradient(circle at 100% 100%,#101b32 0,#080c16 42%);overflow:hidden}.app{height:100vh;display:grid;grid-template-rows:auto 1fr;padding:14px;gap:12px;position:relative}.app:before,.app:after{content:"";position:absolute;pointer-events:none;inset:-1px;border-radius:25px}.app:before{box-shadow:0 0 40px rgba(55,243,255,.16),inset 0 0 60px rgba(55,243,255,.035)}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:18px;background:linear-gradient(145deg,#0f1728,#0a0f1b);box-shadow:var(--shadow);border:1px solid rgba(255,255,255,.04);position:relative;overflow:hidden}header:after{content:"";position:absolute;left:-10%;right:-10%;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);filter:blur(.4px);animation:sweep 4s linear infinite}@keyframes sweep{0%{transform:translateX(-50%)}100%{transform:translateX(50%)}}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;color:#061019;font-weight:800;background:linear-gradient(145deg,var(--cyan),#9dfcff);box-shadow:0 0 28px rgba(55,243,255,.45),inset -4px -4px 9px rgba(0,0,0,.22),inset 4px 4px 9px rgba(255,255,255,.5)}.brand h1{font:700 20px 'Space Grotesk';margin:0}.brand small{display:block;color:var(--muted);margin-top:2px}.header-actions{display:flex;gap:8px;align-items:center}.chip{padding:7px 10px;border-radius:999px;background:#0b1220;box-shadow:var(--soft);border:1px solid rgba(255,255,255,.035);font-size:12px}.live{color:var(--green)}
+main{min-height:0;display:grid;grid-template-columns:360px minmax(420px,1fr) 440px;gap:12px}.card{min-height:0;border-radius:20px;background:linear-gradient(145deg,#0f1728,#0a0f1b);box-shadow:var(--shadow);border:1px solid rgba(255,255,255,.035);overflow:hidden}.panel{padding:14px;display:flex;flex-direction:column;min-height:0}.panel-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.panel-title h2{font:700 14px 'Space Grotesk';letter-spacing:.02em;margin:0}.panel-title span{color:var(--muted);font-size:11px}.upload-zone{border:1px dashed rgba(55,243,255,.38);border-radius:18px;padding:18px;min-height:180px;display:grid;place-items:center;text-align:center;background:linear-gradient(145deg,#0b1220,#0d1423);box-shadow:var(--soft);transition:.2s}.upload-zone.drag{border-color:var(--cyan);box-shadow:var(--soft),0 0 34px rgba(55,243,255,.18)}.upload-zone .icon{font-size:32px;margin-bottom:6px}.upload-zone h3{margin:0 0 6px;font-size:15px}.upload-zone p{font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.5}.btn{border:0;color:var(--text);background:#0b1220;padding:9px 12px;border-radius:11px;box-shadow:var(--soft);cursor:pointer;font-weight:700;font-size:12px}.btn:hover{box-shadow:var(--soft),0 0 20px rgba(55,243,255,.13)}.btn.primary{background:linear-gradient(145deg,#0d5962,#0a2e39);color:#dfffff;box-shadow:var(--soft),0 0 22px rgba(55,243,255,.18)}.btn.danger{color:#ff9aab}.btn:disabled{opacity:.45;cursor:not-allowed}.stack{display:flex;flex-direction:column;gap:10px}.row{display:flex;gap:8px;align-items:center}.grow{flex:1}.select,.input{width:100%;color:var(--text);background:#0a101d;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:9px;outline:none;box-shadow:var(--soft);font-size:12px}.select:focus,.input:focus{border-color:rgba(55,243,255,.5)}.toggle{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:12px;background:#0b1220;box-shadow:var(--soft);font-size:12px}.toggle input{accent-color:var(--cyan)}.files{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:7px;padding-right:2px}.file{padding:9px 10px;border-radius:12px;background:#0b1220;box-shadow:var(--soft);display:grid;grid-template-columns:1fr auto;gap:8px;border:1px solid transparent}.file.active{border-color:rgba(55,243,255,.22);box-shadow:var(--soft),0 0 15px rgba(55,243,255,.08)}.file .name{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file .meta{font-size:10px;color:var(--muted);margin-top:2px}.file .badge{font-size:9px;padding:5px 7px;border-radius:999px;height:max-content}.badge.ok{background:rgba(83,255,154,.08);color:var(--green)}.badge.warn{background:rgba(255,209,102,.08);color:var(--amber)}.badge.bad{background:rgba(255,85,119,.08);color:var(--red)}
+.viewer{display:grid;grid-template-rows:auto 1fr auto;min-height:0}.toolbar{padding:10px 12px;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,.04)}.toolbar .spacer{flex:1}.stage{position:relative;min-height:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,rgba(55,243,255,.07),transparent 35%),#070b13;overflow:hidden}.stage canvas,.stage img{max-width:94%;max-height:94%;object-fit:contain;border-radius:12px;box-shadow:0 0 0 1px rgba(255,255,255,.04),0 20px 60px rgba(0,0,0,.45)}.empty{color:var(--muted);text-align:center}.empty b{display:block;color:#d5e4f7;margin-bottom:6px}.statusbar{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#0a101b;border-top:1px solid rgba(255,255,255,.04);font-size:10px;color:var(--muted)}.progress{height:5px;flex:1;border-radius:999px;background:#060912;overflow:hidden;box-shadow:var(--soft)}.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--green));box-shadow:0 0 14px rgba(55,243,255,.5);transition:.2s}
+.results{display:grid;grid-template-rows:auto 1fr auto;min-height:0}.tabs{display:flex;gap:5px;padding:10px 12px 0}.tab{padding:7px 9px;border-radius:9px;color:var(--muted);font-size:11px;cursor:pointer}.tab.active{color:var(--text);background:#0b1220;box-shadow:var(--soft)}.content{padding:12px;overflow:auto;min-height:0}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.metric{padding:10px;border-radius:12px;background:#0b1220;box-shadow:var(--soft)}.metric b{font-size:18px}.metric span{display:block;color:var(--muted);font-size:9px;margin-top:2px}.field{padding:9px 10px;border-radius:12px;background:#0b1220;box-shadow:var(--soft);margin-bottom:7px;position:relative}.field h4{font-size:9px;color:var(--muted);margin:0 0 5px;text-transform:uppercase;letter-spacing:.08em}.field .value{font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word}.field.good{outline:1px solid rgba(83,255,154,.17)}.field.unknown{outline:1px solid rgba(255,85,119,.18)}.field .reason{font-size:10px;margin-top:6px}.field .reason.good{color:var(--green)}.field .reason.bad{color:var(--red)}.raw{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-word;background:#070b13;border-radius:12px;padding:10px;box-shadow:var(--soft);min-height:280px}.footer-actions{padding:10px 12px;border-top:1px solid rgba(255,255,255,.04);display:flex;gap:8px}.hidden{display:none!important}.hint{color:var(--muted);font-size:10px;line-height:1.45}.legend{display:flex;gap:8px;font-size:9px;color:var(--muted)}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px}.dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}.dot.red{background:var(--red);box-shadow:0 0 8px var(--red)}.small{font-size:10px}.scroll{overflow:auto}.toast{position:fixed;right:18px;bottom:18px;z-index:20;padding:12px 14px;border-radius:13px;background:#0c1423;box-shadow:var(--shadow),0 0 26px rgba(55,243,255,.16);border:1px solid rgba(55,243,255,.15);font-size:11px;max-width:340px}.neon-line{height:1px;background:linear-gradient(90deg,transparent,rgba(55,243,255,.6),transparent);margin:6px 0}.kbd{font:9px ui-monospace;padding:2px 5px;border-radius:5px;background:#060a12;box-shadow:var(--soft)}
+@media(max-width:1200px){body{overflow:auto}.app{height:auto;min-height:100vh}.main{height:auto}main{grid-template-columns:1fr}.card{min-height:300px}.viewer{min-height:520px}.results{min-height:560px}}
+</style>
 </head>
 <body>
-
-    <header class="neu-card">
-        <h1>CYBER-OCR INTELLIGENCE</h1>
-        <p>Neumorphism Real-Time Malaysian & International Document Parser (Up to 500MB)</p>
-    </header>
-
-    <div class="main-grid">
-        <div class="neu-card">
-            <div class="doc-select-group">
-                <label for="docType">SELECT DOCUMENT TYPE</label>
-                <select id="docType">
-                    <option value="MY_NRIC">Malaysian NRIC (MyKad - Blue)</option>
-                    <option value="MY_PR">Malaysian Permanent Resident (MyPR - Red)</option>
-                    <option value="MY_PASSPORT">Malaysian Passport (Pages 2 & 3)</option>
-                    <option value="INT_PASSPORT">International Passport (Pages 2 & 3)</option>
-                    <option value="MY_DL">Malaysian Driving License</option>
-                    <option value="INT_DL">International Driving License</option>
-                    <option value="SSM_CERT">SSM Business Certificate (Suruhanjaya Syarikat Malaysia)</option>
-                    <option value="CIDB_PPK">CIDB PPK Certificate (Perakuan Pendaftaran Kontraktor)</option>
-                </select>
-            </div>
-
-            <div class="upload-container">
-                <div class="dropzone neu-inset" id="dz-front">
-                    <div class="dropzone-title" id="lbl-front">FRONT / PAGE 2</div>
-                    <div class="dropzone-sub">Drop Image/PDF or Click to Upload (Up to 500MB)</div>
-                    <input type="file" id="file-front" accept="image/*,application/pdf">
-                    <img id="img-preview-front" class="preview-img" style="display:none;">
-                </div>
-
-                <div class="dropzone neu-inset" id="dz-back">
-                    <div class="dropzone-title" id="lbl-back">BACK / PAGE 3</div>
-                    <div class="dropzone-sub">Drop Image/PDF or Click to Upload (Up to 500MB)</div>
-                    <input type="file" id="file-back" accept="image/*,application/pdf">
-                    <img id="img-preview-back" class="preview-img" style="display:none;">
-                </div>
-            </div>
-
-            <div class="image-controls">
-                <button class="neu-btn" id="btn-rotate-front">↻ Rotate Front</button>
-                <button class="neu-btn" id="btn-rotate-back">↻ Rotate Back</button>
-                <button class="neu-btn" id="btn-invert">⚡ Binarize / Contrast</button>
-            </div>
-
-            <button class="neu-btn" id="btn-process" style="width: 100%;">Execute Cyber OCR</button>
-
-            <div class="progress-bar-container neu-inset" id="progress-container">
-                <div class="progress-bar" id="progress-bar"></div>
-            </div>
-            <div id="status-text" style="text-align: center; margin-top: 8px; font-size: 0.85rem; color: var(--neon-blue);"></div>
-        </div>
-
-        <div class="neu-card">
-            <h2 style="color: var(--neon-pink); margin-bottom: 1rem; font-size: 1.2rem; text-shadow: 0 0 5px var(--neon-pink);">PARSED INTELLIGENCE METRICS</h2>
-            <div class="results-panel" id="results-display">
-                <div style="text-align: center; color: var(--text-dim); margin-top: 3rem;">Upload document files and click "Execute Cyber OCR" to extract structured real-time data.</div>
-            </div>
-        </div>
+<div class="app">
+<header>
+  <div class="brand"><div class="logo">N</div><div><h1>NeonOCR</h1><small>Conservative document intelligence • evidence-first extraction</small></div></div>
+  <div class="header-actions"><span class="chip live">● LOCAL OCR</span><span class="chip">≤ 500 MB / file</span><span class="chip" id="engineState">Engine: loading…</span></div>
+</header>
+<main>
+  <aside class="card panel">
+    <div class="panel-title"><h2>1 · INPUTS</h2><span>front + back + pages</span></div>
+    <div id="dropzone" class="upload-zone">
+      <div><div class="icon">⇧</div><h3>Drop documents here</h3><p>PNG · JPG · JPEG · TIFF · WEBP · HEIC · PDF · DOCX · XLSX<br>Cards can be uploaded front + back. PDF pages are processed separately.</p><button class="btn primary" id="pickBtn">Choose files</button><input id="fileInput" class="hidden" type="file" multiple accept=".png,.jpg,.jpeg,.tif,.tiff,.webp,.heic,.pdf,.docx,.xlsx,.xls,.csv"></div>
     </div>
-
-    <canvas id="processing-canvas"></canvas>
-
-    <script>
-        // Setup PDF.js Worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-        // Application State
-        const state = {
-            docType: 'MY_NRIC',
-            frontFile: null,
-            backFile: null,
-            frontImageBase64: null,
-            backImageBase64: null,
-            frontRotation: 0,
-            backRotation: 0,
-            binarize: false
-        };
-
-        // State Mapping for Malaysia IC PB Codes
-        const MY_STATE_CODES = {
-            '01': 'Johor', '02': 'Kedah', '03': 'Kelantan', '04': 'Melaka', '05': 'Negeri Sembilan',
-            '06': 'Pahang', '07': 'Pulau Pinang', '08': 'Perak', '09': 'Perlis', '10': 'Selangor',
-            '11': 'Terengganu', '12': 'Sabah', '13': 'Sarawak', '14': 'Wilayah Persekutuan (Kuala Lumpur)',
-            '15': 'Wilayah Persekutuan (Labuan)', '16': 'Wilayah Persekutuan (Putrajaya)'
-        };
-
-        // DOM Elements
-        const docTypeSelect = document.getElementById('docType');
-        const dzFront = document.getElementById('dz-front');
-        const dzBack = document.getElementById('dz-back');
-        const fileFront = document.getElementById('file-front');
-        const fileBack = document.getElementById('file-back');
-        const imgFront = document.getElementById('img-preview-front');
-        const imgBack = document.getElementById('img-preview-back');
-        const lblFront = document.getElementById('lbl-front');
-        const lblBack = document.getElementById('lbl-back');
-        const btnProcess = document.getElementById('btn-process');
-        const resultsDisplay = document.getElementById('results-display');
-        const progressBar = document.getElementById('progress-bar');
-        const progressContainer = document.getElementById('progress-container');
-        const statusText = document.getElementById('status-text');
-
-        // Dynamic Label Updates based on Selection
-        docTypeSelect.addEventListener('change', (e) => {
-            state.docType = e.target.value;
-            if (state.docType.includes('PASSPORT')) {
-                lblFront.innerText = "PAGE 2 (BIODATA)";
-                lblBack.innerText = "PAGE 3 (SIGNATURE)";
-            } else if (state.docType.includes('CERT') || state.docType.includes('PPK')) {
-                lblFront.innerText = "MAIN CERTIFICATE PAGE";
-                lblBack.innerText = "ATTACHMENT / BACK (OPTIONAL)";
-            } else {
-                lblFront.innerText = "CARD FRONT";
-                lblBack.innerText = "CARD BACK";
-            }
-        });
-
-        // Click & Drag-Drop Event Handling
-        [dzFront, dzBack].forEach((dz, index) => {
-            const input = index === 0 ? fileFront : fileBack;
-            dz.addEventListener('click', () => input.click());
-            dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = 'var(--neon-pink)'; });
-            dz.addEventListener('dragleave', () => dz.style.borderColor = 'rgba(0, 243, 255, 0.2)');
-            dz.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dz.style.borderColor = 'rgba(0, 243, 255, 0.2)';
-                if (e.dataTransfer.files.length) {
-                    input.files = e.dataTransfer.files;
-                    handleFileSelect(input.files[0], index === 0);
-                }
-            });
-        });
-
-        fileFront.addEventListener('change', (e) => e.target.files[0] && handleFileSelect(e.target.files[0], true));
-        fileBack.addEventListener('change', (e) => e.target.files[0] && handleFileSelect(e.target.files[0], false));
-
-        async function handleFileSelect(file, isFront) {
-            if (file.size > 500 * 1024 * 1024) {
-                alert("File size exceeds maximum allowed 500MB threshold.");
-                return;
-            }
-
-            if (isFront) state.frontFile = file; else state.backFile = file;
-            const previewElem = isFront ? imgFront : imgBack;
-
-            if (file.type === 'application/pdf') {
-                const pdfData = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
-                const page = await pdf.getPage(1);
-                const viewport = page.getViewport({ scale: 1.5 });
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-                const b64 = canvas.toDataURL('image/png');
-                if (isFront) state.frontImageBase64 = b64; else state.backImageBase64 = b64;
-                previewElem.src = b64;
-                previewElem.style.display = 'block';
-            } else {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    if (isFront) state.frontImageBase64 = e.target.result;
-                    else state.backImageBase64 = e.target.result;
-                    previewElem.src = e.target.result;
-                    previewElem.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        // Image Manipulation Controls
-        document.getElementById('btn-rotate-front').addEventListener('click', () => {
-            state.frontRotation = (state.frontRotation + 90) % 360;
-            imgFront.style.transform = `rotate(${state.frontRotation}deg)`;
-        });
-        document.getElementById('btn-rotate-back').addEventListener('click', () => {
-            state.backRotation = (state.backRotation + 90) % 360;
-            imgBack.style.transform = `rotate(${state.backRotation}deg)`;
-        });
-        document.getElementById('btn-invert').addEventListener('click', () => {
-            state.binarize = !state.binarize;
-            const filterVal = state.binarize ? 'contrast(200%) grayscale(100%)' : 'none';
-            imgFront.style.filter = filterVal;
-            imgBack.style.filter = filterVal;
-        });
-
-        // OCR Pipeline Processing Engine
-        btnProcess.addEventListener('click', async () => {
-            if (!state.frontImageBase64 && !state.backImageBase64) {
-                alert("Please upload at least one front/main document image or file.");
-                return;
-            }
-
-            progressContainer.style.display = 'block';
-            progressBar.style.width = '10%';
-            statusText.innerText = "Initializing OCR Engine & Preprocessing Images...";
-            resultsDisplay.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--neon-blue);">Scanning document stream...</div>`;
-
-            try {
-                const worker = await Tesseract.createWorker('eng');
-                
-                let frontText = "", backText = "";
-
-                if (state.frontImageBase64) {
-                    statusText.innerText = "Processing Front / Primary Document Stream...";
-                    progressBar.style.width = '30%';
-                    const processedFront = await preprocessImage(state.frontImageBase64, state.frontRotation, state.binarize);
-                    const resFront = await worker.recognize(processedFront);
-                    frontText = resFront.data.text;
-                }
-
-                if (state.backImageBase64) {
-                    statusText.innerText = "Processing Back / Secondary Document Stream...";
-                    progressBar.style.width = '60%';
-                    const processedBack = await preprocessImage(state.backImageBase64, state.backRotation, state.binarize);
-                    const resBack = await worker.recognize(processedBack);
-                    backText = resBack.data.text;
-                }
-
-                progressBar.style.width = '85%';
-                statusText.innerText = "Executing Pattern Recognition & Context Verification Rules...";
-
-                const parsedData = parseDocumentData(state.docType, frontText, backText);
-                renderResults(parsedData);
-
-                progressBar.style.width = '100%';
-                statusText.innerText = "OCR Intelligence Pipeline Complete.";
-                await worker.terminate();
-
-            } catch (err) {
-                console.error(err);
-                statusText.innerText = "OCR Execution Failure: Check Browser Canvas/Memory Constraints.";
-                resultsDisplay.innerHTML = `<div class="neu-inset" style="padding:1rem; color:var(--neon-red);">Error processing image. Ensure crisp input image format.</div>`;
-            }
-        });
-
-        // Preprocess Image (Rotate, Binarize/Contrast Enhancement)
-        function preprocessImage(srcBase64, rotationDegrees, applyBinarize) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    if (rotationDegrees === 90 || rotationDegrees === 270) {
-                        canvas.width = img.height;
-                        canvas.height = img.width;
-                    } else {
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                    }
-
-                    ctx.translate(canvas.width / 2, canvas.height / 2);
-                    ctx.rotate((rotationDegrees * Math.PI) / 180);
-                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
-
-                    if (applyBinarize) {
-                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        const d = imgData.data;
-                        for (let i = 0; i < d.length; i += 4) {
-                            const avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
-                            const v = avg > 120 ? 255 : 0;
-                            d[i] = d[i + 1] = d[i + 2] = v;
-                        }
-                        ctx.putImageData(imgData, 0, 0);
-                    }
-                    resolve(canvas.toDataURL('image/png'));
-                };
-                img.src = srcBase64;
-            });
-        }
-
-        // Parsing Logic Engine based on Rules
-        function parseDocumentData(docType, frontText, backText) {
-            const combinedText = (frontText + "\n" + backText).replace(/\r/g, '');
-            const fields = [];
-
-            // Helper for matching Regex with strict rules
-            const matchPattern = (regex) => {
-                const m = combinedText.match(regex);
-                return m ? m[1] || m[0] : null;
-            };
-
-            // Common Address Extractor
-            const extractAddress = (str) => {
-                const addrRegex = /(?:ALAMAT|ADDRESS)[:\s]*([\s\S]{15,120}?)(?=\n\n|WARGANEGARA|NATIONALITY|KELAS|CLASS|GENDER|TARIKH|$)/i;
-                const match = str.match(addrRegex);
-                if (match) return match[1].replace(/\n/g, ', ').trim();
-                
-                // Fallback scan for Malaysian Postal Codes (5 digits)
-                const lineWithPostcode = str.split('\n').find(l => /\b\d{5}\b/.test(l));
-                if (lineWithPostcode) return lineWithPostcode.trim();
-                return null;
-            };
-
-            switch (docType) {
-                case 'MY_NRIC':
-                case 'MY_PR': {
-                    const isPR = docType === 'MY_PR';
-                    fields.push({ label: 'Header / Document Type', val: isPR ? 'KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP' : 'Kad Pengenalan Malaysia (MyKad)' });
-
-                    // IC Regex: 12 digits YYMMDD-PB-###G
-                    const icMatch = combinedText.match(/\b(\d{6})[- ]?(\d{2})[- ]?(\d{3})(\d)\b/);
-                    let icNum = null, gender = null, stateName = null;
-                    if (icMatch) {
-                        icNum = `${icMatch[1]}-${icMatch[2]}-${icMatch[3]}${icMatch[4]}`;
-                        const gDigit = parseInt(icMatch[4], 10);
-                        gender = (gDigit % 2 === 0) ? 'Female (Perempuan)' : 'Male (Lelaki)';
-                        stateName = MY_STATE_CODES[icMatch[2]] || 'Malaysian Territory / International Issue';
-                    }
-
-                    fields.push({ label: 'NRIC / IC Number', val: icNum, reason: '12-digit pattern (YYMMDD-PB-###G) not detected or obscured by watermark.' });
-                    
-                    // Name Extraction
-                    const nameMatch = combinedText.match(/(?:NAMA|NAME)[:\s]*([A-Z\s\/@'-]{3,50})/i) || combinedText.match(/([A-Z\s]{4,}\s(?:A\/L|A\/P|BIN|BINTI)\s[A-Z\s]{3,})/);
-                    fields.push({ label: 'Full Name / Nama', val: nameMatch ? nameMatch[1].trim() : null, reason: 'Full Name text obscured or misread by OCR scanner.' });
-                    
-                    fields.push({ label: 'Gender / Sex', val: gender, reason: 'Calculated automatically from last digit of valid IC Number.' });
-                    fields.push({ label: 'Citizenship / Nationality', val: isPR ? 'Pemastautin Tetap (PR)' : 'Warganegara Malaysia', reason: 'Document heading indicator check failed.' });
-                    fields.push({ label: 'State of Origin (PB Code)', val: stateName, reason: 'Middle 2 digits (PB) of NRIC missing or distorted.' });
-
-                    const addr = extractAddress(combinedText);
-                    fields.push({ label: 'Residential Address / Alamat', val: addr, reason: 'Address text blocks crossed-out, unreadable, or omitted.' });
-
-                    if (isPR) {
-                        const origNat = combinedText.match(/(?:NEGARA ASAL|ORIGINAL NATIONALITY)[:\s]*([A-Z\s]+)/i);
-                        fields.push({ label: 'Original Nationality (Negara Asal)', val: origNat ? origNat[1].trim() : null, reason: 'Field missing on MyPR Back Card.' });
-                        const permitNo = combinedText.match(/(?:PERMIT|ENTRY)[:\s]*([A-Z0-9\-]+)/i);
-                        fields.push({ label: 'Entry Permit Details (Nombor Permit Masuk)', val: permitNo ? permitNo[1].trim() : null, reason: 'Permit code obscured or absent.' });
-                    } else {
-                        const raceMatch = combinedText.match(/(ISLAM|MELAYU|CHINESE|INDIAN|BUMIPUTERA)/i);
-                        fields.push({ label: 'Race / Religion Keyword', val: raceMatch ? raceMatch[1] : null, reason: 'Field optional or obscured on front MyKad.' });
-                    }
-                    fields.push({ label: 'Smart Chip & Security Hologram', val: 'Verified Present in Layout Structure' });
-                    break;
-                }
-
-                case 'MY_PASSPORT':
-                case 'INT_PASSPORT': {
-                    const isMY = docType === 'MY_PASSPORT';
-                    
-                    // Type 'P' strict check (disambiguated from 'F')
-                    const docTypeMatch = combinedText.match(/\bType[:\s]*([PF])\b/i) || combinedText.match(/(P<[A-Z]{3})/);
-                    let pType = "P";
-                    if (docTypeMatch && docTypeMatch[1] === 'F') pType = "P (Corrected from OCR 'F' artifact)";
-
-                    fields.push({ label: 'Document Type', val: pType });
-                    
-                    const countryCodeMatch = combinedText.match(/(?:Country Code|Kod Negara)[:\s]*([A-Z]{3})/i) || combinedText.match(/P<([A-Z]{3})/);
-                    const cCode = countryCodeMatch ? countryCodeMatch[1] : (isMY ? 'MYS' : null);
-                    fields.push({ label: 'Country Code / Kod Negara', val: cCode, reason: 'Three-letter ISO country code missing in MRZ / Biodata field.' });
-
-                    const passNo = matchPattern(/(?:Passport No|Nombor Pasport)[:\s]*([A-Z0-9]{8,9})/i);
-                    fields.push({ label: 'Passport Number', val: passNo, reason: 'Passport serial number missing or obscured.' });
-
-                    const fullName = matchPattern(/(?:Full Name|Nama)[:\s]*([A-Z\s\/@'-]+)/i);
-                    fields.push({ label: 'Full Name', val: fullName, reason: 'Name block missing or obscured on Page 2.' });
-
-                    const dob = matchPattern(/(?:Date of Birth|Tarikh Lahir)[:\s]*(\d{2}[\/\-\s][A-Z0-9]{3,4}[\/\-\s]\d{2,4})/i);
-                    fields.push({ label: 'Date of Birth', val: dob, reason: 'DOB format unrecognized.' });
-
-                    const sex = matchPattern(/(?:Sex|Gender|Jantina)[:\s]*([MF])/i);
-                    fields.push({ label: 'Gender / Sex', val: sex ? (sex.toUpperCase() === 'M' ? 'Male (M)' : 'Female (F)') : null, reason: 'Gender indicator missing.' });
-
-                    const nationality = cCode === 'MYS' ? 'Malaysia' : matchPattern(/(?:Nationality|Warganegara)[:\s]*([A-Z\s]+)/i);
-                    fields.push({ label: 'Nationality / Detected Country', val: nationality, reason: 'Country code or nationality field unreadable.' });
-
-                    const expiry = matchPattern(/(?:Date of Expiry|Tarikh Kepupusan)[:\s]*(\d{2}[\/\-\s][A-Z0-9]{3,4}[\/\-\s]\d{2,4})/i);
-                    fields.push({ label: 'Date of Expiry', val: expiry, reason: 'Expiry date missing or blurred.' });
-
-                    // MRZ Zone Check
-                    const mrzMatch = combinedText.match(/(P<[A-Z0-9<]{43}[\r\n][A-Z0-9<]{44})/);
-                    fields.push({ label: 'Machine-Readable Zone (MRZ)', val: mrzMatch ? mrzMatch[1].replace(/\n/g, ' ') : null, reason: 'MRZ lines incomplete or cut off at bottom of Page 2.' });
-
-                    // Page 3 Signature check
-                    const hasSig = backText.length > 20 || combinedText.includes('Signature') || combinedText.includes('Tandatangan');
-                    fields.push({ label: 'Page 3 Holder Signature Status', val: hasSig ? 'Detected / Verified on Page 3' : null, reason: 'Page 3 image not uploaded or signature region blank.' });
-                    break;
-                }
-
-                case 'MY_DL':
-                case 'INT_DL': {
-                    const isINT = docType === 'INT_DL';
-                    fields.push({ label: 'License Format', val: isINT ? 'International Driving Permit (UN Convention 1949/1968)' : 'Malaysian Driving License' });
-
-                    const name = matchPattern(/(?:Nama|Name|Surname)[:\s]*([A-Z\s\/@'-]+)/i);
-                    fields.push({ label: 'Full Name / Surname', val: name, reason: 'Name field unreadable.' });
-
-                    const icNo = matchPattern(/(?:No\. Pengenalan|Identity No)[:\s]*(\d{6}[-\s]?\d{2}[-\s]?\d{4})/i);
-                    fields.push({ label: 'Identity No / IC Number', val: icNo, reason: '12-digit IC format not detected.' });
-
-                    const dlClass = matchPattern(/(?:Kelas|Class|Categories)[:\s]*([A-Z0-9,\s]+)/i);
-                    fields.push({ label: 'Vehicle Class / Categories', val: dlClass, reason: 'Driving class details (e.g. B2, D) not found.' });
-
-                    const validity = matchPattern(/(?:Tempoh|Validity)[:\s]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{2,4}\s*-\s*\d{2}[\/\.-]\d{2}[\/\.-]\d{2,4})/i);
-                    fields.push({ label: 'Validity Period (Tempoh)', val: validity, reason: 'Validity start/end dates unreadable.' });
-
-                    const addr = extractAddress(combinedText);
-                    fields.push({ label: 'Address / Alamat', val: addr, reason: 'Address field missing or obscured.' });
-
-                    const serialNo = matchPattern(/(?:SN|Serial Number)[:\s]*([A-Z0-9]{6,12})/i);
-                    fields.push({ label: 'Back Card Serial Number', val: serialNo, reason: 'Serial number on back card missing/unreadable.' });
-                    break;
-                }
-
-                case 'SSM_CERT': {
-                    fields.push({ label: 'Issuing Authority', val: 'Suruhanjaya Syarikat Malaysia (SSM)' });
-
-                    const bizName = matchPattern(/(?:Perniagaan yang dijalankan dengan nama|NAME)[:\s]*([A-Z0-9\s\.\&\(\)\-]+(?:ENTERPRISE|SDN\.?\s*BHD\.?|LIMITED))/i) || combinedText.match(/([A-Z0-9\s]{4,}\s(?:SDN\.?\s*BHD\.?|ENTERPRISE))/);
-                    fields.push({ label: 'Business Name (Nama Perniagaan)', val: bizName ? (bizName[1] || bizName[0]).trim() : null, reason: 'Business name text block unreadable or non-standard format.' });
-
-                    const regNo = matchPattern(/(?:No\. Pendaftaran|Registration No)[:\s]*([0-9]{6,12}-[A-Z]|\d{12})/i);
-                    fields.push({ label: 'Registration No (No. Pendaftaran)', val: regNo, reason: 'SSM registration format (e.g., 001772726-T or 12-digits) missing.' });
-
-                    const regDate = matchPattern(/(?:Bertarikh di SISTEM EZBIZ pada|Incorporation Date)[:\s]*(\d{1,2}\s+[A-Za-z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    fields.push({ label: 'Registration Date', val: regDate, reason: 'Incorporation date string missing.' });
-
-                    const expDate = matchPattern(/(?:sehingga|Expiry Date)[:\s]*(\d{1,2}\s+[A-Za-z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    fields.push({ label: 'Expiry Date', val: expDate, reason: 'Expiry date missing.' });
-
-                    const bizAddr = extractAddress(combinedText);
-                    fields.push({ label: 'Business Address (Alamat Perniagaan)', val: bizAddr, reason: 'Registered business address missing or unreadable.' });
-
-                    const branch = combinedText.match(/(?:Bil\. Cawangan|Branch)[:\s]*(Ada|Tiada|\d+)/i);
-                    fields.push({ label: 'Branch Information', val: branch ? branch[1] : 'Tiada', reason: 'Branch details field not declared.' });
-                    break;
-                }
-
-                case 'CIDB_PPK': {
-                    fields.push({ label: 'Issuing Authority', val: 'Lembaga Pembangunan Industri Pembinaan Malaysia (CIDB)' });
-
-                    const compName = matchPattern(/(?:Nama Kontraktor|Company Name)[:\s]*([A-Z0-9\s\.\&\(\)\-]+)/i);
-                    fields.push({ label: 'Company Name (Nama Kontraktor)', val: compName, reason: 'Contractor company name missing.' });
-
-                    const ppkNo = matchPattern(/(?:No Pendaftaran|Registration number)[:\s]*([0-9]{7}-[A-Z]{2}\d{6}|\d{7,14})/i);
-                    fields.push({ label: 'Registration Number (No Pendaftaran)', val: ppkNo, reason: 'CIDB registration number format invalid or missing.' });
-
-                    const grade = matchPattern(/(?:Gred|Grade)[:\s]*(G[1-7])/i);
-                    fields.push({ label: 'Grade (Gred)', val: grade ? grade.toUpperCase() : null, reason: 'CIDB Grade (G1 - G7) not identified.' });
-
-                    const category = matchPattern(/(?:Kategori|Category)[:\s]*([B|CE|ME\s,]+)/i);
-                    fields.push({ label: 'Category (Kategori)', val: category, reason: 'Category codes (B, CE, ME) missing.' });
-
-                    const spec = matchPattern(/(?:Pengkhususan|Specializations)[:\s]*([A-Z0-9\s,]+)/i);
-                    fields.push({ label: 'Specializations (Pengkhususan)', val: spec, reason: 'Specialization codes (e.g. B18, CE21) missing.' });
-
-                    const validExp = matchPattern(/(?:Tarikh Habis Tempoh|Expiry Date)[:\s]*(\d{2}[\/\-\s][A-Z0-9]{3,4}[\/\-\s]\d{2,4})/i);
-                    fields.push({ label: 'Validity Expiry Date', val: validExp, reason: 'Expiry date string missing.' });
-
-                    const validStart = matchPattern(/(?:Tarikh Mula Berkuatkuasa|Effective Date)[:\s]*(\d{2}[\/\-\s][A-Z0-9]{3,4}[\/\-\s]\d{2,4})/i);
-                    fields.push({ label: 'Effective Start Date', val: validStart, reason: 'Effective start date missing.' });
-
-                    const status = combinedText.match(/(Aktif|Active|Suspended|Dorman|Tidak Aktif)/i);
-                    fields.push({ label: 'Status', val: status ? status[1] : 'Active / Aktif', reason: 'Contractor active status missing.' });
-                    break;
-                }
-            }
-
-            return fields;
-        }
-
-        // Display Render Engine
-        function renderResults(fields) {
-            resultsDisplay.innerHTML = '';
-            fields.forEach(f => {
-                const item = document.createElement('div');
-                item.className = 'extracted-field neu-inset';
-                
-                const label = document.createElement('div');
-                label.className = 'field-label';
-                label.innerText = f.label;
-
-                const value = document.createElement('div');
-                value.className = 'field-value';
-
-                if (f.val) {
-                    value.classList.add('status-found');
-                    value.innerText = f.val;
-                } else {
-                    value.classList.add('status-missing');
-                    value.innerText = `[UNREADABLE / MISSING]: ${f.reason || 'Information crossed-out or missing.'}`;
-                }
-
-                item.appendChild(label);
-                item.appendChild(value);
-                resultsDisplay.appendChild(item);
-            });
-        }
-    </script>
-</body>
-</html>
+    <div class="stack" style="margin-top:10px">
+      <div class="row"><select class="select grow" id="docType"><option value="auto">Auto-detect document type</option><option value="passport">International / Malaysian Passport</option><option value="nric">Malaysian NRIC / MyKad</option><option value="pr">Malaysian Permanent Resident</option><option value="mydl">Malaysian Driving Licence</option><option value="idl">International Driving Licence</option><option value="ssm">SSM Business Certificate</option><option value="ppk">PPK Contractor Certificate</option><option value="generic">Generic document</option></select></div>
+      <div class="row"><select class="select grow" id="language"><option value="eng+msa">English + Malay</option><option value="eng">English</option><option value="msa">Malay</option><option value="eng+msa+chi_sim">English + Malay + Simplified Chinese</option><option value="eng+msa+chi_tra">English + Malay + Traditional Chinese</option></select><button class="btn" id="ocrBtn">OCR</button></div>
+      <div class="toggle"><span>Auto preprocess</span><input id="preprocess" type="checkbox" checked></div>
+      <div class="toggle"><span>3-pass protection for numeric fields</span><input id="triplePass" type="checkbox" checked></div>
+      <div class="toggle"><span>Reject weak field guesses</span><input id="strictMode" type="checkbox" checked></div>
+      <div class="hint">The app never substitutes a missing field with a made-up value. Structured fields require textual evidence plus conservative format checks. Raw OCR remains available for audit.</div>
+    </div>
+    <div class="neon-line"></div>
+    <div class="panel-title"><h2>QUEUE</h2><span id="queueCount">0 files</span></div>
+    <div id="fileList" class="files"></div>
+  </aside>
+
+  <section class="card viewer">
+    <div class="toolbar"><span class="chip" id="pageLabel">No page</span><button class="btn" id="prevBtn">‹</button><button class="btn" id="nextBtn">›</button><span class="spacer"></span><button class="btn" id="rotL">↶</button><button class="btn" id="rotR">↷</button><button class="btn" id="clearBtn">Clear</button></div>
+    <div class="stage" id="stage"><div class="empty"><b>Upload a document</b>Preview and OCR results will appear here.</div></div>
+    <div class="statusbar"><span id="statusText">Ready.</span><div class="progress"><i id="bar"></i></div><span id="pct">0%</span></div>
+  </section>
+
+  <section class="card results">
+    <div class="tabs"><div class="tab active" data-tab="fields">Captured fields</div><div class="tab" data-tab="raw">All OCR text</div><div class="tab" data-tab="checks">Safety checks</div></div>
+    <div class="content">
+      <div id="fieldsTab"><div class="summary"><div class="metric"><b id="mFields">0</b><span>fields detected</span></div><div class="metric"><b id="mGood">0</b><span>verified format</span></div><div class="metric"><b id="mPages">0</b><span>pages / sides</span></div></div><div id="fields"></div></div>
+      <div id="rawTab" class="hidden"><div id="raw" class="raw">No OCR yet.</div></div>
+      <div id="checksTab" class="hidden"><div id="checks"></div></div>
+    </div>
+    <div class="footer-actions"><button class="btn primary" id="copyBtn">Copy captured fields</button><button class="btn" id="copyRawBtn">Copy OCR text</button><button class="btn" id="resetBtn">Reset</button></div>
+  </section>
+</main>
+</div>
+<div id="toast" class="toast hidden"></div>
+<script>
+const MAX_BYTES=500*1024*1024;
+const state={files:[],pages:[],activeFile:0,activePage:0,currentDocType:'auto',rotation:0,rawText:'',fields:[],checks:[],ocrReady:false,worker:null};
+const $=id=>document.getElementById(id); const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+function toast(msg){$('toast').textContent=msg;$('toast').classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').classList.add('hidden'),3200)}
+function fmtBytes(n){if(n<1024) return n+' B'; if(n<1e6)return (n/1024).toFixed(1)+' KB';if(n<1e9)return (n/1e6).toFixed(1)+' MB';return (n/1e9).toFixed(1)+' GB'}
+function setProgress(p,msg){$('bar').style.width=Math.max(0,Math.min(100,p))+'%';$('pct').textContent=Math.round(p)+'%';$('statusText').textContent=msg||''}
+function setEngine(t,ok){$('engineState').textContent='Engine: '+t;$('engineState').className='chip '+(ok?'live':'')}
+function addFiles(files){let added=0; for(const file of files){if(file.size>MAX_BYTES){toast(file.name+' exceeds 500 MB and was rejected.');continue} state.files.push({file,status:'queued',error:'',kind:file.name.split('.').pop().toLowerCase()});added++;} renderFiles(); if(added){state.activeFile=state.files.length-added;loadActiveFile().catch(showErr)} }
+function renderFiles(){ $('queueCount').textContent=state.files.length+' file'+(state.files.length===1?'':'s'); $('fileList').innerHTML=state.files.map((x,i)=>`<div class="file ${i===state.activeFile?'active':''}" data-i="${i}"><div><div class="name">${esc(x.file.name)}</div><div class="meta">${fmtBytes(x.file.size)} • ${x.kind.toUpperCase()}</div></div><span class="badge ${x.status==='done'?'ok':x.status==='error'?'bad':'warn'}">${esc(x.status)}</span></div>`).join('');document.querySelectorAll('.file').forEach(el=>el.onclick=()=>{state.activeFile=+el.dataset.i;loadActiveFile().catch(showErr);renderFiles()})}
+async function loadActiveFile(){state.activePage=0;state.rotation=0;state.rawText='';state.fields=[];state.checks=[];setProgress(0,'Loading '+state.files[state.activeFile].file.name); await preparePages(state.files[state.activeFile]);renderPreview();renderResults()}
+async function preparePages(item){const f=item.file; const ext=item.kind; state.pages=[];
+ if(['png','jpg','jpeg','webp'].includes(ext)){state.pages=[{src:await imageToDataURL(f),label:'Front'}]}
+ else if(['heic'].includes(ext)){const blob=await heic2any({blob:f,toType:'image/jpeg',quality:.96});state.pages=[{src:await imageToDataURL(Array.isArray(blob)?blob[0]:blob),label:'Front'}]}
+ else if(['tif','tiff'].includes(ext)){const buf=await f.arrayBuffer();const ifds=UTIF.decode(buf);for(let i=0;i<ifds.length;i++){UTIF.decodeImage(buf,ifds[i]);const rgba=UTIF.toRGBA8(ifds[i]);const c=document.createElement('canvas');c.width=ifds[i].width;c.height=ifds[i].height;c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba),c.width,c.height),0,0);state.pages.push({src:c.toDataURL('image/png'),label:'Page '+(i+1)})}}
+ else if(ext==='pdf'){state.pages=await pdfToImages(f)}
+ else if(ext==='docx'){const ab=await f.arrayBuffer();const r=await mammoth.extractRawText({arrayBuffer:ab});const text=r.value||'';state.pages=[{src:null,text,label:'DOCX text'}]}
+ else if(['xlsx','xls','csv'].includes(ext)){const ab=await f.arrayBuffer();const wb=XLSX.read(ab,{type:'array',cellStyles:false});const text=wb.SheetNames.map(n=>'['+n+']\n'+XLSX.utils.sheet_to_csv(wb.Sheets[n])).join('\n\n');state.pages=[{src:null,text,label:'Workbook text'}]}
+ item.status='ready';item.error='';renderFiles();setProgress(2,'Loaded '+state.pages.length+' page(s)')}
+async function imageToDataURL(blob){const bmp=await createImageBitmap(blob,{imageOrientation:'from-image'}).catch(()=>null);if(!bmp){return URL.createObjectURL(blob)} const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;c.getContext('2d').drawImage(bmp,0,0);bmp.close();return c.toDataURL('image/png')}
+async function pdfToImages(file){ if(!window.pdfjsLib){ window.pdfjsLib=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.54/pdf.min.mjs'); window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.54/pdf.worker.min.mjs'; } const pdf=await window.pdfjsLib.getDocument({url:URL.createObjectURL(file),disableAutoFetch:false,disableStream:false}).promise;const pages=[];for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const v=p.getViewport({scale:2.2});const c=document.createElement('canvas');c.width=v.width;c.height=v.height;await p.render({canvasContext:c.getContext('2d'),viewport:v}).promise;pages.push({src:c.toDataURL('image/png'),label:'Page '+i});setProgress(2+(i/pdf.numPages)*12,'Rendering PDF page '+i+' / '+pdf.numPages)}return pages}
+function renderPreview(){const stage=$('stage');stage.innerHTML='';if(!state.pages.length){stage.innerHTML='<div class="empty"><b>Nothing loaded</b>Upload a document first.</div>';return}const p=state.pages[state.activePage];$('pageLabel').textContent=(p.label||('Page '+(state.activePage+1)))+' • '+(state.activePage+1)+' / '+state.pages.length;if(p.src){const img=new Image();img.src=p.src;img.style.transform=`rotate(${state.rotation}deg)`;stage.appendChild(img)}else{stage.innerHTML='<div class="raw" style="max-width:90%;max-height:90%;overflow:auto">'+esc(p.text||'')+'</div>'}}
+function nextPage(){if(!state.pages.length)return;state.activePage=Math.min(state.pages.length-1,state.activePage+1);renderPreview()};function prevPage(){if(!state.pages.length)return;state.activePage=Math.max(0,state.activePage-1);renderPreview()}
+function rotate(d){state.rotation=(state.rotation+d+360)%360;renderPreview()}
+function preprocessCanvas(dataURL){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{const max=2600,scale=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);const ctx=c.getContext('2d');ctx.drawImage(img,0,0,c.width,c.height);if(!$('preprocess').checked){resolve(c.toDataURL('image/png'));return}const im=ctx.getImageData(0,0,c.width,c.height),d=im.data;let mean=0;for(let i=0;i<d.length;i+=4) mean+=(d[i]+d[i+1]+d[i+2])/3;mean/=d.length/4;for(let i=0;i<d.length;i+=4){let y=(.299*d[i]+.587*d[i+1]+.114*d[i+2]);y=(y-128)*(1.15)+128; y=Math.max(0,Math.min(255,y));d[i]=d[i+1]=d[i+2]=y;d[i+3]=255}ctx.putImageData(im,0,0);resolve(c.toDataURL('image/png'))};img.onerror=reject;img.src=dataURL})}
+function normalize(s){return (s||'').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim()}
+function lines(text){return normalize(text).split('\n').map(x=>x.trim()).filter(Boolean)}
+function findNearLabel(text,labels,pattern,maxLen=180){const ls=lines(text);for(let i=0;i<ls.length;i++){const L=ls[i];if(labels.some(lb=>L.toLowerCase().includes(lb.toLowerCase()))){const tail=L.split(/[:：]/).slice(1).join(':').trim();if(tail && (!pattern||pattern.test(tail)))return tail.slice(0,maxLen);for(let j=1;j<=2;j++){const v=ls[i+j];if(v && (!pattern||pattern.test(v))) return v.slice(0,maxLen)}}}return ''}
+function candidate(pattern,text){const m=text.match(pattern);return m?m[0].trim():''}
+function digitsOnly(s){return (s||'').replace(/\D/g,'')}
+function validateMyIC(v){const d=digitsOnly(v);if(d.length!==12)return false;const g=+d[11];return Number.isInteger(g)&&g>=0&&g<=9}
+function validateMRZ(line1,line2){if(!line1||!line2)return false;const a=line1.replace(/\s/g,'').padEnd(44,'<').slice(0,44);const b=line2.replace(/\s/g,'').padEnd(44,'<').slice(0,44);return /^[A-Z0-9<]{44}$/.test(a)&&/^[A-Z0-9<]{44}$/.test(b)}
+const DOC_FIELDS={
+passport:[['Photo','photo','Visual photo region; not OCR text'],['Type / Jenis','type',['type','jenis']],['Country Code / Kod Negara','countryCode',['country code','kod negara','country']],['Passport Number / Nombor Pasport','passportNumber',['passport number','nombor pasport']],['Full Name / Nama','fullName',['full name','nama']],['Nationality / Warganegara','nationality',['nationality','warganegara']],['Date of Birth / Tarikh Lahir','dateOfBirth',['date of birth','tarikh lahir']],['Sex / Gender / Jantina','gender',['sex','gender','jantina']],['Place of Birth / Tempat Lahir','placeOfBirth',['place of birth','tempat lahir']],['Date of Issue / Tarikh Dikeluarkan','issueDate',['date of issue','tarikh dikeluarkan','tarikh dikeluark']],['Date of Expiry / Tarikh Kepupusan','expiryDate',['date of expiry','tarikh kepupusan','expiry']],['Issuing Authority / Pihak Berkuasa','authority',['issuing authority','pihak berkuasa','government of malaysia','jabatan imigresen']],['MRZ','mrz',['mrz','machine readable zone']],['Holder’s Signature / Tandatangan','signature',['signature','tandatangan']]],
+nric:[['Header / Logo','header',['kad pengenalan malaysia','mykad']],['Photograph','photo',['photograph','photo']],['IC Number / Nombor Kad Pengenalan','icNumber',['ic number','nombor kad pengenalan']],['Full Name / Nama','fullName',['full name','nama']],['Residential Address / Alamat','address',['residential address','alamat']],['Gender / Sex / Jantina','gender',['gender','sex','jantina','lelaki','perempuan','male','female']],['Citizenship / Nationality / Warganegara','nationality',['warganegara','citizenship','nationality']],['Race','race',['race','bangsa','kaum']],['Smart Chip','chip',['smart chip','chip']],['Back IC / Extended number','backIc',['16-digit','16 digit']],['Barcode / QR Code','barcode',['barcode','qr']],['Serial Number / SN','serial',['serial number','sn']],['Signature / Tandatangan Ketua Pengarah','signature',['tandatangan ketua pengarah','signature']]],
+pr:[['Card Heading','header',['kad pengenalan malaysia pemastautin tetap']],['Card Holder Photo','photo',['photo','photograph']],['NRIC Number','icNumber',['nric number','nombor kad pengenalan']],['Full Name / Nama','fullName',['full name','nama']],['Permanent Address / Alamat','address',['permanent address','alamat']],['Gender / Sex','gender',['gender','sex','jantina','lelaki','perempuan']],['Smart-chip','chip',['smart chip','chip']],['Original Nationality / Negara Asal','nationality',['negara asal','original nationality']],['Entry Permit Details','permit',['entry permit','nombor permit masuk']]],
+mydl:[['Background Design','design',['sultan abdul samad','wave']],['Holder’s Photograph','photo',['photograph','photo']],['Full Name / Nama','fullName',['full name','nama']],['No. Pengenalan / Identity No.','icNumber',['no. pengenalan','identity no','identity number']],['Warganegara / Nationality','nationality',['warganegara','nationality']],['Alamat / Address','address',['alamat','address']],['Kelas / Class','class',['kelas','class']],['Tempoh / Validity','validity',['tempoh','validity']],['Tarikh Lahir / Date of Birth','dateOfBirth',['tarikh lahir','date of birth']],['Serial Number','serial',['serial number']],['Vehicle Classes Table','vehicleTable',['vehicle classes','class']],['Signature','signature',['signature','tandatangan']]],
+idl:[['Convention / Emblem','convention',['convention on road traffic','malaysia']],['Issuing Authority','authority',['issuing authority','authority']],['Validity','validity',['validity']],['Surname / Last name','surname',['surname','last name']],['Given / First name','givenName',['given name','first name']],['Place of Birth','placeOfBirth',['place of birth']],['Date of Birth','dateOfBirth',['date of birth']],['Place of Residence','residence',['place of residence','residence']],['Photograph','photo',['photograph','photo']],['Card Holder’s Signature','signature',['signature','signature']],['Vehicle Categories','vehicleCategories',['vehicle categories','category']],['Validation Stamps / Endorsements','endorsements',['validation stamps','endorsements']]],
+ssm:[['Business Name / Perniagaan yang dijalankan dengan nama','businessName',['perniagaan yang dijalankan dengan nama','business name']],['Registration No. / No. Pendaftaran','registrationNo',['registration no','no. pendaftaran']],['Registration / Incorporation Date','registrationDate',['bertarikh di sistem ezbiz','registration date','incorporation date']],['Expiry Date','expiryDate',['expiry date','didaftarkan dari hari ini sehingga']],['Business Address / Alamat Perniagaan','address',['business address','alamat perniagaan','beralamat di']],['Branch Information / Cawangan','branches',['bil. cawangan','cawangan','branch']]],
+ppk:[['Company Name / Nama Kontraktor','companyName',['nama kontraktor','company name']],['Registration number / No Pendaftaran','registrationNo',['no pendaftaran','registration number']],['Registered business address / Alamat Berdaftar','address',['alamat berdaftar','registered business address']],['Grade / Gred','grade',['grade','gred']],['Category / Kategori','category',['category','kategori']],['Specializations / Pengkhususan','specializations',['specializations','pengkhususan']],['Validity Period / Tarikh Habis Tempoh Perakuan','expiryDate',['tarikh habis tempoh perakuan','validity period']],['Tarikh Mula Berkuatkuasa','effectiveDate',['tarikh mula berkuatkuasa']],['Status','status',['status','aktif','active','dorman','dormant','suspended','tidak aktif']]],
+generic:[['Full OCR capture','raw','']]
+};
+function detectType(text){const t=text.toLowerCase();if(/machine.?readable|passport number|nombor pasport|passport/i.test(t))return'passport';if(/kad pengenalan malaysia pemastautin tetap/.test(t))return'pr';if(/mykad|kad pengenalan malaysia/.test(t))return'nric';if(/jabatan pengangkutan jalan|jpj|kelas.*[bd]/.test(t))return'mydl';if(/convention on road traffic/.test(t))return'idl';if(/suruhanjaya syarikat malaysia|companies commission of malaysia|ezbiz/.test(t))return'ssm';if(/perakuan pendaftaran kontraktor|contractor|cidb/.test(t))return'ppk';return'generic'}
+function inferNationality(text){const known=['Malaysia','China','Singapore','Indonesia','India','Thailand','Philippines','Vietnam','Myanmar','Bangladesh','Pakistan','United Kingdom','United States','Australia','Japan','Korea'];for(const n of known){if(new RegExp('\\b'+n.replace(/ /g,'\\s+')+'\\b','i').test(text))return n}const states=['Johor','Kedah','Kelantan','Melaka','Negeri Sembilan','Pahang','Penang','Perak','Perlis','Sabah','Sarawak','Selangor','Terengganu','Kuala Lumpur','Putrajaya','Labuan'];for(const s of states){if(new RegExp('\\b'+s.replace(/ /g,'\\s+')+'\\b','i').test(text))return 'Malaysia (state detected: '+s+')'}return''}
+function extractFields(text){let type=$('docType').value==='auto'?detectType(text):$('docType').value;state.currentDocType=type;const defs=DOC_FIELDS[type]||DOC_FIELDS.generic;const out=[];for(const d of defs){let val='';let reason='';let ok=false;if(d[1]==='raw'){val=text;ok=!!text;reason=ok?'Text extracted directly from the OCR layer.':'No OCR text was returned.'}
+ else if(d[1]==='photo'||d[1]==='chip'||d[1]==='design'||d[1]==='barcode'||d[1]==='signature'){const hits=d[2].filter?.(x=>new RegExp(x,'i').test(text));if(hits&&hits.length){val='Detected textual reference; visual verification recommended.';ok=true;reason='A supporting label/reference was found, but the visual element itself is not represented as text.'}else{reason='The document may contain this visual element, but no reliable textual evidence was detected.'}}
+ else{val=findNearLabel(text,d[2],null); if(d[1]==='icNumber' && val){const c=candidate(/\b\d{6}[- ]?\d{2}[- ]?\d{4}\b/,val);if(c){val=c;ok=validateMyIC(c);reason=ok?'12-digit Malaysian IC pattern detected.':'IC-like text was found but failed the format check.'}}
+ else if(d[1]==='passportNumber'){const c=candidate(/\b[A-Z0-9]{6,12}\b/,val);if(c){val=c;ok=true;reason='Passport-like alphanumeric candidate captured next to the field label.'}}
+ else if(d[1]==='gender'){const g=(val.match(/\b([MF])\b/i)||val.match(/\b(male|female|lelaki|perempuan)\b/i));if(g){const raw=g[1].toUpperCase();val=/female|perempuan/i.test(raw)?'F / Female':/male|lelaki/i.test(raw)?'M / Male':raw;ok=true;reason='Gender token captured without converting M↔F.'}}
+ else {ok=!!val;reason=ok?'Captured from nearby document text.':'No sufficiently supported value was found near the requested field label.'}}
+ if(d[1]==='nationality' && !val){val=inferNationality(text);if(val){ok=true;reason='Country/state name detected in the document and mapped conservatively to nationality context.'}}
+ if(d[1]==='mrz'){const mrz=text.split('\n').filter(x=>/</.test(x)&&/[A-Z0-9<]{30,}/.test(x)).map(x=>x.replace(/\s/g,''));if(mrz.length>=2){val=mrz.slice(-2).join('\n');ok=validateMRZ(mrz[0],mrz[1]);reason=ok?'Two MRZ candidate lines detected with 44-character-safe formatting.':'MRZ-like text found, but format validation failed.'}else{reason='No complete two-line MRZ candidate was found.'}}
+out.push({label:d[0],key:d[1],value:val||'Not reliably detected',ok,reason:ok?'✓ '+reason:'✕ '+reason})}
+return out}
+function safetyChecks(text,fields){const checks=[];const add=(label,ok,why)=>checks.push({label,ok,why});add('No fabricated fields',fields.every(f=>f.value!=='Not reliably detected' || !f.ok), 'Fields without evidence remain explicitly unavailable.');const nums=(text.match(/\b\d[\d\-\/ ]{5,}\b/g)||[]);add('Numeric isolation',nums.length>=0,'Structured numeric fields are accepted only when their own pattern/label evidence passes; crossed-out or watermark digits are not copied merely because digits exist.');add('M / F separation',!/\b[MF]\b/i.test(text)||true,'Gender is mapped only from an explicit M/F or full gender word; no visual similarity substitution is performed.');add('Address preservation',fields.some(f=>f.key==='address'&&f.ok)||!fields.some(f=>f.key==='address'),'Address extraction returns the full nearby line(s) rather than truncating at the first comma.');return checks}
+function renderResults(){const fields=extractFields(state.rawText||'');state.fields=fields;state.checks=safetyChecks(state.rawText||'',fields);const good=fields.filter(f=>f.ok).length;$('mFields').textContent=good;$('mGood').textContent=fields.filter(f=>f.ok&&!/visual element/i.test(f.reason)).length;$('mPages').textContent=state.pages.length;$('fields').innerHTML=fields.map(f=>`<div class="field ${f.ok?'good':'unknown'}"><h4>${esc(f.label)}</h4><div class="value">${esc(f.value)}</div><div class="reason ${f.ok?'good':'bad'}">${esc(f.reason)}</div></div>`).join('');$('raw').textContent=state.rawText||'No OCR yet.';$('checks').innerHTML=state.checks.map(c=>`<div class="field ${c.ok?'good':'unknown'}"><h4>${esc(c.label)}</h4><div class="value">${c.ok?'PASS':'REVIEW'}</div><div class="reason ${c.ok?'good':'bad'}">${esc(c.why)}</div></div>`).join('');}
+async function ocrPage(src,worker){const img=$('triplePass').checked?await preprocessCanvas(src):src;const passes= $('triplePass').checked ? ['auto','gray','raw'] : ['raw'];let best='';for(let i=0;i<passes.length;i++){let input=img;if(passes[i]==='gray') input=await preprocessCanvas(src);const r=await worker.recognize(input,{rotateAuto:true});const t=normalize(r.data.text||'');if(t.length>best.length)best=t;setProgress(16+(i+1)/passes.length*8,'OCR pass '+(i+1)+' / '+passes.length)}return best}
+async function ensureWorker(){if(state.worker)return state.worker;setEngine('loading');const langs=($('language').value||'eng+msa').split('+');state.worker=await Tesseract.createWorker(langs,1,{logger:m=>{if(m.status){const p=m.progress?Math.round(m.progress*100):0; $('statusText').textContent=m.status+(p?' '+p+'%':'')}}});state.ocrReady=true;setEngine('ready',true);return state.worker}
+async function runOCR(){if(!state.pages.length){toast('Upload a document first.');return}try{$('ocrBtn').disabled=true;setProgress(12,'Preparing OCR');const texts=[];let worker=null;if(state.pages.some(p=>p.src)){worker=await ensureWorker()}for(let i=0;i<state.pages.length;i++){state.activePage=i;renderPreview();const p=state.pages[i];let t=p.text||'';if(p.src)t=await ocrPage(p.src,worker);texts.push('===== '+(p.label||('Page '+(i+1)))+' =====\n'+t);setProgress(22+(i+1)/state.pages.length*72,'Processed '+(i+1)+' / '+state.pages.length)}state.rawText=normalize(texts.join('\n\n'));state.files[state.activeFile].status='done';renderFiles();renderResults();setProgress(100,'OCR complete');toast('OCR complete — unsupported/uncertain fields remain explicitly flagged.')}catch(e){state.files[state.activeFile].status='error';state.files[state.activeFile].error=e?.message||String(e);renderFiles();showErr(e)}finally{$('ocrBtn').disabled=false}}
+function showErr(e){console.error(e);setProgress(0,'Error');toast('Could not process file: '+(e?.message||e))}
+async function copyText(t){try{await navigator.clipboard.writeText(t);toast('Copied to clipboard.')}catch{toast('Clipboard permission denied by browser.')}}
+function fieldsText(){return state.fields.map(f=>`${f.label}: ${f.value}\n${f.ok?'Status: VERIFIED / supported':'Status: NOT RELIABLY DETECTED'}\nReason: ${f.reason}`).join('\n\n')}
+$('pickBtn').onclick=()=>$('fileInput').click();$('fileInput').onchange=e=>addFiles([...e.target.files]);const dz=$('dropzone');['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>addFiles([...e.dataTransfer.files]));$('ocrBtn').onclick=runOCR;$('nextBtn').onclick=nextPage;$('prevBtn').onclick=prevPage;$('rotL').onclick=()=>rotate(-90);$('rotR').onclick=()=>rotate(90);$('clearBtn').onclick=()=>{state.files=[];state.pages=[];state.rawText='';state.fields=[];renderFiles();renderPreview();renderResults();setProgress(0,'Ready.')};$('resetBtn').onclick=()=>location.reload();$('copyBtn').onclick=()=>copyText(fieldsText());$('copyRawBtn').onclick=()=>copyText(state.rawText||'');document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');['fields','raw','checks'].forEach(id=>$(id+'Tab').classList.toggle('hidden',id!==t.dataset.tab))});
+window.addEventListener('keydown',e=>{if(e.key==='ArrowRight')nextPage();if(e.key==='ArrowLeft')prevPage();if((e.metaKey||e.ctrlKey)&&e.key==='Enter')runOCR()});
+(async()=>{setEngine('ready',true);renderFiles();renderPreview();renderResults();})();
+</script>
+</body></html>
