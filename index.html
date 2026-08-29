@@ -1,1575 +1,392 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NeonOCR — Production AI Document Intelligence Platform</title>
-  <!-- Fonts & Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Tesseract.js Engine for Client-Side Real OCR -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  
-  <style>
-    :root {
-      --bg: #0b0d13;
-      --panel-bg: #121620;
-      --panel-inset: #0d0f17;
-      --shadow-dark: #06070a;
-      --shadow-light: #1b2130;
-      
-      --neon-cyan: #00f3ff;
-      --neon-pink: #ff007f;
-      --neon-green: #00ff66;
-      --neon-amber: #ffaa00;
-      --neon-red: #ff3366;
-      --neon-blue: #3b82f6;
-
-      --text-main: #e2e8f0;
-      --text-muted: #8492a6;
-      --border-subtle: rgba(255, 255, 255, 0.05);
-
-      --radius-sm: 8px;
-      --radius-md: 14px;
-      --radius-lg: 20px;
-
-      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-      --font-mono: 'Fira Code', monospace;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-    }
-
-    body {
-      background-color: var(--bg);
-      color: var(--text-main);
-      font-family: var(--font-sans);
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* Neumorphic Shadows */
-    .neu-flat {
-      background: var(--panel-bg);
-      box-shadow: 6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
-      border-radius: var(--radius-md);
-      border: 1px solid var(--border-subtle);
-    }
-
-    .neu-inset {
-      background: var(--panel-inset);
-      box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
-      border-radius: var(--radius-sm);
-    }
-
-    .neu-button {
-      background: var(--panel-bg);
-      box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light);
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border-subtle);
-      color: var(--text-main);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      font-family: var(--font-sans);
-      font-weight: 500;
-      padding: 8px 16px;
-    }
-
-    .neu-button:hover {
-      box-shadow: 2px 2px 5px var(--shadow-dark), -2px -2px 5px var(--shadow-light);
-      color: var(--neon-cyan);
-      border-color: rgba(0, 243, 255, 0.3);
-    }
-
-    .neu-button:active, .neu-button.active {
-      box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-      color: var(--neon-cyan);
-      border-color: var(--neon-cyan);
-    }
-
-    .neu-button.primary {
-      background: linear-gradient(135deg, rgba(0,243,255,0.1) 0%, rgba(18,22,32,1) 100%);
-      border-color: rgba(0, 243, 255, 0.4);
-      color: var(--neon-cyan);
-    }
-
-    .neu-button.primary:hover {
-      box-shadow: 0 0 15px rgba(0, 243, 255, 0.4), inset 1px 1px 2px rgba(255,255,255,0.2);
-    }
-
-    /* HEADER */
-    header {
-      height: 60px;
-      padding: 0 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border-subtle);
-      background: var(--panel-bg);
-      z-index: 10;
-    }
-
-    .logo-container {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .logo-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: var(--panel-bg);
-      box-shadow: 3px 3px 8px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--neon-cyan);
-      font-size: 18px;
-      border: 1px solid rgba(0, 243, 255, 0.3);
-      text-shadow: 0 0 8px var(--neon-cyan);
-    }
-
-    .logo-text {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      background: linear-gradient(90deg, #fff, var(--neon-cyan));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .logo-subtitle {
-      font-size: 11px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-left: 8px;
-      padding-left: 8px;
-      border-left: 1px solid rgba(255,255,255,0.1);
-    }
-
-    .system-status {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      font-size: 13px;
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-    }
-
-    .status-badge.ready {
-      background: rgba(0, 255, 102, 0.08);
-      color: var(--neon-green);
-      border: 1px solid rgba(0, 255, 102, 0.2);
-    }
-
-    .status-badge.processing {
-      background: rgba(0, 243, 255, 0.08);
-      color: var(--neon-cyan);
-      border: 1px solid rgba(0, 243, 255, 0.2);
-    }
-
-    .dot-pulse {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: currentColor;
-      box-shadow: 0 0 8px currentColor;
-      animation: pulse 1.5s infinite ease-in-out;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-
-    /* MAIN APP WORKSPACE */
-    .workspace {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 420px 1fr 480px;
-      gap: 16px;
-      padding: 16px;
-      height: calc(100vh - 92px);
-      overflow: hidden;
-    }
-
-    /* LEFT PANEL: Upload & Thumbnails */
-    .panel-left {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      height: 100%;
-    }
-
-    .dropzone {
-      padding: 24px;
-      text-align: center;
-      border: 2px dashed rgba(0, 243, 255, 0.2);
-      border-radius: var(--radius-md);
-      background: var(--panel-inset);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      position: relative;
-    }
-
-    .dropzone:hover, .dropzone.dragover {
-      border-color: var(--neon-cyan);
-      background: rgba(0, 243, 255, 0.03);
-      box-shadow: 0 0 20px rgba(0, 243, 255, 0.15);
-    }
-
-    .dropzone-icon {
-      font-size: 32px;
-      color: var(--neon-cyan);
-      margin-bottom: 12px;
-      text-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
-    }
-
-    .dropzone h3 {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-
-    .dropzone p {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    .file-input {
-      display: none;
-    }
-
-    .file-list-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      overflow-y: auto;
-      padding-right: 4px;
-    }
-
-    .card-pair-view {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .doc-card {
-      padding: 10px;
-      border-radius: var(--radius-sm);
-      position: relative;
-      cursor: pointer;
-      border: 1px solid var(--border-subtle);
-      transition: all 0.2s ease;
-    }
-
-    .doc-card.active {
-      border-color: var(--neon-cyan);
-      box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
-    }
-
-    .doc-card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .doc-thumb {
-      width: 100%;
-      height: 110px;
-      object-fit: cover;
-      border-radius: 4px;
-      background: #050608;
-    }
-
-    /* CENTER PANEL: Canvas Preview & Interactive Workbench */
-    .panel-center {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      height: 100%;
-      position: relative;
-    }
-
-    .canvas-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 16px;
-    }
-
-    .toolbar-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .toolbar-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-    }
-
-    .viewport-container {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #07090d;
-      border-radius: var(--radius-md);
-      box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
-      border: 1px solid var(--border-subtle);
-    }
-
-    .canvas-wrapper {
-      position: relative;
-      transform-origin: center center;
-      transition: transform 0.1s ease-out;
-      cursor: grab;
-    }
-
-    .canvas-wrapper:active {
-      cursor: grabbing;
-    }
-
-    canvas#docCanvas {
-      display: block;
-      max-width: 100%;
-      max-height: 100%;
-      border-radius: 4px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-
-    svg#overlaySvg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    .bbox-rect {
-      fill: rgba(0, 243, 255, 0.08);
-      stroke: var(--neon-cyan);
-      stroke-width: 1.5;
-      transition: all 0.2s ease;
-      cursor: pointer;
-      pointer-events: auto;
-    }
-
-    .bbox-rect:hover, .bbox-rect.highlighted {
-      fill: rgba(0, 255, 102, 0.2);
-      stroke: var(--neon-green);
-      stroke-width: 2.5;
-      filter: drop-shadow(0 0 6px var(--neon-green));
-    }
-
-    .bbox-rect.review {
-      stroke: var(--neon-amber);
-      fill: rgba(255, 170, 0, 0.12);
-    }
-
-    .bbox-rect.missing {
-      stroke: var(--neon-red);
-      fill: rgba(255, 51, 102, 0.1);
-    }
-
-    /* Laser Scanner Beam Effect */
-    .scan-beam {
-      position: absolute;
-      left: 0;
-      width: 100%;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
-      box-shadow: 0 0 15px var(--neon-cyan), 0 0 30px var(--neon-cyan);
-      opacity: 0;
-      pointer-events: none;
-      z-index: 5;
-    }
-
-    .scan-beam.scanning {
-      opacity: 1;
-      animation: scanAnim 2s infinite ease-in-out;
-    }
-
-    @keyframes scanAnim {
-      0% { top: 0%; }
-      50% { top: 98%; }
-      100% { top: 0%; }
-    }
-
-    /* RIGHT PANEL: Extracted Intelligence & Template Trainer */
-    .panel-right {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      height: 100%;
-    }
-
-    .tabs-nav {
-      display: flex;
-      gap: 6px;
-      padding: 4px;
-      border-radius: var(--radius-sm);
-    }
-
-    .tab-btn {
-      flex: 1;
-      padding: 8px 12px;
-      font-size: 11px;
-      font-weight: 600;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .tab-btn.active {
-      background: var(--panel-bg);
-      color: var(--neon-cyan);
-      box-shadow: 2px 2px 6px var(--shadow-dark), -2px -2px 6px var(--shadow-light);
-      text-shadow: 0 0 8px rgba(0, 243, 255, 0.3);
-    }
-
-    .tab-content {
-      flex: 1;
-      overflow-y: auto;
-      padding-right: 4px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .field-group {
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .field-group-title {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .field-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      padding: 10px;
-      border-radius: var(--radius-sm);
-      background: var(--panel-inset);
-      border: 1px solid var(--border-subtle);
-      transition: all 0.2s ease;
-      cursor: pointer;
-    }
-
-    .field-item:hover, .field-item.active {
-      border-color: rgba(0, 243, 255, 0.4);
-      box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
-    }
-
-    .field-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 11px;
-    }
-
-    .field-label {
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-
-    .field-status {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-weight: 600;
-    }
-
-    .status-detected { color: var(--neon-green); }
-    .status-review { color: var(--neon-amber); }
-    .status-missing { color: var(--neon-red); }
-
-    .field-value {
-      font-family: var(--font-mono);
-      font-size: 13px;
-      color: #fff;
-      word-break: break-all;
-      line-height: 1.4;
-    }
-
-    .field-explanation {
-      font-size: 10px;
-      color: var(--text-muted);
-      margin-top: 4px;
-      padding-top: 4px;
-      border-top: 1px dashed rgba(255,255,255,0.05);
-      font-style: italic;
-    }
-
-    .confidence-bar {
-      height: 3px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 2px;
-      overflow: hidden;
-      margin-top: 4px;
-    }
-
-    .confidence-fill {
-      height: 100%;
-      background: var(--neon-green);
-      width: 0%;
-      transition: width 0.4s ease;
-    }
-
-    /* TEMPLATE MAKER / SET & MARK BAR */
-    .template-box {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .template-box p {
-      font-size: 12px;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-
-    .template-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 4px;
-      background: rgba(0,243,255,0.1);
-      color: var(--neon-cyan);
-      font-size: 11px;
-      font-family: var(--font-mono);
-    }
-
-    /* BOTTOM STATUS FOOTER */
-    footer {
-      height: 32px;
-      padding: 0 24px;
-      background: var(--panel-bg);
-      border-top: 1px solid var(--border-subtle);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    .footer-stat {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .footer-stat span {
-      color: var(--text-main);
-    }
-
-    /* Scrollbars */
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-    }
-    ::-webkit-scrollbar-track {
-      background: var(--panel-inset);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #1e2638;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: var(--neon-cyan);
-    }
-
-    /* Modal dialog */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(5,7,11,0.85);
-      backdrop-filter: blur(8px);
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-    }
-
-    .modal-overlay.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal-card {
-      width: 400px;
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .modal-card h3 {
-      font-size: 16px;
-      color: var(--neon-cyan);
-    }
-
-    .input-field {
-      width: 100%;
-      padding: 10px 14px;
-      background: var(--panel-inset);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      color: #fff;
-      font-family: var(--font-sans);
-      font-size: 13px;
-      outline: none;
-    }
-
-    .input-field:focus {
-      border-color: var(--neon-cyan);
-      box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="NeonOCR — privacy-first browser OCR document intelligence workspace">
+<title>NeonOCR — AI Document Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0d12;--panel:#10151d;--panel2:#0d1219;--text:#e9f2ff;--muted:#8391a6;
+  --cyan:#42e8ff;--violet:#a875ff;--green:#4de39b;--amber:#ffbd55;--red:#ff667b;
+  --shadow1:12px 12px 28px #05070b,-10px -10px 25px #141b25;
+  --inset:inset 5px 5px 13px #070a0f,inset -4px -4px 10px #151d28;
+  --border:rgba(255,255,255,.065)
+}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 12% 0%,rgba(66,232,255,.07),transparent 28%),radial-gradient(circle at 90% 10%,rgba(168,117,255,.07),transparent 30%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{overflow:hidden}.app{height:100vh;display:grid;grid-template-rows:68px 1fr 34px;gap:10px;padding:10px}
+header,.panel,.statusbar{background:linear-gradient(145deg,#111720,#0c1118);border:1px solid var(--border);box-shadow:var(--shadow1);border-radius:18px}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 18px}.brand{display:flex;gap:12px;align-items:center}.logo{width:38px;height:38px;border-radius:12px;background:#0b1219;box-shadow:var(--inset);display:grid;place-items:center;color:var(--cyan);font-weight:800;text-shadow:0 0 16px var(--cyan);border:1px solid rgba(66,232,255,.18)}h1{font-size:16px;margin:0;letter-spacing:.3px}header small{display:block;color:var(--muted);font-size:10px;margin-top:2px}.ready{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--green)}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}
+.workspace{min-height:0;display:grid;grid-template-columns:29% 42% 29%;gap:10px}.panel{min-height:0;padding:13px;overflow:hidden}.paneltitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.paneltitle h2{font-size:12px;letter-spacing:.8px;text-transform:uppercase;margin:0}.muted{color:var(--muted)}button,.select,.input{font:inherit;color:var(--text);background:#0c1219;border:1px solid var(--border);border-radius:11px;box-shadow:var(--inset);padding:9px 11px;outline:none}button{cursor:pointer;transition:.18s}button:hover{border-color:rgba(66,232,255,.4);transform:translateY(-1px)}button:focus-visible,.input:focus-visible,.select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}.primary{background:linear-gradient(145deg,#13232b,#0d171e);border-color:rgba(66,232,255,.3);color:var(--cyan);box-shadow:0 0 18px rgba(66,232,255,.08),var(--inset)}.danger{color:var(--red)}.upload{height:180px;border:1px dashed rgba(66,232,255,.38);border-radius:16px;display:flex;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle,rgba(66,232,255,.08),transparent 65%),#0c1219;box-shadow:var(--inset);position:relative;overflow:hidden}.upload.drag{border-color:var(--cyan);box-shadow:0 0 25px rgba(66,232,255,.15),var(--inset)}.scan{position:absolute;left:0;right:0;height:1px;background:var(--cyan);box-shadow:0 0 12px var(--cyan);top:-5px;opacity:.65;animation:scan 3.2s linear infinite;pointer-events:none}@keyframes scan{to{top:105%}}.upload strong{display:block;font-size:14px}.upload span{display:block;color:var(--muted);font-size:10px;margin-top:7px}.upload input{display:none}.controls{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.filelist{height:calc(100% - 225px);overflow:auto;padding-right:3px}.filecard{padding:9px;border-radius:12px;background:#0d131b;box-shadow:var(--inset);border:1px solid var(--border);margin-bottom:7px;cursor:pointer}.filecard.active{border-color:rgba(66,232,255,.45);box-shadow:0 0 16px rgba(66,232,255,.08),var(--inset)}.filetop{display:flex;justify-content:space-between;gap:6px;font-size:11px}.tag{font-size:9px;padding:3px 6px;border-radius:999px;border:1px solid var(--border);white-space:nowrap}.frontback{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}.fb{padding:7px;text-align:center;font-size:9px;border-radius:8px;background:#0a1016;color:var(--muted);border:1px solid var(--border)}.fb.has{color:var(--cyan);border-color:rgba(66,232,255,.3)}
+.viewer{height:calc(100% - 36px);display:grid;grid-template-rows:36px 1fr 36px;min-height:0}.viewerbar{display:flex;align-items:center;gap:6px}.viewerbar button{padding:6px 9px;font-size:10px}.canvaswrap{position:relative;min-height:0;border-radius:15px;background:#070a0f;box-shadow:var(--inset);overflow:hidden;display:grid;place-items:center}.canvaswrap canvas{max-width:100%;max-height:100%;object-fit:contain;cursor:crosshair}.empty{color:var(--muted);text-align:center;font-size:11px;padding:20px}.viewerfoot{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--muted)}.progress{height:4px;border-radius:5px;background:#080c11;overflow:hidden;box-shadow:var(--inset);margin:8px 0}.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--violet));box-shadow:0 0 10px var(--cyan);transition:width .25s}.stage{font-size:10px;color:var(--cyan);min-height:14px}.results{height:calc(100% - 36px);overflow:auto;padding-right:3px}.docbadge{display:flex;justify-content:space-between;gap:10px;padding:9px;border-radius:12px;background:#0c131b;box-shadow:var(--inset);margin-bottom:9px}.docbadge strong{font-size:11px}.docbadge span{font-size:9px;color:var(--muted)}.section{margin:10px 0}.section h3{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:#b7c6da;margin:12px 3px 7px}.field{border:1px solid var(--border);border-radius:12px;background:#0d131a;box-shadow:var(--inset);padding:9px;margin-bottom:6px}.fieldrow{display:flex;justify-content:space-between;gap:8px}.fieldname{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}.value{font-size:11px;margin-top:5px;white-space:pre-wrap;word-break:break-word}.meta{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}.status{font-size:8px;border-radius:999px;padding:3px 6px;border:1px solid currentColor}.green{color:var(--green)}.amber{color:var(--amber)}.red{color:var(--red)}.confidence{font-size:8px;color:var(--muted)}.sourcebtn{margin-left:auto;font-size:8px;padding:4px 6px}.alltext{font-size:9px;line-height:1.55;color:#bdc8d7;white-space:pre-wrap}.notice{padding:9px;border-radius:11px;background:#0b1118;border:1px solid var(--border);font-size:9px;line-height:1.45;color:var(--muted)}.settings{position:fixed;right:24px;top:74px;width:330px;max-height:calc(100vh - 120px);overflow:auto;z-index:30;padding:14px;background:#10161f;border:1px solid var(--border);border-radius:18px;box-shadow:0 25px 70px #000;display:none}.settings.open{display:block}.settingrow{margin:10px 0}.settingrow label{display:block;font-size:10px;color:#b9c6d8;margin-bottom:6px}.settingrow input,.settingrow select{width:100%}.templateList{display:grid;gap:6px}.tpl{display:flex;justify-content:space-between;gap:6px;align-items:center;padding:7px;border-radius:9px;background:#0b1118;border:1px solid var(--border);font-size:9px}.toast{position:fixed;right:20px;bottom:55px;z-index:50;min-width:260px;max-width:420px;padding:11px 13px;border-radius:13px;background:#101820;border:1px solid rgba(66,232,255,.3);box-shadow:0 0 25px rgba(66,232,255,.12),var(--shadow1);font-size:10px;display:none}.toast.show{display:block}.kbd{padding:2px 5px;border:1px solid var(--border);border-radius:5px;color:var(--muted)}.hidden{display:none!important}
+@media(max-width:1050px){body{overflow:auto}.app{height:auto;min-height:100vh}.workspace{grid-template-columns:1fr;min-height:900px}.panel{min-height:350px}.settings{position:fixed;left:15px;right:15px;width:auto}}
+</style>
 </head>
 <body>
+<div class="app">
+<header>
+  <div class="brand"><div class="logo">N</div><div><h1>NeonOCR</h1><small>AI Document Intelligence · Browser Processing</small></div></div>
+  <div class="ready"><i class="dot"></i><span id="systemState">SYSTEM READY</span></div>
+  <button id="settingsBtn" aria-label="Open settings">⚙ Settings</button>
+</header>
 
-  <!-- HEADER -->
-  <header>
-    <div class="logo-container">
-      <div class="logo-icon"><i class="fa-solid fa-eye"></i></div>
-      <div>
-        <span class="logo-text">NeonOCR</span>
-        <span class="logo-subtitle">AI Document Intelligence</span>
-      </div>
+<main class="workspace">
+<section class="panel">
+  <div class="paneltitle"><h2>Documents</h2><span class="muted" id="fileCount">0 files</span></div>
+  <div class="upload" id="drop">
+    <div class="scan"></div>
+    <div><strong>DROP DOCUMENTS HERE</strong><span>or <u>Browse Files</u> · up to 500 MB per file</span><span>PNG · JPG · WEBP · TIFF · BMP · HEIC · PDF · DOCX · XLSX · PPTX · TXT · CSV</span></div>
+    <input id="fileInput" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv">
+  </div>
+  <div class="controls">
+    <button class="primary" id="processBtn">▶ Process Selected</button>
+    <button id="processAllBtn">Process All</button>
+    <button class="danger" id="clearBtn">Clear</button>
+  </div>
+  <div class="notice">Privacy-first: OCR runs in this browser. Files are not uploaded by this page to an OCR server. External libraries are loaded from public CDNs.</div>
+  <div class="filelist" id="fileList"></div>
+</section>
+
+<section class="panel">
+  <div class="paneltitle"><h2>Document Preview</h2><span class="muted" id="pageInfo">No document</span></div>
+  <div class="viewer">
+    <div class="viewerbar">
+      <button id="prevPage">‹</button><button id="nextPage">›</button>
+      <button id="zoomOut">−</button><button id="zoomIn">+</button><button id="fitBtn">Fit</button>
+      <button id="boxesBtn">Boxes</button>
+      <button id="rotateBtn">Rotate</button>
     </div>
-
-    <div class="system-status">
-      <div class="status-badge ready" id="statusBadge">
-        <div class="dot-pulse"></div>
-        <span id="statusText">SYSTEM READY</span>
-      </div>
-      <button class="neu-button primary" id="btnExportJson">
-        <i class="fa-solid fa-file-export"></i> Export JSON
-      </button>
-    </div>
-  </header>
-
-  <!-- WORKSPACE -->
-  <main class="workspace">
-    
-    <!-- LEFT PANEL: Uploads & Cards -->
-    <section class="panel-left">
-      <div class="dropzone neu-flat" id="dropzone">
-        <input type="file" id="fileInput" class="file-input" multiple accept="image/*,.pdf,.doc,.docx,.tiff,.webp">
-        <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-        <h3>DROP DOCUMENTS HERE</h3>
-        <p>PNG, JPG, WEBP, TIFF, PDF (Up to 500 MB)</p>
-      </div>
-
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-        <span style="font-size: 11px; font-weight: 600; color: var(--text-muted); font-family: var(--font-mono);">DOCUMENT QUEUE</span>
-        <button class="neu-button" id="btnClearAll" style="padding: 4px 8px; font-size: 10px;">Clear</button>
-      </div>
-
-      <div class="file-list-container" id="fileList">
-        <!-- Document cards dynamically populated -->
-      </div>
-    </section>
-
-    <!-- CENTER PANEL: Document Viewport & SVG Overlay -->
-    <section class="panel-center neu-flat">
-      <div class="canvas-toolbar">
-        <div class="toolbar-group">
-          <span class="toolbar-title" id="docTitle">No document selected</span>
-        </div>
-        <div class="toolbar-group">
-          <button class="neu-button" id="btnRotateCcw" title="Rotate 90° CCW"><i class="fa-solid fa-rotate-left"></i></button>
-          <button class="neu-button" id="btnRotateCw" title="Rotate 90° CW"><i class="fa-solid fa-rotate-right"></i></button>
-          <button class="neu-button" id="btnAutoDeskew" title="Auto Deskew / Orient"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Orient</button>
-          <button class="neu-button" id="btnZoomIn" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
-          <button class="neu-button" id="btnZoomOut" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
-          <button class="neu-button" id="btnResetView" title="Reset View"><i class="fa-solid fa-expand"></i></button>
-          <button class="neu-button primary" id="btnSetMarkMode" title="Set and Mark Region Template">
-            <i class="fa-solid fa-crop-simple"></i> Set & Mark
-          </button>
-        </div>
-      </div>
-
-      <div class="viewport-container" id="viewportContainer">
-        <div class="scan-beam" id="scanBeam"></div>
-        <div class="canvas-wrapper" id="canvasWrapper">
-          <canvas id="docCanvas"></canvas>
-          <svg id="overlaySvg"></svg>
-        </div>
-      </div>
-    </section>
-
-    <!-- RIGHT PANEL: Extraction Hub & Set & Mark Template Trainer -->
-    <section class="panel-right neu-flat">
-      <div class="tabs-nav neu-inset">
-        <button class="tab-btn active" data-tab="extracted">EXTRACTED FIELDS</button>
-        <button class="tab-btn" data-tab="template">TEMPLATE TRAINER</button>
-        <button class="tab-btn" data-tab="raw">ALL TEXT & TABLES</button>
-      </div>
-
-      <!-- TAB 1: EXTRACTED STRUCTURED FIELDS -->
-      <div class="tab-content" id="tabExtracted">
-        <div class="field-group neu-flat" id="docTypeCard">
-          <div class="field-group-title">
-            <i class="fa-solid fa-id-card" style="color: var(--neon-cyan);"></i> Document Classification
-          </div>
-          <div style="display: flex; align-items: center; justify-content: space-between;">
-            <span id="detectedDocType" style="font-weight: 700; font-size: 14px; color: #fff;">Unclassified</span>
-            <span class="status-badge ready" id="docTypeConfidence">0% CONF</span>
-          </div>
-        </div>
-
-        <div id="fieldsContainer" style="display: flex; flex-direction: column; gap: 12px;">
-          <!-- Field Items dynamically populated -->
-        </div>
-      </div>
-
-      <!-- TAB 2: SET & MARK ONE-TIME TEMPLATE TRAINER -->
-      <div class="tab-content" id="tabTemplate" style="display: none;">
-        <div class="template-box neu-flat">
-          <h4 style="font-size: 13px; color: var(--neon-cyan);"><i class="fa-solid fa-bullseye"></i> One-Time Layout Trainer</h4>
-          <p>Mark target information zones on this document ONCE. NeonOCR will remember the region mapping and automatically extract it for future matching documents.</p>
-          
-          <div style="display: flex; gap: 8px; margin-top: 8px;">
-            <button class="neu-button primary" id="btnSaveTemplate" style="flex: 1;">
-              <i class="fa-solid fa-floppy-disk"></i> Save Layout Template
-            </button>
-            <button class="neu-button" id="btnClearRegions">Clear Marks</button>
-          </div>
-        </div>
-
-        <div class="field-group neu-flat">
-          <div class="field-group-title">Defined Region Maps</div>
-          <div id="definedRegionsList" style="display: flex; flex-direction: column; gap: 8px; font-size: 12px;">
-            <span style="color: var(--text-muted); font-style: italic;">No custom region boxes marked yet. Click 'Set & Mark' to drag on document.</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- TAB 3: ALL TEXT & TABLES -->
-      <div class="tab-content" id="tabRaw" style="display: none;">
-        <div class="field-group neu-flat">
-          <div class="field-group-title"><i class="fa-solid fa-table-cells"></i> Detected Structured Tables</div>
-          <div id="tableOutputContainer" style="font-family: var(--font-mono); font-size: 11px; overflow-x: auto; color: var(--text-muted);">
-            No structured table detected in current ROI.
-          </div>
-        </div>
-
-        <div class="field-group neu-flat">
-          <div class="field-group-title"><i class="fa-solid fa-align-left"></i> All Detected Document Text</div>
-          <textarea id="rawTextOutput" class="input-field" style="height: 260px; font-family: var(--font-mono); font-size: 11px; resize: none;" readonly placeholder="Complete text capture stream will appear here..."></textarea>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- BOTTOM FOOTER -->
-  <footer>
-    <div class="footer-stat"><i class="fa-solid fa-file"></i> Pages: <span id="statPages">0</span></div>
-    <div class="footer-stat"><i class="fa-solid fa-list-check"></i> Fields Captured: <span id="statFields">0</span></div>
-    <div class="footer-stat"><i class="fa-solid fa-shield-halved"></i> Audit Status: <span id="statAudit">PASSED</span></div>
-    <div class="footer-stat"><i class="fa-solid fa-stopwatch"></i> Processing Time: <span id="statTime">0 ms</span></div>
-  </footer>
-
-  <!-- MODAL FOR REGION LABELING -->
-  <div class="modal-overlay" id="regionModal">
-    <div class="modal-card neu-flat">
-      <h3>Label Targeted ROI Field</h3>
-      <p style="font-size: 12px; color: var(--text-muted);">Assign a label to the highlighted region for template auto-extraction:</p>
-      <input type="text" id="regionLabelInput" class="input-field" placeholder="e.g., Complete Address, NRIC Number, Passport Expiry">
-      <div style="display: flex; justify-content: flex-end; gap: 8px;">
-        <button class="neu-button" id="btnCancelRegion">Cancel</button>
-        <button class="neu-button primary" id="btnConfirmRegion">Save Region</button>
-      </div>
+    <div class="canvaswrap" id="canvasWrap"><div class="empty" id="emptyPreview">Upload a document to begin.<br><br>OCR bounding boxes will appear after processing.</div><canvas id="previewCanvas" class="hidden"></canvas></div>
+    <div>
+      <div class="stage" id="stage">READY</div>
+      <div class="progress"><i id="progressBar"></i></div>
+      <div class="viewerfoot"><span id="pageStatus">0 pages</span><span id="timing">0 ms</span></div>
     </div>
   </div>
-
-  <!-- JAVASCRIPT ENGINE -->
-  <script>
-    /**
-     * NeonOCR Client Engine Architecture
-     * Features: Canvas Preprocessing, Auto Deskew, Disambiguation Rules, MRZ Checksums, 
-     * Malaysian IC / Address Parsers, Custom Template "Set & Mark" Trainer.
-     */
-    
-    // Core App State
-    const state = {
-      documents: [],
-      activeDocIndex: -1,
-      rotation: 0,
-      zoom: 1.0,
-      panX: 0,
-      panY: 0,
-      isPanning: false,
-      startPanX: 0,
-      startPanY: 0,
-      
-      // Set & Mark mode
-      isMarkingMode: false,
-      isDrawingRect: false,
-      markStartX: 0,
-      markStartY: 0,
-      currentDrawRect: null,
-      savedTemplates: JSON.parse(localStorage.getItem('neonocr_templates') || '{}'),
-      currentDocRegions: [],
-      
-      // Active field highlight
-      highlightedFieldKey: null
-    };
-
-    // DOM References
-    const dropzone = document.getElementById('dropzone');
-    const fileInput = document.getElementById('fileInput');
-    const fileList = document.getElementById('fileList');
-    const docCanvas = document.getElementById('docCanvas');
-    const overlaySvg = document.getElementById('overlaySvg');
-    const canvasWrapper = document.getElementById('canvasWrapper');
-    const viewportContainer = document.getElementById('viewportContainer');
-    const scanBeam = document.getElementById('scanBeam');
-    const fieldsContainer = document.getElementById('fieldsContainer');
-    const rawTextOutput = document.getElementById('rawTextOutput');
-    const detectedDocType = document.getElementById('detectedDocType');
-    const docTypeConfidence = document.getElementById('docTypeConfidence');
-    const statusText = document.getElementById('statusText');
-    const statusBadge = document.getElementById('statusBadge');
-
-    // Canvas Context
-    const ctx = docCanvas.getContext('2d');
-
-    // Initialize Event Listeners
-    window.addEventListener('load', () => {
-      initDragAndDrop();
-      initToolbar();
-      initTabs();
-      initSetAndMarkTrainer();
-    });
-
-    // Drag and Drop Pipeline
-    function initDragAndDrop() {
-      dropzone.addEventListener('click', () => fileInput.click());
-      
-      dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-      });
-
-      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-
-      dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-        if (e.dataTransfer.files.length > 0) {
-          handleFiles(e.dataTransfer.files);
-        }
-      });
-
-      fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-          handleFiles(e.target.files);
-        }
-      });
-
-      document.getElementById('btnClearAll').addEventListener('click', () => {
-        state.documents = [];
-        state.activeDocIndex = -1;
-        renderFileList();
-        clearCanvas();
-        resetExtractionPanels();
-      });
-    }
-
-    // Process Uploaded Files
-    function handleFiles(files) {
-      Array.from(files).forEach(file => {
-        if (file.size > 500 * 1024 * 1024) {
-          alert(`File ${file.name} exceeds maximum allowed size of 500 MB.`);
-          return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const docObj = {
-            id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-            name: file.name,
-            size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
-            type: file.type,
-            dataUrl: e.target.result,
-            imageObj: new Image(),
-            extractedData: null,
-            rotation: 0
-          };
-
-          docObj.imageObj.src = e.target.result;
-          docObj.imageObj.onload = () => {
-            state.documents.push(docObj);
-            renderFileList();
-            if (state.activeDocIndex === -1) {
-              selectDocument(state.documents.length - 1);
-            }
-          };
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-
-    // Render Queue Cards (Supports Front/Back cards side-by-side)
-    function renderFileList() {
-      fileList.innerHTML = '';
-      state.documents.forEach((doc, idx) => {
-        const card = document.createElement('div');
-        card.className = `doc-card neu-flat ${idx === state.activeDocIndex ? 'active' : ''}`;
-        card.innerHTML = `
-          <div class="doc-card-header">
-            <span style="truncate">${doc.name}</span>
-            <span>${doc.size}</span>
-          </div>
-          <img class="doc-thumb" src="${doc.dataUrl}" alt="Thumbnail">
-        `;
-        card.addEventListener('click', () => selectDocument(idx));
-        fileList.appendChild(card);
-      });
-
-      document.getElementById('statPages').innerText = state.documents.length;
-    }
-
-    // Select Document for Active Viewport
-    function selectDocument(index) {
-      state.activeDocIndex = index;
-      const doc = state.documents[index];
-      state.rotation = doc.rotation || 0;
-      document.getElementById('docTitle').innerText = doc.name;
-      
-      renderFileList();
-      renderDocumentToCanvas();
-      
-      // Run OCR & Disambiguation pipeline if not already extracted
-      if (!doc.extractedData) {
-        runOcrPipeline(doc);
-      } else {
-        renderExtractedResults(doc.extractedData);
-      }
-    }
-
-    // Render Image to Canvas with Transformation Pipeline
-    function renderDocumentToCanvas() {
-      if (state.activeDocIndex === -1) return;
-      const doc = state.documents[state.activeDocIndex];
-      const img = doc.imageObj;
-
-      let width = img.width;
-      let height = img.height;
-
-      // Handle 90/270 Degree Swap
-      if (state.rotation % 180 !== 0) {
-        docCanvas.width = height;
-        docCanvas.height = width;
-      } else {
-        docCanvas.width = width;
-        docCanvas.height = height;
-      }
-
-      ctx.save();
-      ctx.clearRect(0, 0, docCanvas.width, docCanvas.height);
-      
-      // Translate & Rotate around canvas center
-      ctx.translate(docCanvas.width / 2, docCanvas.height / 2);
-      ctx.rotate((state.rotation * Math.PI) / 180);
-      ctx.drawImage(img, -width / 2, -height / 2, width, height);
-      ctx.restore();
-
-      // Sync SVG Overlay dimensions
-      overlaySvg.setAttribute('viewBox', `0 0 ${docCanvas.width} ${docCanvas.height}`);
-      
-      applyTransformations();
-    }
-
-    function applyTransformations() {
-      canvasWrapper.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
-    }
-
-    // Toolbar Controls
-    function initToolbar() {
-      document.getElementById('btnRotateCw').addEventListener('click', () => {
-        state.rotation = (state.rotation + 90) % 360;
-        if (state.activeDocIndex !== -1) state.documents[state.activeDocIndex].rotation = state.rotation;
-        renderDocumentToCanvas();
-      });
-
-      document.getElementById('btnRotateCcw').addEventListener('click', () => {
-        state.rotation = (state.rotation - 90 + 360) % 360;
-        if (state.activeDocIndex !== -1) state.documents[state.activeDocIndex].rotation = state.rotation;
-        renderDocumentToCanvas();
-      });
-
-      document.getElementById('btnAutoDeskew').addEventListener('click', () => {
-        setProcessingStatus(true, "Detecting orientation & deskewing...");
-        setTimeout(() => {
-          state.rotation = 0; // Auto-detected best axis
-          renderDocumentToCanvas();
-          setProcessingStatus(false, "SYSTEM READY");
-        }, 600);
-      });
-
-      document.getElementById('btnZoomIn').addEventListener('click', () => {
-        state.zoom = Math.min(state.zoom + 0.25, 4.0);
-        applyTransformations();
-      });
-
-      document.getElementById('btnZoomOut').addEventListener('click', () => {
-        state.zoom = Math.max(state.zoom - 0.25, 0.5);
-        applyTransformations();
-      });
-
-      document.getElementById('btnResetView').addEventListener('click', () => {
-        state.zoom = 1.0;
-        state.panX = 0;
-        state.panY = 0;
-        applyTransformations();
-      });
-
-      // Pan Interaction
-      viewportContainer.addEventListener('mousedown', (e) => {
-        if (state.isMarkingMode) return;
-        state.isPanning = true;
-        state.startPanX = e.clientX - state.panX;
-        state.startPanY = e.clientY - state.panY;
-      });
-
-      window.addEventListener('mousemove', (e) => {
-        if (!state.isPanning) return;
-        state.panX = e.clientX - state.startPanX;
-        state.panY = e.clientY - state.startPanY;
-        applyTransformations();
-      });
-
-      window.addEventListener('mouseup', () => state.isPanning = false);
-    }
-
-    // Tab Navigation
-    function initTabs() {
-      const btns = document.querySelectorAll('.tab-btn');
-      btns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          btns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-
-          const tabName = btn.getAttribute('data-tab');
-          document.getElementById('tabExtracted').style.display = tabName === 'extracted' ? 'flex' : 'none';
-          document.getElementById('tabTemplate').style.display = tabName === 'template' ? 'flex' : 'none';
-          document.getElementById('tabRaw').style.display = tabName === 'raw' ? 'flex' : 'none';
-        });
-      });
-    }
-
-    // Status Indicator Helper
-    function setProcessingStatus(isProcessing, text) {
-      statusText.innerText = text;
-      if (isProcessing) {
-        statusBadge.className = 'status-badge processing';
-        scanBeam.classList.add('scanning');
-      } else {
-        statusBadge.className = 'status-badge ready';
-        scanBeam.classList.remove('scanning');
-      }
-    }
-
-    /**
-     * OCR PIPELINE & DISAMBIGUATION ENGINE
-     * Strictly enforces non-guessing, character audits (P vs F, O vs 0, etc.),
-     * complete address reconstruction, Malaysian NRIC validation, and MRZ checks.
-     */
-    async function runOcrPipeline(doc) {
-      const startTime = performance.now();
-      setProcessingStatus(true, "Running OCR & Character Disambiguation...");
-
-      try {
-        let textResult = "";
-        
-        // Use Tesseract.js if available, otherwise apply pattern analysis
-        if (window.Tesseract) {
-          const worker = await Tesseract.createWorker('eng');
-          const ret = await worker.recognize(docCanvas);
-          textResult = ret.data.text;
-          await worker.terminate();
-        } else {
-          textResult = "MOCK OCR TEXT FOR TESTING MALAYSIAN PASSPORT AND MYKAD";
-        }
-
-        // Parse Document Type and Extracts
-        const extracted = analyzeDocumentContent(textResult, docCanvas.width, docCanvas.height);
-        doc.extractedData = extracted;
-
-        const duration = Math.round(performance.now() - startTime);
-        document.getElementById('statTime').innerText = `${duration} ms`;
-
-        renderExtractedResults(extracted);
-      } catch (err) {
-        console.error("OCR Pipeline Error:", err);
-        alert("OCR processing encountered an issue. Falling back to structured inspection.");
-      } finally {
-        setProcessingStatus(false, "SYSTEM READY");
-      }
-    }
-
-    /**
-     * Document Classifier & Character Disambiguator
-     */
-    function analyzeDocumentContent(rawText, width, height) {
-      const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-      
-      let docType = "Generic Document";
-      let docConfidence = 88.5;
-
-      const upper = rawText.toUpperCase();
-      if (upper.includes("PASSPORT") || upper.includes("PASPORT") || upper.includes("P<")) {
-        docType = upper.includes("MALAYSIA") ? "Malaysian Passport" : "International Passport";
-        docConfidence = 98.4;
-      } else if (upper.includes("KAD PENGENALAN") || upper.includes("MYKAD") || upper.includes("PERSEKUTUAN MALAYSIA")) {
-        docType = "Malaysian MyKad / NRIC";
-        docConfidence = 99.1;
-      } else if (upper.includes("LESEN MEMANDU") || upper.includes("DRIVING LICENCE")) {
-        docType = "Malaysian Driving Licence";
-        docConfidence = 96.8;
-      } else if (upper.includes("SURUHANJAYA SYARIKAT") || upper.includes("SSM") || upper.includes("PERAKUAN PENDAFTARAN")) {
-        docType = "SSM Certificate";
-        docConfidence = 97.2;
-      } else if (upper.includes("PPK") || upper.includes("KONTRAKTOR") || upper.includes("CIDB")) {
-        docType = "Perakuan Pendaftaran Kontraktor (PPK)";
-        docConfidence = 95.0;
-      }
-
-      // Fields map with validation audit rules
-      const fields = [];
-
-      // 1. Check for Malaysian IC Patterns (YYMMDD-PB-###G)
-      const icMatch = rawText.match(/\b(\d{6})[-s]?(\d{2})[-s]?(\d{4})\b/);
-      if (icMatch) {
-        const rawIc = `${icMatch[1]}-${icMatch[2]}-${icMatch[3]}`;
-        const icSignalGender = parseInt(icMatch[3].slice(-1)) % 2 !== 0 ? "MALE" : "FEMALE";
-        
-        // Character audit for high-risk digits (0 vs O, 1 vs I, 8 vs B)
-        const hasAmbiguousChars = /[OIB]/i.test(icMatch[0]);
-
-        fields.push({
-          key: "ic_number",
-          label: "Identity Card Number (NRIC)",
-          value: rawIc,
-          confidence: hasAmbiguousChars ? 82.0 : 99.2,
-          status: hasAmbiguousChars ? "NEEDS REVIEW" : "VALIDATED",
-          explanation: hasAmbiguousChars ? "🟠 Contains characters prone to O/0 or B/8 confusion." : "🟢 Formatted and checksum validated.",
-          bbox: { x: width * 0.45, y: height * 0.22, w: width * 0.4, h: height * 0.08 }
-        });
-
-        // IC Derived Date of Birth
-        const yearPrefix = parseInt(icMatch[1].substring(0, 2)) > 30 ? "19" : "20";
-        const dobStr = `${icMatch[1].substring(4, 6)}/${icMatch[1].substring(2, 4)}/${yearPrefix}${icMatch[1].substring(0, 2)}`;
-        
-        fields.push({
-          key: "dob",
-          label: "Date of Birth",
-          value: dobStr,
-          confidence: 96.5,
-          status: "DETECTED",
-          explanation: "🟢 Extracted directly from primary identifier.",
-          bbox: { x: width * 0.45, y: height * 0.32, w: width * 0.3, h: height * 0.06 }
-        });
-
-        fields.push({
-          key: "gender",
-          label: "Gender / Sex",
-          value: icSignalGender,
-          confidence: 97.0,
-          status: "DETECTED",
-          explanation: `🟢 Signal derived from NRIC final digit (${icMatch[3].slice(-1)}).`,
-          bbox: { x: width * 0.45, y: height * 0.38, w: width * 0.2, h: height * 0.05 }
-        });
-      }
-
-      // 2. Full Name Extraction (Preserving multi-line names)
-      const nameMatch = rawText.match(/(?:NAMA|NAME|HOLDER)\s*[:\n]\s*([A-Z\s\/]+)/i);
-      if (nameMatch && nameMatch[1].trim().length > 3) {
-        const cleanName = nameMatch[1].split('\n')[0].trim();
-        fields.push({
-          key: "full_name",
-          label: "Full Name",
-          value: cleanName,
-          confidence: 98.2,
-          status: "DETECTED",
-          explanation: "🟢 Information extracted directly without truncation.",
-          bbox: { x: width * 0.45, y: height * 0.45, w: width * 0.5, h: height * 0.08 }
-        });
-      } else {
-        fields.push({
-          key: "full_name",
-          label: "Full Name",
-          value: "NOT DETECTED",
-          confidence: 0,
-          status: "NOT DETECTED",
-          explanation: "🔴 Text field obscured or missing standard label anchors.",
-          bbox: null
-        });
-      }
-
-      // 3. Complete Address Extraction (Strict non-truncation)
-      const addressRegex = /(?:ALAMAT|ADDRESS)\s*[:\n]\s*([\s\S]{15,120}?)(?=\n\n|\bGENDER\b|\bWARGANEGARA\b|$)/i;
-      const addrMatch = rawText.match(addressRegex);
-      if (addrMatch) {
-        const fullAddress = addrMatch[1].replace(/\r?\n/g, ', ').trim();
-        fields.push({
-          key: "address",
-          label: "Complete Residential Address",
-          value: fullAddress,
-          confidence: 94.1,
-          status: "DETECTED",
-          explanation: "🟢 Complete address reconstructed without line truncation.",
-          bbox: { x: width * 0.1, y: height * 0.6, w: width * 0.8, h: height * 0.2 }
-        });
-      } else {
-        fields.push({
-          key: "address",
-          label: "Complete Residential Address",
-          value: "NOT DETECTED",
-          confidence: 0,
-          status: "NOT DETECTED",
-          explanation: "🔴 Address region obstructed or unreadable.",
-          bbox: null
-        });
-      }
-
-      // 4. MRZ Line Inspector for Passports (ICAO 9303 standard)
-      const mrzMatches = rawText.match(/P[A-Z0-9<]{43}\n[A-Z0-9<]{44}/g);
-      if (mrzMatches) {
-        const mrzLines = mrzMatches[0].split('\n');
-        fields.push({
-          key: "mrz_lines",
-          label: "Passport MRZ (ICAO 9303)",
-          value: `${mrzLines[0]}\n${mrzLines[1]}`,
-          confidence: 99.5,
-          status: "VALIDATED",
-          explanation: "🟢 2-Line MRZ detected and check digits validated.",
-          bbox: { x: width * 0.05, y: height * 0.75, w: width * 0.9, h: height * 0.2 }
-        });
-      }
-
-      return {
-        docType,
-        docConfidence,
-        fields,
-        rawText
-      };
-    }
-
-    // Render Extracted Results into Right Panel
-    function renderExtractedResults(data) {
-      detectedDocType.innerText = data.docType;
-      docTypeConfidence.innerText = `${data.docConfidence}% CONF`;
-      rawTextOutput.value = data.rawText || "";
-
-      fieldsContainer.innerHTML = '';
-      overlaySvg.innerHTML = '';
-
-      let capturedCount = 0;
-
-      data.fields.forEach(field => {
-        if (field.status !== "NOT DETECTED") capturedCount++;
-
-        // Render Field Item
-        const item = document.createElement('div');
-        item.className = 'field-item';
-        
-        let statusClass = "status-detected";
-        let statusIcon = "🟢";
-        if (field.status === "NEEDS REVIEW") {
-          statusClass = "status-review";
-          statusIcon = "🟠";
-        } else if (field.status === "NOT DETECTED") {
-          statusClass = "status-missing";
-          statusIcon = "🔴";
-        }
-
-        item.innerHTML = `
-          <div class="field-header">
-            <span class="field-label">${field.label}</span>
-            <span class="field-status ${statusClass}">${statusIcon} ${field.status}</span>
-          </div>
-          <div class="field-value">${field.value}</div>
-          <div class="field-explanation">${field.explanation}</div>
-          <div class="confidence-bar">
-            <div class="confidence-fill" style="width: ${field.confidence}%; background: ${field.confidence > 90 ? 'var(--neon-green)' : 'var(--neon-amber)'}"></div>
-          </div>
-        `;
-
-        item.addEventListener('mouseenter', () => highlightRegion(field.key));
-        item.addEventListener('mouseleave', () => clearRegionHighlight());
-
-        fieldsContainer.appendChild(item);
-
-        // Render Bounding Box SVG Overlay
-        if (field.bbox) {
-          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          rect.setAttribute('x', field.bbox.x);
-          rect.setAttribute('y', field.bbox.y);
-          rect.setAttribute('width', field.bbox.w);
-          rect.setAttribute('height', field.bbox.h);
-          rect.setAttribute('id', `bbox_${field.key}`);
-          rect.setAttribute('class', `bbox-rect ${field.status === 'NEEDS REVIEW' ? 'review' : ''}`);
-
-          rect.addEventListener('click', () => {
-            alert(`Field: ${field.label}\nValue: ${field.value}\nConfidence: ${field.confidence}%`);
-          });
-
-          overlaySvg.appendChild(rect);
-        }
-      });
-
-      document.getElementById('statFields').innerText = capturedCount;
-      document.getElementById('statAudit').innerText = data.fields.some(f => f.status === "NEEDS REVIEW") ? "REVIEW REQD" : "PASSED";
-      document.getElementById('statAudit').style.color = data.fields.some(f => f.status === "NEEDS REVIEW") ? "var(--neon-amber)" : "var(--neon-green)";
-    }
-
-    function highlightRegion(key) {
-      const el = document.getElementById(`bbox_${key}`);
-      if (el) el.classList.add('highlighted');
-    }
-
-    function clearRegionHighlight() {
-      const rects = overlaySvg.querySelectorAll('.bbox-rect');
-      rects.forEach(r => r.classList.remove('highlighted'));
-    }
-
-    /**
-     * SET & MARK ONE-TIME REGION TRAINER
-     * Allows user to draw rectangular targets on a document ONCE, label them,
-     * save to localStorage, and auto-apply to subsequent uploads.
-     */
-    function initSetAndMarkTrainer() {
-      const btnSetMark = document.getElementById('btnSetMarkMode');
-      const modal = document.getElementById('regionModal');
-      const btnConfirm = document.getElementById('btnConfirmRegion');
-      const btnCancel = document.getElementById('btnCancelRegion');
-      const labelInput = document.getElementById('regionLabelInput');
-
-      btnSetMark.addEventListener('click', () => {
-        state.isMarkingMode = !state.isMarkingMode;
-        btnSetMark.classList.toggle('active', state.isMarkingMode);
-        viewportContainer.style.cursor = state.isMarkingMode ? 'crosshair' : 'default';
-      });
-
-      // Canvas Draw Region
-      viewportContainer.addEventListener('mousedown', (e) => {
-        if (!state.isMarkingMode) return;
-        const rect = docCanvas.getBoundingClientRect();
-        const scaleX = docCanvas.width / rect.width;
-        const scaleY = docCanvas.height / rect.height;
-
-        state.isDrawingRect = true;
-        state.markStartX = (e.clientX - rect.left) * scaleX;
-        state.markStartY = (e.clientY - rect.top) * scaleY;
-      });
-
-      viewportContainer.addEventListener('mousemove', (e) => {
-        if (!state.isDrawingRect || !state.isMarkingMode) return;
-        const rect = docCanvas.getBoundingClientRect();
-        const scaleX = docCanvas.width / rect.width;
-        const scaleY = docCanvas.height / rect.height;
-
-        const currentX = (e.clientX - rect.left) * scaleX;
-        const currentY = (e.clientY - rect.top) * scaleY;
-
-        const w = currentX - state.markStartX;
-        const h = currentY - state.markStartY;
-
-        // Draw temp bbox on overlay
-        let tempRect = document.getElementById('tempDrawBbox');
-        if (!tempRect) {
-          tempRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          tempRect.setAttribute('id', 'tempDrawBbox');
-          tempRect.setAttribute('class', 'bbox-rect highlighted');
-          overlaySvg.appendChild(tempRect);
-        }
-
-        tempRect.setAttribute('x', Math.min(state.markStartX, currentX));
-        tempRect.setAttribute('y', Math.min(state.markStartY, currentY));
-        tempRect.setAttribute('width', Math.abs(w));
-        tempRect.setAttribute('height', Math.abs(h));
-      });
-
-      viewportContainer.addEventListener('mouseup', (e) => {
-        if (!state.isDrawingRect || !state.isMarkingMode) return;
-        state.isDrawingRect = false;
-
-        const tempRect = document.getElementById('tempDrawBbox');
-        if (tempRect) {
-          state.currentDrawRect = {
-            x: parseFloat(tempRect.getAttribute('x')),
-            y: parseFloat(tempRect.getAttribute('y')),
-            w: parseFloat(tempRect.getAttribute('width')),
-            h: parseFloat(tempRect.getAttribute('height'))
-          };
-          
-          if (state.currentDrawRect.w > 20 && state.currentDrawRect.h > 20) {
-            modal.classList.add('active');
-            labelInput.focus();
-          } else {
-            tempRect.remove();
-          }
-        }
-      });
-
-      btnConfirm.addEventListener('click', () => {
-        const label = labelInput.value.trim();
-        if (!label) return;
-
-        state.currentDocRegions.push({
-          label,
-          bbox: state.currentDrawRect
-        });
-
-        labelInput.value = '';
-        modal.classList.remove('active');
-        
-        const tempRect = document.getElementById('tempDrawBbox');
-        if (tempRect) tempRect.remove();
-
-        renderSavedRegionsList();
-      });
-
-      btnCancel.addEventListener('click', () => {
-        modal.classList.remove('active');
-        const tempRect = document.getElementById('tempDrawBbox');
-        if (tempRect) tempRect.remove();
-      });
-
-      document.getElementById('btnSaveTemplate').addEventListener('click', () => {
-        if (state.currentDocRegions.length === 0) {
-          alert('Please mark at least one region on the document before saving.');
-          return;
-        }
-
-        const templateName = prompt('Enter a name for this layout template:', 'Custom Document Layout');
-        if (templateName) {
-          state.savedTemplates[templateName] = state.currentDocRegions;
-          localStorage.setItem('neonocr_templates', JSON.stringify(state.savedTemplates));
-          alert(`Template "${templateName}" saved successfully! Future documents matching this layout will auto-apply region extraction.`);
-        }
-      });
-
-      document.getElementById('btnClearRegions').addEventListener('click', () => {
-        state.currentDocRegions = [];
-        renderSavedRegionsList();
-      });
-    }
-
-    function renderSavedRegionsList() {
-      const container = document.getElementById('definedRegionsList');
-      if (state.currentDocRegions.length === 0) {
-        container.innerHTML = `<span style="color: var(--text-muted); font-style: italic;">No custom region boxes marked yet. Click 'Set & Mark' to drag on document.</span>`;
-        return;
-      }
-
-      container.innerHTML = '';
-      state.currentDocRegions.forEach((r, idx) => {
-        const tag = document.createElement('div');
-        tag.className = 'template-tag';
-        tag.innerHTML = `<i class="fa-solid fa-vector-square"></i> ${r.label} <i class="fa-solid fa-xmark" style="cursor:pointer; margin-left: auto;" onclick="removeRegion(${idx})"></i>`;
-        container.appendChild(tag);
-      });
-    }
-
-    function removeRegion(idx) {
-      state.currentDocRegions.splice(idx, 1);
-      renderSavedRegionsList();
-    }
-
-    function clearCanvas() {
-      ctx.clearRect(0, 0, docCanvas.width, docCanvas.height);
-      overlaySvg.innerHTML = '';
-      document.getElementById('docTitle').innerText = 'No document selected';
-    }
-
-    function resetExtractionPanels() {
-      detectedDocType.innerText = 'Unclassified';
-      docTypeConfidence.innerText = '0% CONF';
-      fieldsContainer.innerHTML = '';
-      rawTextOutput.value = '';
-      document.getElementById('statFields').innerText = '0';
-      document.getElementById('statTime').innerText = '0 ms';
-    }
-
-    // JSON Export Pipeline
-    document.getElementById('btnExportJson').addEventListener('click', () => {
-      if (state.activeDocIndex === -1 || !state.documents[state.activeDocIndex].extractedData) {
-        alert('No extracted document data available to export.');
-        return;
-      }
-
-      const activeDoc = state.documents[state.activeDocIndex];
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(activeDoc.extractedData, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `${activeDoc.name}_ocr_extracted.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-    });
-  </script>
+</section>
+
+<section class="panel">
+  <div class="paneltitle"><h2>Extracted Information</h2><span class="muted" id="fieldCount">0 fields</span></div>
+  <div class="results" id="results">
+    <div class="empty">Processed fields will appear here.<br><br>Choose <b>Settings → Field Templates</b> to save which information you want captured once and automatically reused next time.</div>
+  </div>
+</section>
+</main>
+
+<footer class="statusbar" style="display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:9px;color:var(--muted)">
+  <span id="bottomStatus">Pages 0 · Fields 0 · OCR confidence — · Validation —</span>
+  <span>Client-side · No raw document logging · <span class="kbd">Ctrl/⌘ + O</span> upload</span>
+</footer>
+</div>
+
+<div class="settings" id="settings">
+  <div class="paneltitle"><h2>Capture Settings</h2><button id="closeSettings">×</button></div>
+  <div class="notice">Templates are stored locally in this browser using localStorage. They contain field names/rules, not document images.</div>
+  <div class="settingrow"><label>Template name</label><input class="input" id="tplName" placeholder="e.g. MyKad Front + Back"></div>
+  <div class="settingrow"><label>Document class</label><select class="select" id="tplClass">
+    <option>Generic</option><option>International Passport</option><option>Malaysian Passport</option><option>Malaysian MyKad / NRIC</option><option>Malaysian Permanent Resident Card</option><option>Malaysian Driving Licence</option><option>International Driving Permit</option><option>SSM Certificate</option><option>PPK / Contractor Registration</option>
+  </select></div>
+  <div class="settingrow"><label>Fields to capture (one per line)</label><textarea class="input" id="tplFields" rows="8" style="resize:vertical" placeholder="Full Name&#10;IC Number&#10;Date of Birth&#10;Gender&#10;Nationality&#10;Complete Address"></textarea></div>
+  <div class="controls"><button class="primary" id="saveTpl">Save Template</button><button id="useTpl">Use Template</button></div>
+  <div class="settingrow"><label>Saved templates</label><div class="templateList" id="templateList"></div></div>
+  <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
+  <div class="settingrow"><label>OCR language</label><select class="select" id="ocrLang"><option value="eng">English</option><option value="msa">Malay (requires language asset support)</option></select></div>
+  <div class="notice">For maximum accuracy, this browser build uses Tesseract.js. PaddleOCR/EasyOCR/OpenCV/PyMuPDF are server-side Python technologies and cannot be genuinely embedded into a static GitHub Pages HTML file. This build does not pretend otherwise.</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+
+<script type="module">
+/* NeonOCR single-file GitHub Pages build.
+   Design goals: real browser OCR, sequential processing, source boxes, validation,
+   saved capture templates, no invented values. Specialized server engines can be
+   added later without changing the UI contract. */
+
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+
+const $=id=>document.getElementById(id);
+const MAX=500*1024*1024;
+const state={files:[],selected:null,page:0,zoom:1,boxes:true,rotation:0,templates:JSON.parse(localStorage.getItem("neonocr.templates")||"[]"),activeTemplate:null,worker:null,processing:false};
+
+const supported=["png","jpg","jpeg","webp","tif","tiff","bmp","heic","heif","pdf","doc","docx","xls","xlsx","ppt","pptx","txt","csv"];
+const builtIn={
+ "International Passport":["Document Type","Country Code","Passport Number","Full Name","Nationality","Date of Birth","Sex / Gender","Place of Birth","Date of Issue","Date of Expiry","Issuing Authority","MRZ"],
+ "Malaysian Passport":["Type / Jenis","Country Code / Kod Negara","Passport Number / Nombor Pasport","Full Name / Nama","Nationality / Warganegara","Date of Birth / Tarikh Lahir","Identity Card Number / Nombor Kad Pengenalan","Gender / Jantina","Place of Birth / Tempat Lahir","Date of Issue / Tarikh Dikeluarkan","Date of Expiry / Tarikh Kepupusan","Issuing Authority / Pihak Berkuasa","MRZ","Signature"],
+ "Malaysian MyKad / NRIC":["IC Number","Full Name / Nama","Residential Address / Alamat","Gender / Sex / Jantina","Citizenship / Warganegara","Race"],
+ "Malaysian Permanent Resident Card":["NRIC Number","Full Name","Permanent Address","Gender","Original Nationality / Negara Asal","Entry Permit Number / Nombor Permit Masuk"],
+ "Malaysian Driving Licence":["Full Name / Nama","Identity Number","Warganegara / Nationality","Address","Class / Kelas","Validity / Tempoh","Date of Birth","Serial Number"],
+ "International Driving Permit":["Convention Title","Issuing Authority","Validity","Surname / Last Name","Given / First Name","Place of Birth","Date of Birth","Place of Residence","Vehicle Categories","Holder Signature"],
+ "SSM Certificate":["Business / Company Name","Registration Number","Registration / Incorporation Date","Expiry Date","Business Address","Branch Information"],
+ "PPK / Contractor Registration":["Company Name / Nama Kontraktor","Registration Number / No Pendaftaran","Registered Business Address / Alamat Berdaftar","Grade / Gred","Category / Kategori","Specializations / Pengkhususan","Validity Period","Effective Date / Tarikh Mula Berkuatkuasa","Status"]
+};
+
+function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>$("toast").classList.remove("show"),4200)}
+function setStage(s,p=null){$("stage").textContent=s;if(p!==null)$("progressBar").style.width=Math.max(0,Math.min(100,p))+"%"}
+function ext(n){return (n.split(".").pop()||"").toLowerCase()}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function confidence(n){return typeof n==="number"&&Number.isFinite(n)?Math.round(n*10)/10:null}
+function statusFor(v,c){if(!v||!v.trim())return["NOT DETECTED","red"];if(c!==null&&c<65)return["NEEDS REVIEW","amber"];return["DETECTED","green"]}
+
+$("settingsBtn").onclick=()=>$("settings").classList.toggle("open");
+$("closeSettings").onclick=()=>$("settings").classList.remove("open");
+$("drop").onclick=e=>{if(e.target.tagName!=="BUTTON")$("fileInput").click()};
+$("drop").ondragover=e=>{e.preventDefault();$("drop").classList.add("drag")};
+$("drop").ondragleave=()=>$("drop").classList.remove("drag");
+$("drop").ondrop=e=>{e.preventDefault();$("drop").classList.remove("drag");addFiles([...e.dataTransfer.files])};
+$("fileInput").onchange=e=>addFiles([...e.target.files]);
+document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="o"){e.preventDefault();$("fileInput").click()}});
+
+function addFiles(list){
+ for(const f of list){
+   if(f.size>MAX){toast(`${f.name}: File exceeds the 500 MB limit.`);continue}
+   const x=ext(f.name);
+   if(!supported.includes(x)){toast(`${f.name}: Unsupported document format.`);continue}
+   const item={id:crypto.randomUUID(),file:f,name:f.name,size:f.size,ext:x,status:"QUEUED",pages:[],result:null};
+   state.files.push(item);
+ }
+ if(!state.selected&&state.files.length)state.selected=state.files[0].id;
+ renderFiles();selectFile(state.selected);
+}
+function renderFiles(){
+ $("fileCount").textContent=`${state.files.length} file${state.files.length===1?"":"s"}`;
+ $("fileList").innerHTML=state.files.map(f=>`<div class="filecard ${f.id===state.selected?"active":""}" data-id="${f.id}">
+ <div class="filetop"><span title="${esc(f.name)}">${esc(f.name.length>35?f.name.slice(0,32)+"…":f.name)}</span><span class="tag">${esc(f.status)}</span></div>
+ <div class="muted" style="font-size:8px;margin-top:4px">${(f.size/1024/1024).toFixed(2)} MB · ${f.ext.toUpperCase()}</div>
+ ${["jpg","jpeg","png","webp","tif","tiff","bmp","heic","heif"].includes(f.ext)?`<div class="frontback"><div class="fb has">FRONT / PAGE</div><div class="fb">BACK / PAGE</div></div>`:""}
+ </div>`).join("");
+ document.querySelectorAll(".filecard").forEach(x=>x.onclick=()=>selectFile(x.dataset.id));
+}
+function selectFile(id){state.selected=id;state.page=0;state.zoom=1;state.rotation=0;renderFiles();const f=state.files.find(x=>x.id===id);if(f){$("timing").textContent=f.elapsed?`${f.elapsed} ms`:"0 ms";if(f.pages.length)showPage(f,0);else if(f.previewURL)drawImageURL(f.previewURL);else clearPreview();renderResult(f)}}
+function clearPreview(){$("previewCanvas").classList.add("hidden");$("emptyPreview").classList.remove("hidden");$("pageInfo").textContent="No document";$("pageStatus").textContent="0 pages"}
+async function drawImageURL(url){
+ const img=new Image();img.onload=()=>{const c=$("previewCanvas"),ctx=c.getContext("2d");const r=state.rotation%360;const sw=img.naturalWidth,sh=img.naturalHeight;c.width=(r%180?sh:sw);c.height=(r%180?sw:sh);ctx.save();ctx.translate(c.width/2,c.height/2);ctx.rotate(r*Math.PI/180);ctx.drawImage(img,-sw/2,-sh/2);ctx.restore();$("emptyPreview").classList.add("hidden");c.classList.remove("hidden");$("pageInfo").textContent=`${sw} × ${sh}`};img.src=url
+}
+async function showPage(f,i){
+ if(!f.pages[i])return;state.page=i;const p=f.pages[i];$("pageInfo").textContent=`Page ${i+1} / ${f.pages.length}`;$("pageStatus").textContent=`${f.pages.length} page${f.pages.length===1?"":"s"}`;
+ if(p.canvas){drawProcessedCanvas(p);return} if(p.url){drawImageURL(p.url)}
+}
+function drawProcessedCanvas(p){
+ const c=$("previewCanvas"),src=p.canvas;const scale=Math.min(1,(document.querySelector(".canvaswrap").clientWidth-20)/src.width,(document.querySelector(".canvaswrap").clientHeight-20)/src.height)*state.zoom;c.width=src.width*scale;c.height=src.height*scale;const ctx=c.getContext("2d");ctx.drawImage(src,0,0,c.width,c.height);
+ if(state.boxes&&p.words){ctx.strokeStyle="#42e8ff";ctx.lineWidth=Math.max(1,1.5*scale);for(const w of p.words){if(w.conf<45)continue;const b=w.bbox;ctx.strokeRect(b.x0*scale,b.y0*scale,(b.x1-b.x0)*scale,(b.y1-b.y0)*scale)}}
+ $("emptyPreview").classList.add("hidden");c.classList.remove("hidden");
+}
+$("prevPage").onclick=()=>{const f=state.files.find(x=>x.id===state.selected);if(f&&state.page>0)showPage(f,state.page-1)}
+$("nextPage").onclick=()=>{const f=state.files.find(x=>x.id===state.selected);if(f&&state.page<f.pages.length-1)showPage(f,state.page+1)}
+$("zoomIn").onclick=()=>{state.zoom=Math.min(3,state.zoom+0.2);const f=state.files.find(x=>x.id===state.selected);if(f&&f.pages[state.page])showPage(f,state.page)}
+$("zoomOut").onclick=()=>{state.zoom=Math.max(.4,state.zoom-.2);const f=state.files.find(x=>x.id===state.selected);if(f&&f.pages[state.page])showPage(f,state.page)}
+$("fitBtn").onclick=()=>{state.zoom=1;const f=state.files.find(x=>x.id===state.selected);if(f&&f.pages[state.page])showPage(f,state.page)}
+$("boxesBtn").onclick=()=>{state.boxes=!state.boxes;const f=state.files.find(x=>x.id===state.selected);if(f&&f.pages[state.page])showPage(f,state.page)}
+$("rotateBtn").onclick=()=>{state.rotation=(state.rotation+90)%360;const f=state.files.find(x=>x.id===state.selected);if(f?.pages[state.page])showPage(f,state.page);else if(f?.previewURL)drawImageURL(f.previewURL)}
+
+$("clearBtn").onclick=()=>{state.files=[];state.selected=null;clearPreview();$("results").innerHTML='<div class="empty">Processed fields will appear here.</div>';renderFiles();$("fieldCount").textContent="0 fields";$("bottomStatus").textContent="Pages 0 · Fields 0 · OCR confidence — · Validation —"}
+$("processBtn").onclick=async()=>{const f=state.files.find(x=>x.id===state.selected);if(f)await processFile(f)}
+$("processAllBtn").onclick=async()=>{for(const f of state.files)if(f.status!=="COMPLETE")await processFile(f)}
+
+async function getWorker(){
+ if(state.worker)return state.worker;
+ state.worker=await Tesseract.createWorker("eng",1,{logger:m=>{
+   if(m.status==="recognizing text")setStage("Running OCR",Math.round((m.progress||0)*100));
+ }});
+ return state.worker;
+}
+
+async function fileToPages(f){
+ const pages=[];const file=f.file;
+ if(["png","jpg","jpeg","webp","tif","tiff","bmp","heic","heif"].includes(f.ext)){
+   let blob=file;
+   if(["heic","heif"].includes(f.ext)){if(!window.heic2any)throw Error("HEIC decoder is unavailable in this browser session.");blob=await heic2any({blob:file,toType:"image/png"});if(Array.isArray(blob))blob=blob[0]}
+   const url=URL.createObjectURL(blob);f.previewURL=url;pages.push({url});return pages;
+ }
+ if(f.ext==="pdf"){
+   const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+   for(let i=1;i<=pdf.numPages;i++){setStage(`Reading PDF page ${i}/${pdf.numPages}`);const pg=await pdf.getPage(i);const vp=pg.getViewport({scale:2});const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;pages.push({canvas:c});}
+   return pages;
+ }
+ if(f.ext==="docx"){
+   if(!window.mammoth)throw Error("DOCX reader unavailable.");const ab=await file.arrayBuffer();const out=await mammoth.extractRawText({arrayBuffer:ab});const c=textCanvas(out.value);pages.push({canvas:c});return pages;
+ }
+ if(["xlsx","xls","csv"].includes(f.ext)){
+   if(!window.XLSX)throw Error("Spreadsheet reader unavailable.");
+   let wb;if(f.ext==="csv"){const text=await file.text();wb=XLSX.read(text,{type:"string"});}else wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
+   const txt=wb.SheetNames.map(s=>`[${s}]\n${XLSX.utils.sheet_to_csv(wb.Sheets[s])}`).join("\n\n");pages.push({canvas:textCanvas(txt)});return pages;
+ }
+ if(["pptx","ppt"].includes(f.ext)){
+   if(f.ext==="ppt")throw Error("Legacy binary PPT is not supported in-browser. Use PPTX or export it to PDF.");
+   const zip=await JSZip.loadAsync(await file.arrayBuffer());let text="";
+   for(const path of Object.keys(zip.files).filter(x=>/^ppt\/slides\/slide\d+\.xml$/i.test(x)).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}))){
+     const xml=await zip.files[path].async("text");const doc=new DOMParser().parseFromString(xml,"application/xml");const ts=[...doc.getElementsByTagNameNS("*","t")].map(n=>n.textContent).filter(Boolean);text+=ts.join(" ")+"\n";
+   }
+   pages.push({canvas:textCanvas(text)});return pages;
+ }
+ if(["txt"].includes(f.ext)){pages.push({canvas:textCanvas(await file.text())});return pages}
+ throw Error("This format cannot be processed by this browser build.");
+}
+function textCanvas(text){
+ const lines=String(text||"").split(/\r?\n/),c=document.createElement("canvas"),ctx=c.getContext("2d");ctx.font="20px Arial";const width=Math.min(2200,Math.max(900,...lines.map(x=>ctx.measureText(x).width+80)));c.width=width;c.height=Math.max(400,lines.length*30+50);ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle="#111";ctx.font="20px Arial";lines.forEach((l,i)=>ctx.fillText(l,25,35+i*30));return c}
+
+async function processFile(f){
+ if(state.processing)return;state.processing=true;state.selected=f.id;renderFiles();const start=performance.now();
+ try{
+   f.status="PROCESSING";renderFiles();$("systemState").textContent="PROCESSING";setStage("Validating file",5);
+   const pages=await fileToPages(f);f.pages=pages;setStage("Preparing pages",20);
+   const worker=await getWorker();const pageResults=[];
+   for(let i=0;i<pages.length;i++){
+     state.page=i;await showPage(f,i);setStage(`Detecting orientation · page ${i+1}/${pages.length}`,25+Math.round(i/pages.length*10));
+     const source=pages[i].canvas||pages[i].url;
+     // Tesseract OSD is not universally reliable in browser workers. We run OCR on the
+     // original source and preserve it; no guessed rotation is applied to source data.
+     setStage(`Running OCR · page ${i+1}/${pages.length}`,35+Math.round(i/pages.length*40));
+     const r=await worker.recognize(source,{rotateAuto:true});
+     pageResults.push({text:r.data.text,words:(r.data.words||[]).map(w=>({text:w.text,conf:w.confidence,bbox:w.bbox})),confidence:r.data.confidence});
+     pages[i].words=pageResults[i].words;
+     if(pages[i].canvas)drawProcessedCanvas(pages[i]);
+   }
+   setStage("Reconstructing layout",78);f.ocr=pageResults;setStage("Extracting fields",84);
+   const classification=classify(f,joinPages(pageResults));setStage("Validating fields",90);
+   const extracted=extractFields(f,classification);setStage("Cross-checking",95);
+   extracted.conflicts=consistency(extracted,f);
+   f.result={classification,fields:extracted.fields,conflicts:extracted.conflicts,allText:joinPages(pageResults),confidence:avg(pageResults.map(x=>x.confidence))};
+   f.elapsed=Math.round(performance.now()-start);f.status="COMPLETE";setStage("COMPLETE",100);$("timing").textContent=`${f.elapsed} ms`;renderResult(f);renderFiles();updateBottom(f);
+ }catch(e){
+   console.error(e);f.status="ERROR";f.error=userError(e);setStage("ERROR",0);toast(f.error);renderFiles();renderResult(f)
+ }finally{state.processing=false;$("systemState").textContent="SYSTEM READY"}
+}
+function userError(e){const m=String(e?.message||e);if(/memory|array buffer/i.test(m))return"The document is too large or complex for available browser memory.";if(/password|encrypted/i.test(m))return"The document is protected and cannot be read in this browser session.";if(/unsupported|cannot be processed/i.test(m))return"Unsupported document format.";return"The document could not be processed reliably. Please try a clearer copy or a supported format."}
+function joinPages(ps){return ps.map((p,i)=>`--- PAGE ${i+1} ---\n${p.text}`).join("\n")}
+function avg(a){const x=a.filter(v=>typeof v==="number"&&isFinite(v));return x.length?Math.round(x.reduce((s,v)=>s+v,0)/x.length*10)/10:null}
+
+function classify(f,text){
+ const t=text.toUpperCase();let scores=[
+  ["International Passport",/(PASSPORT|PASSEPORT|PASAPORTE).*(MRZ|NATIONALITY|NATIONALIT)/s.test(t)?80:0],
+  ["Malaysian Passport",/MALAYSIA|MALAYSIAN/.test(t)&&/PASSPORT|PASPORT/.test(t)?82:0],
+  ["Malaysian MyKad / NRIC",/(KAD PENGENALAN MALAYSIA|MYKAD)/.test(t)||/\b\d{6}[- ]?\d{2}[- ]?\d{4}\b/.test(t)?78:0],
+  ["Malaysian Permanent Resident Card",/PERMANENT RESIDENT|PENDUDUK TETAP|PERMIT MASUK/.test(t)?76:0],
+  ["Malaysian Driving Licence",/DRIVING LICEN[CS]E|LESEN MEMANDU|KELAS/.test(t)?75:0],
+  ["International Driving Permit",/INTERNATIONAL DRIVING PERMIT|PERMIS DE CONDUIRE INTERNATIONAL/.test(t)?80:0],
+  ["SSM Certificate",/SURUHANJAYA SYARIKAT MALAYSIA|COMPANIES COMMISSION OF MALAYSIA/.test(t)?85:0],
+  ["PPK / Contractor Registration",/PERAKUAN PENDAFTARAN KONTRAKTOR|NO\.?\s*PENDAFTARAN|PENGKHUSUSAN/.test(t)&&/G[1-7]\b/.test(t)?82:0]
+ ].sort((a,b)=>b[1]-a[1]);
+ if(!scores[0]||scores[0][1]<55)return{type:"Generic",confidence:null,status:"NEEDS REVIEW"};
+ return{type:scores[0][0],confidence:scores[0][1],status:"DETECTED"};
+}
+
+const labelMap={
+ "Full Name":/^(?:full\s*name|name|nama|surname|last\s*name|given\s*name|first\s*name)$/i,
+ "IC Number":/^(?:ic|ic number|identity number|nombor kad pengenalan|no\.?\s*(?:kad pengenalan|kp))$/i,
+ "Passport Number":/^(?:passport number|passport no|nombor pasport|no\.?\s*pasport)$/i,
+ "Date of Birth":/^(?:date of birth|dob|tarikh lahir)$/i,
+ "Gender":/^(?:gender|sex|jantina)$/i,
+ "Nationality":/^(?:nationality|citizenship|warganegara|nationality \/ warganegara)$/i,
+ "Complete Address":/^(?:address|alamat|residential address|permanent address|business address|registered business address|alamat berdaftar)$/i,
+ "Date of Issue":/^(?:date of issue|tarikh dikeluarkan|tarikh mula|issue date)$/i,
+ "Date of Expiry":/^(?:date of expiry|expiry date|tarikh kepupusan|validity|tempoh)$/i,
+ "Place of Birth":/^(?:place of birth|tempat lahir)$/i,
+ "Registration Number":/^(?:registration number|no pendaftaran|registration no)$/i,
+ "Company Name":/^(?:company name|business name|nama syarikat|nama kontraktor)$/i,
+ "Grade":/^(?:grade|gred)$/i,
+ "Category":/^(?:category|kategori)$/i,
+ "Specializations":/^(?:specializations|pengkhususan)$/i,
+ "Status":/^(?:status|aktif|active)$/i
+};
+function cleanLines(text){return text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)}
+function getTemplateFields(cls){
+ if(state.activeTemplate)return state.activeTemplate.fields;
+ return builtIn[cls]||["Full Name","IC Number","Date of Birth","Gender","Nationality","Complete Address"];
+}
+function extractFields(f,cls){
+ const text=f.ocr.map(p=>p.text).join("\n");const lines=cleanLines(text);const fields=[];const requested=getTemplateFields(cls.type);
+ for(const field of requested){
+   let hit=findLabeled(lines,field);
+   if(!hit)hit=findPattern(lines,field);
+   const val=hit?.value?.trim()||"";
+   const conf=hit?.confidence??null;
+   const [st,cl]=statusFor(val,conf);
+   fields.push({name:field,value:val,confidence:confidence(conf),status:st,class:cl,source:hit?.source||null,explanation:hit?.explanation||(!val?"The field was not reliably detected from the document.":"Information extracted directly from the OCR text.")});
+ }
+ // Complete readable information always remains available, without inventing field mappings.
+ return{fields,allText:text}
+}
+function findLabeled(lines,field){
+ const aliases=[field,...Object.keys(labelMap).filter(k=>labelMap[k].test(field))];
+ for(let i=0;i<lines.length;i++){
+   const line=lines[i],colon=line.indexOf(":");let lab=colon>=0?line.slice(0,colon).trim():line;
+   if(aliases.some(a=>new RegExp("^"+a.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*$","i").test(lab))){
+     let value=colon>=0?line.slice(colon+1).trim():"";
+     if(!value)value=lines[i+1]||"";
+     const suspicious=/^[\W_]+$/.test(value)||value.length<2;
+     if(!suspicious)return{value,confidence:Math.min(99,Math.max(55,90-value.length*.08)),source:`Line ${i+1}`};
+   }
+ }
+ return null
+}
+function findPattern(lines,field){
+ const s=lines.join("\n");
+ if(/ic number|identity number|nombor kad pengenalan/i.test(field)){const m=s.match(/\b\d{6}[- ]?\d{2}[- ]?\d{4}\b/);if(m)return{value:m[0],confidence:92,source:"Pattern match"}}
+ if(/passport number/i.test(field)){const m=s.match(/\b[A-Z0-9]{6,9}\b/g)?.find(x=>/[A-Z]/i.test(x)&&/\d/.test(x));if(m)return{value:m,confidence:78,source:"Pattern match"}}
+ if(/date of birth/i.test(field)){const m=s.match(/\b(?:\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}\s+[A-Z]{3,9}\s+\d{4}|\d{4}-\d{2}-\d{2})\b/i);if(m)return{value:m[0],confidence:82,source:"Date pattern"}}
+ if(/gender|sex/i.test(field)){const m=s.match(/\b(MALE|FEMALE|M|F|LELAKI|PEREMPUAN)\b/i);if(m)return{value:m[0],confidence:88,source:"Gender token"}}
+ if(/nationality|warganegara|citizenship/i.test(field)){const m=s.match(/\b(MALAYSIA|MALAYSIAN|SINGAPORE|SINGAPOREAN|INDONESIA|INDONESIAN|THAILAND|THAI|BRITISH|AMERICAN|AUSTRALIAN)\b/i);if(m)return{value:m[0],confidence:75,source:"Explicit nationality token"}}
+ if(/grade|gred/i.test(field)){const m=s.match(/\bG[1-7]\b/i);if(m)return{value:m[0].toUpperCase(),confidence:88,source:"Grade token"}}
+ if(/category|kategori/i.test(field)){const m=s.match(/\b(?:B|CE|ME)\b/i);if(m)return{value:m[0],confidence:75,source:"Category token"}}
+ if(/special/i.test(field)){const m=s.match(/\b(?:B\d{2}|CE\d{2}|ME\d{2})\b/g);if(m)return{value:[...new Set(m)].join(", "),confidence:76,source:"Specialization token"}}
+ if(/status/i.test(field)){const m=s.match(/\b(ACTIVE|AKTIF|SUSPENDED|DORMANT|DORMAN|TIDAK AKTIF)\b/i);if(m)return{value:m[0],confidence:80,source:"Status token"}}
+ if(/address|alamat/i.test(field)){const idx=lines.findIndex(x=>/\b\d{5}\b/.test(x));if(idx>=0){let block=lines.slice(Math.max(0,idx-2),Math.min(lines.length,idx+3)).join("\n");return{value:block,confidence:70,source:`Lines ${Math.max(1,idx-1)}–${Math.min(lines.length,idx+3)}`,explanation:"Address reconstructed from nearby readable lines; review if the document contains unrelated nearby text."}}
+ }
+ return null
+}
+function consistency(ex,f){
+ const c=[];
+ const get=n=>ex.fields.find(x=>x.name.toLowerCase().includes(n.toLowerCase()));
+ const ic=get("ic number"),dob=get("date of birth"),gender=get("gender");
+ if(ic?.value&&/^\d{6}/.test(ic.value.replace(/-/g,""))&&dob?.value){
+   const six=ic.value.replace(/\D/g,"").slice(0,6), d=dob.value.replace(/\D/g,"").slice(0,8);
+   if(d.length>=8){const icMMDD=six.slice(2,6), dateDMY=d.slice(2,6);if(icMMDD!==dateDMY)c.push("The IC date portion and visible date-of-birth reading do not match. No value was overwritten.")}
+ }
+ if(ic?.value&&gender?.value){const digits=ic.value.replace(/\D/g,"");if(digits.length>=12){const last=+digits.at(-1), derived=last%2?"Male":"Female";if(/male|female|lelaki|perempuan/i.test(gender.value)&&!new RegExp(gender.value,"i").test(derived))c.push("Visible gender and the IC-derived parity signal conflict. No value was overwritten.")}}
+ const issue=get("date of issue"),exp=get("date of expiry");if(issue?.value&&exp?.value&&issue.value===exp.value)c.push("Issue and expiry dates appear identical; review the source document.");
+ return c
+}
+function renderResult(f){
+ if(f.error){$("results").innerHTML=`<div class="field"><div class="fieldrow"><span class="fieldname">Processing</span><span class="status red">ERROR</span></div><div class="value">${esc(f.error)}</div></div>`;return}
+ if(!f.result){$("results").innerHTML='<div class="empty">Processed fields will appear here.</div>';return}
+ const r=f.result;$("fieldCount").textContent=`${r.fields.length} fields`;const sections={};
+ for(const x of r.fields){const sec=sectionFor(x.name);(sections[sec]??=[]).push(x)}
+ let html=`<div class="docbadge"><div><strong>${esc(r.classification.type)}</strong><span style="display:block">${r.classification.status}</span></div><div>${r.classification.confidence==null?"—":r.classification.confidence+"%"} class</div></div>`;
+ if(r.conflicts?.length)html+=`<div class="notice" style="border-color:rgba(255,189,85,.35);color:#ffcf82"><b>⚠ CONFLICT DETECTED</b><br>${r.conflicts.map(esc).join("<br>")}</div>`;
+ for(const [sec,arr] of Object.entries(sections))html+=`<div class="section"><h3>${esc(sec)}</h3>${arr.map(fieldHTML).join("")}</div>`;
+ html+=`<div class="section"><h3>ALL DETECTED INFORMATION</h3><div class="field"><div class="alltext">${esc(r.allText||"")}</div></div></div>`;
+ $("results").innerHTML=html;
+ document.querySelectorAll("[data-source]").forEach(b=>b.onclick=()=>focusSource(f,Number(b.dataset.source)));
+ updateBottom(f)
+}
+function sectionFor(n){const s=n.toLowerCase();if(/address/.test(s))return"ADDRESS";if(/date|expiry|validity/.test(s))return"DATES";if(/national|citizenship/.test(s))return"NATIONALITY";if(/ic|passport|identity|serial/.test(s))return"IDENTIFICATION";if(/company|business|registration|grade|category|special|status/.test(s))return"BUSINESS / CERTIFICATE INFORMATION";if(/vehicle|licence|license|class/.test(s))return"LICENCE INFORMATION";return"PERSONAL INFORMATION"}
+function fieldHTML(x,i){
+ const cls=x.class==="green"?"green":x.class==="amber"?"amber":"red";const conf=x.confidence==null?"—":`${x.confidence}%`;
+ return `<div class="field"><div class="fieldrow"><span class="fieldname">${esc(x.name)}</span><span class="status ${cls}">${esc(x.status)}</span></div><div class="value">${esc(x.value||"NOT DETECTED")}</div><div class="meta"><span class="confidence">${conf} · ${esc(x.explanation||"")}</span>${x.source?`<button class="sourcebtn" data-source="${i}">SOURCE</button>`:""}</div></div>`
+}
+function focusSource(f,i){const field=f.result.fields[i];if(!field?.source)return;const m=String(field.source).match(/(\d+)/);if(m){const line=+m[1]-1;let page=0,acc=0;for(let j=0;j<f.ocr.length;j++){const n=f.ocr[j].text.split(/\r?\n/).length;if(line>=acc&&line<acc+n){page=j;break}acc+=n}showPage(f,page);toast(`Source: ${field.source}. Bounding boxes are shown for the selected OCR page.`)}}
+function updateBottom(f){$("bottomStatus").textContent=`Pages ${f.pages?.length||0} · Fields ${f.result?.fields?.length||0} · OCR confidence ${f.result?.confidence==null?"—":f.result.confidence+"%"} · Validation ${f.result?.conflicts?.length?"REVIEW REQUIRED":"OK"}`}
+
+$("saveTpl").onclick=()=>{
+ const name=$("tplName").value.trim(),cls=$("tplClass").value,fields=$("tplFields").value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ if(!name||!fields.length){toast("Enter a template name and at least one field.");return}
+ const t={id:crypto.randomUUID(),name,cls,fields};state.templates.push(t);localStorage.setItem("neonocr.templates",JSON.stringify(state.templates));renderTemplates();$("tplName").value="";toast("Capture template saved locally.")
+}
+$("useTpl").onclick=()=>{const id=$("templateList").querySelector(".selected")?.dataset.id;if(!id){toast("Select a saved template first.");return}state.activeTemplate=state.templates.find(t=>t.id===id)||null;toast(state.activeTemplate?`Template "${state.activeTemplate.name}" active.`:"Template unavailable.")}
+function renderTemplates(){$("templateList").innerHTML=state.templates.length?state.templates.map(t=>`<div class="tpl ${state.activeTemplate?.id===t.id?"selected":""}" data-id="${t.id}"><span><b>${esc(t.name)}</b><br><span class="muted">${esc(t.cls)} · ${t.fields.length} fields</span></span><button data-del="${t.id}">Delete</button></div>`).join(""):'<span class="muted" style="font-size:9px">No saved templates.</span>';document.querySelectorAll(".tpl").forEach(x=>x.onclick=e=>{if(e.target.dataset.del)return;document.querySelectorAll(".tpl").forEach(y=>y.classList.remove("selected"));x.classList.add("selected")});document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{state.templates=state.templates.filter(t=>t.id!==b.dataset.del);localStorage.setItem("neonocr.templates",JSON.stringify(state.templates));renderTemplates()})}
+renderTemplates();renderFiles();
+
+window.addEventListener("beforeunload",()=>{for(const f of state.files)for(const p of f.pages||[])if(p.url)URL.revokeObjectURL(p.url)});
+</script>
 </body>
 </html>
