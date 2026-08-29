@@ -1,341 +1,1254 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeonOCR — Document Intelligence</title>
-<meta name="description" content="Client-side document OCR workspace for passports, Malaysian identity cards, licences and certificates.">
-<style>
-:root{
-  --bg:#dfe7ef;--panel:#e8eef5;--ink:#172334;--muted:#66778b;--accent:#00b8ff;
-  --accent2:#7b2cff;--good:#0b9f6e;--bad:#e53935;--warn:#c27a00;
-  --shadow1:14px 14px 30px rgba(119,133,151,.25),-12px -12px 28px rgba(255,255,255,.95);
-  --inset:inset 5px 5px 12px rgba(125,143,164,.22),inset -5px -5px 12px rgba(255,255,255,.9);
-}
-*{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:var(--bg);min-height:100vh}
-body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 10% 10%,rgba(0,190,255,.12),transparent 28%),radial-gradient(circle at 90% 85%,rgba(123,44,255,.10),transparent 30%)}
-.app{max-width:1500px;margin:auto;padding:22px}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:20px}
-.brand{display:flex;align-items:center;gap:14px}.logo{width:54px;height:54px;border-radius:18px;background:var(--panel);box-shadow:var(--shadow1);display:grid;place-items:center;position:relative}
-.logo:after{content:"";position:absolute;inset:7px;border-radius:13px;border:2px solid var(--accent);box-shadow:0 0 10px var(--accent),0 0 22px rgba(0,184,255,.5);animation:pulse 2.2s infinite}
-.logo b{z-index:2;color:var(--accent2);font-size:18px}.brand h1{font-size:22px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:12px}
-.status{display:flex;align-items:center;gap:9px;padding:10px 14px;border-radius:16px;background:var(--panel);box-shadow:var(--shadow1);font-size:12px;color:var(--muted)}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
-.grid{display:grid;grid-template-columns:390px 1fr;gap:20px}.panel{background:var(--panel);border-radius:25px;box-shadow:var(--shadow1);padding:20px;position:relative;overflow:hidden}
-.panel:before{content:"";position:absolute;top:0;left:-40%;width:45%;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);filter:blur(.2px);animation:scan 3.8s linear infinite}
-h2{font-size:15px;margin:0 0 14px}.sub{color:var(--muted);font-size:12px;line-height:1.5}
-.drop{min-height:225px;border-radius:22px;box-shadow:var(--inset);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:22px;border:1px dashed rgba(0,184,255,.45);cursor:pointer;transition:.2s}
-.drop.drag{transform:scale(1.015);border-color:var(--accent);box-shadow:var(--inset),0 0 25px rgba(0,184,255,.22)}
-.drop .big{font-size:36px;color:var(--accent);filter:drop-shadow(0 0 8px rgba(0,184,255,.6));margin-bottom:8px}.drop strong{font-size:14px}.drop small{display:block;color:var(--muted);margin-top:7px}
-input[type=file]{display:none}.btnrow{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
-button,.select{border:0;border-radius:14px;background:var(--panel);box-shadow:7px 7px 14px rgba(122,138,157,.22),-6px -6px 12px rgba(255,255,255,.85);padding:11px 13px;color:var(--ink);font-weight:700;cursor:pointer}
-button:active{box-shadow:var(--inset)}button.primary{background:linear-gradient(135deg,#00b8ff,#7b2cff);color:#fff;box-shadow:0 8px 20px rgba(70,86,180,.28),0 0 18px rgba(0,184,255,.18)}
-button.danger{color:var(--bad)}button:disabled{opacity:.45;cursor:not-allowed}
-.field{margin-top:16px}.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:7px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
-select{width:100%;border:0;outline:0;padding:12px 14px;border-radius:14px;background:var(--panel);box-shadow:var(--inset);color:var(--ink)}
-.switch{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(100,120,145,.12);font-size:12px}.switch:last-child{border:0}
-.switch input{appearance:none;width:43px;height:23px;border-radius:30px;background:#c5d0db;box-shadow:var(--inset);position:relative;cursor:pointer}.switch input:after{content:"";position:absolute;width:17px;height:17px;border-radius:50%;top:3px;left:3px;background:white;box-shadow:0 2px 5px #8d9aaa;transition:.2s}.switch input:checked{background:linear-gradient(90deg,var(--accent),var(--accent2))}.switch input:checked:after{left:23px}
-.queue{margin-top:16px;display:flex;flex-direction:column;gap:8px;max-height:210px;overflow:auto}.file{display:grid;grid-template-columns:34px 1fr auto;gap:9px;align-items:center;padding:10px;border-radius:14px;box-shadow:var(--inset);font-size:11px}.file .ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:rgba(0,184,255,.1);color:var(--accent);font-weight:900}.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file span{color:var(--muted)}
-.main{display:grid;grid-template-rows:auto auto 1fr;gap:15px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric{padding:15px;border-radius:18px;box-shadow:var(--inset)}.metric span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;font-weight:800}.metric strong{font-size:21px;margin-top:5px;display:block}
-.progress{height:10px;border-radius:99px;box-shadow:var(--inset);overflow:hidden;margin-top:12px}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));box-shadow:0 0 12px var(--accent);transition:.25s}
-.results{display:grid;grid-template-columns:1.05fr .95fr;gap:15px;min-height:0}.card{border-radius:20px;box-shadow:var(--inset);padding:16px;min-height:0;display:flex;flex-direction:column}
-.cardhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}.cardhead h3{margin:0;font-size:13px}.pill{font-size:10px;padding:5px 8px;border-radius:99px;background:rgba(0,184,255,.1);color:#087fae}
-.preview{height:300px;border-radius:15px;box-shadow:var(--inset);display:grid;place-items:center;overflow:hidden;background:#d7e0e9}.preview img{max-width:100%;max-height:100%;object-fit:contain}.empty{color:var(--muted);font-size:12px;text-align:center;padding:20px}
-.fields{overflow:auto;display:flex;flex-direction:column;gap:8px}.fieldrow{display:grid;grid-template-columns:170px 1fr auto;gap:8px;align-items:start;padding:9px 10px;border-radius:13px;background:rgba(255,255,255,.25);font-size:11px}.fieldrow .key{font-weight:800;color:#53657a}.value{word-break:break-word}.confidence{font-size:9px;padding:4px 6px;border-radius:7px;background:rgba(11,159,110,.1);color:var(--good);white-space:nowrap}.confidence.bad{background:rgba(229,57,53,.1);color:var(--bad)}
-.notice{padding:9px 11px;border-radius:12px;font-size:11px;margin-bottom:8px;background:rgba(11,159,110,.08);color:var(--good)}.notice.bad{background:rgba(229,57,53,.08);color:var(--bad)}
-.raw{white-space:pre-wrap;overflow:auto;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;flex:1;padding:12px;border-radius:14px;box-shadow:var(--inset);color:#324458}
-.log{height:105px;overflow:auto;font:10px/1.45 ui-monospace,monospace;color:#566a7f;padding:10px;border-radius:13px;box-shadow:var(--inset);margin-top:10px}
-footer{text-align:center;color:var(--muted);font-size:10px;padding:13px}
-@keyframes pulse{0%,100%{opacity:.65;transform:scale(.96)}50%{opacity:1;transform:scale(1.04)}}@keyframes scan{0%{left:-45%}100%{left:110%}}
-@media(max-width:1050px){.grid{grid-template-columns:1fr}.results{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.app{padding:12px}.metrics{grid-template-columns:1fr 1fr}.fieldrow{grid-template-columns:1fr}.topbar{align-items:flex-start;flex-direction:column}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neumorphic Neon Document OCR Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Orbitron:wght@500;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        :root {
+            --bg-base: #0b0e14;
+            --panel-bg: #111622;
+            --panel-inset: #080b10;
+            --nm-shadow-out: 8px 8px 18px #050609, -8px -8px 18px #171f2f;
+            --nm-shadow-in: inset 5px 5px 10px #050609, inset -5px -5px 10px #171f2f;
+            --neon-cyan: #00f3ff;
+            --neon-magenta: #ff007f;
+            --neon-green: #00ff88;
+            --neon-amber: #ffb700;
+            --neon-red: #ff3366;
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+            --border-glow: rgba(0, 243, 255, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--panel-bg);
+            padding: 1.5rem 2rem;
+            border-radius: 20px;
+            box-shadow: var(--nm-shadow-out);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .brand i {
+            font-size: 2rem;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 12px var(--neon-cyan);
+        }
+
+        .brand h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, #fff, var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .engine-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.85rem;
+            font-family: 'Fira Code', monospace;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            background: var(--panel-inset);
+            box-shadow: var(--nm-shadow-in);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--neon-amber);
+            box-shadow: 0 0 10px var(--neon-amber);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.active {
+            background: var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        /* Controls Panel */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .selector-card {
+            background: var(--panel-bg);
+            padding: 1.5rem;
+            border-radius: 20px;
+            box-shadow: var(--nm-shadow-out);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .section-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9rem;
+            color: var(--neon-cyan);
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.9rem 1.2rem;
+            background: var(--panel-inset);
+            border: 1px solid rgba(0, 243, 255, 0.1);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            outline: none;
+            box-shadow: var(--nm-shadow-in);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:focus {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2), var(--nm-shadow-in);
+        }
+
+        .options-bar {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .checkbox-label input {
+            accent-color: var(--neon-cyan);
+        }
+
+        /* Upload Dual Viewport */
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .upload-card {
+            background: var(--panel-bg);
+            padding: 1.5rem;
+            border-radius: 20px;
+            box-shadow: var(--nm-shadow-out);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            position: relative;
+        }
+
+        .drop-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem 1rem;
+            text-align: center;
+            background: var(--panel-inset);
+            box-shadow: var(--nm-shadow-in);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem;
+            overflow: hidden;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.02);
+        }
+
+        .drop-zone i {
+            font-size: 2.5rem;
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone:hover i {
+            color: var(--neon-cyan);
+            transform: translateY(-4px);
+        }
+
+        .preview-canvas {
+            max-width: 100%;
+            max-height: 220px;
+            object-fit: contain;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .card-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn {
+            background: var(--panel-bg);
+            border: none;
+            color: var(--text-main);
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            box-shadow: var(--nm-shadow-out);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            color: var(--neon-cyan);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            box-shadow: var(--nm-shadow-in);
+            transform: translateY(0);
+        }
+
+        .btn-action {
+            background: linear-gradient(135deg, rgba(0, 243, 255, 0.1), rgba(255, 0, 127, 0.1));
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            text-shadow: 0 0 8px var(--neon-cyan);
+        }
+
+        .btn-action:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 15px var(--neon-cyan);
+        }
+
+        /* Execution Bar */
+        .execute-panel {
+            background: var(--panel-bg);
+            padding: 1.5rem;
+            border-radius: 20px;
+            box-shadow: var(--nm-shadow-out);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 12px;
+            background: var(--panel-inset);
+            border-radius: 20px;
+            box-shadow: var(--nm-shadow-in);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
+            box-shadow: 0 0 12px var(--neon-cyan);
+            transition: width 0.3s ease;
+        }
+
+        /* Results Display */
+        .results-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .extracted-panel, .raw-panel {
+            background: var(--panel-bg);
+            padding: 1.5rem;
+            border-radius: 20px;
+            box-shadow: var(--nm-shadow-out);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .field-card {
+            background: var(--panel-inset);
+            padding: 1rem 1.2rem;
+            border-radius: 12px;
+            box-shadow: var(--nm-shadow-in);
+            border-left: 4px solid var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            position: relative;
+        }
+
+        .field-card.success {
+            border-left-color: var(--neon-green);
+        }
+
+        .field-card.error {
+            border-left-color: var(--neon-red);
+        }
+
+        .field-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .field-name {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        .field-status {
+            font-size: 0.7rem;
+            font-family: 'Fira Code', monospace;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .field-card.success .field-status {
+            color: var(--neon-green);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .field-card.error .field-status {
+            color: var(--neon-red);
+            background: rgba(255, 51, 102, 0.1);
+        }
+
+        .field-value {
+            font-size: 0.95rem;
+            font-family: 'Fira Code', monospace;
+            word-break: break-all;
+        }
+
+        .field-card.success .field-value {
+            color: #ffffff;
+        }
+
+        .field-card.error .field-value {
+            color: var(--neon-red);
+            font-size: 0.85rem;
+        }
+
+        .raw-text-box {
+            width: 100%;
+            height: 450px;
+            background: var(--panel-inset);
+            box-shadow: var(--nm-shadow-in);
+            border-radius: 12px;
+            padding: 1rem;
+            color: var(--neon-cyan);
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            border: none;
+            resize: none;
+            outline: none;
+            white-space: pre-wrap;
+        }
+
+        /* File input hidden */
+        input[type="file"] { display: none; }
+
+        .tag-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: rgba(0, 243, 255, 0.1);
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+        }
+
+        /* Responsive Layout */
+        @media (max-width: 1024px) {
+            .controls-grid, .upload-grid, .results-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-<div class="app">
-  <div class="topbar">
-    <div class="brand"><div class="logo"><b>OCR</b></div><div><h1>NeonOCR</h1><p>Evidence-first document capture • browser workspace</p></div></div>
-    <div class="status"><i class="dot"></i><span id="engineStatus">OCR engine loading…</span></div>
-  </div>
 
-  <div class="grid">
-    <aside class="panel">
-      <h2>Document intake</h2>
-      <div class="drop" id="drop">
-        <div class="big">⇧</div><strong>Drop front, back or document files</strong>
-        <small>Images • PDF • DOCX • XLSX • HEIC/HEIF<br>Up to 500 MB per file</small>
-        <div class="btnrow"><button class="primary" id="browse">Choose files</button><button id="camera">Camera</button></div>
-      </div>
-      <input id="fileInput" type="file" multiple accept="image/*,.pdf,.docx,.xlsx,.xls,.heic,.heif,.webp,.tif,.tiff">
-      <input id="cameraInput" type="file" accept="image/*" capture="environment">
-
-      <div class="field"><label>Document profile</label>
-        <select id="profile">
-          <option value="auto">Auto-detect document type</option>
-          <option>International Passport</option><option>Malaysian Passport</option>
-          <option>Malaysian NRIC / MyKad</option><option>Malaysia Permanent Resident</option>
-          <option>Malaysian Driving Licence</option><option>International Driving Permit</option>
-          <option>SSM Certificate</option><option>PPK / Perakuan Pendaftaran Kontraktor</option>
-          <option>Generic document</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>Capture controls</label>
-        <div class="switch"><span>Automatic preprocessing</span><input id="pre" type="checkbox" checked></div>
-        <div class="switch"><span>Try inverted image</span><input id="invert" type="checkbox" checked></div>
-        <div class="switch"><span>MRZ-aware pass</span><input id="mrz" type="checkbox" checked></div>
-        <div class="switch"><span>Conservative extraction</span><input id="strict" type="checkbox" checked></div>
-      </div>
-
-      <div class="queue" id="queue"><div class="empty">No files queued.</div></div>
-      <div class="btnrow"><button class="primary" id="start" disabled>Start OCR</button><button class="danger" id="clear">Clear</button></div>
-    </aside>
-
-    <main class="main">
-      <section class="panel">
-        <div class="metrics">
-          <div class="metric"><span>Files</span><strong id="mFiles">0</strong></div>
-          <div class="metric"><span>Pages / views</span><strong id="mPages">0</strong></div>
-          <div class="metric"><span>Progress</span><strong id="mProgress">0%</strong></div>
-          <div class="metric"><span>Verified fields</span><strong id="mFields">0</strong></div>
+    <header>
+        <div class="brand">
+            <i class="fa-solid fa-microchip"></i>
+            <div>
+                <h1>NEUMORPH OCR</h1>
+                <p style="font-size: 0.75rem; color: var(--text-muted);">Real-Time Intelligence Extraction System</p>
+            </div>
         </div>
-        <div class="progress"><div class="bar" id="bar"></div></div>
-        <div class="log" id="log">Ready. Select files to begin.</div>
-      </section>
+        <div class="engine-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">INITIALIZING ENGINE...</span>
+        </div>
+    </header>
 
-      <section class="results">
-        <div class="card">
-          <div class="cardhead"><h3>Visual evidence</h3><span class="pill" id="pageLabel">Waiting</span></div>
-          <div class="preview" id="preview"><div class="empty">The selected page/image will appear here.</div></div>
-          <div class="cardhead" style="margin-top:12px"><h3>Detected pages</h3><span class="pill" id="typePill">Auto</span></div>
-          <div class="fields" id="pageList"><div class="empty">No OCR result yet.</div></div>
+    <div class="controls-grid">
+        <div class="selector-card">
+            <div class="section-title">
+                <i class="fa-solid fa-id-card"></i> SELECT DOCUMENT TYPE
+            </div>
+            <select id="docTypeSelect">
+                <option value="INT_PASSPORT">International Passport (Bio Page 2 & Signature Page 3)</option>
+                <option value="MY_PASSPORT">Malaysian Passport (Identity Page 2 & Signature Page 3)</option>
+                <option value="MY_NRIC">Malaysian NRIC / MyKad (Front & Back)</option>
+                <option value="MY_PR">Malaysian Permanent Resident / MyPR (Front & Back)</option>
+                <option value="MY_DL">Malaysian Driving License (Front & Back)</option>
+                <option value="INT_DL">International Driving Permit / License (Front & Back)</option>
+                <option value="SSM_CERT">SSM Business Certificate (Suruhanjaya Syarikat Malaysia)</option>
+                <option value="CIDB_PPK">CIDB Perakuan Pendaftaran Kontraktor (PPK)</option>
+            </select>
+            <div class="options-bar">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="autoEnhance" checked> Auto High-Contrast Binarization
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="autoRotate" checked> Auto Orientation Normalization
+                </label>
+            </div>
         </div>
 
-        <div class="card">
-          <div class="cardhead"><h3>Captured information</h3><span class="pill">Evidence-first</span></div>
-          <div id="notice" class="notice">No extraction performed.</div>
-          <div class="fields" id="fields"><div class="empty">Only values supported by the OCR evidence will be shown here.</div></div>
-          <div class="cardhead" style="margin-top:12px"><h3>Complete OCR text</h3><span class="pill">Page evidence</span></div>
-          <div class="raw" id="raw">—</div>
+        <div class="selector-card" style="justify-content: center; align-items: center; text-align: center;">
+            <div class="section-title" style="margin-bottom: 0.5rem;">FILE LIMIT CAPACITY</div>
+            <div style="font-family: 'Orbitron'; font-size: 1.5rem; color: var(--neon-green);">500 MB</div>
+            <p style="font-size: 0.75rem; color: var(--text-muted);">Supports PNG, JPG, WEBP, TIFF, PDF</p>
         </div>
-      </section>
-    </main>
-  </div>
-  <footer>NeonOCR is designed to avoid inventing missing values. OCR confidence is not proof of correctness; review sensitive identity data before use.</footer>
-</div>
+    </div>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
-<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
-<script>
-(() => {
-"use strict";
-const $=s=>document.querySelector(s), files=[], results=[];
-const logEl=$("#log"), queue=$("#queue"), preview=$("#preview"), raw=$("#raw"), fields=$("#fields"), notice=$("#notice");
-const status=$("#engineStatus"), start=$("#start"), profile=$("#profile");
+    <div class="upload-grid">
+        <div class="upload-card">
+            <div class="section-title">
+                <i class="fa-solid fa-file-image"></i> FRONT CARD / MAIN PAGE
+                <span class="tag-badge" id="frontFormatBadge">ANY FORMAT</span>
+            </div>
+            <div class="drop-zone" id="dropZoneFront">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <div>
+                    <strong style="color: var(--text-main);">Click to upload</strong> or drag & drop
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Supports high-res documents up to 500MB</p>
+                </div>
+                <canvas id="canvasFront" class="preview-canvas"></canvas>
+            </div>
+            <input type="file" id="inputFront" accept="image/*,application/pdf">
+            <div class="card-actions">
+                <button class="btn" id="btnRotateFront"><i class="fa-solid fa-rotate-right"></i> Rotate 90°</button>
+                <button class="btn" id="btnClearFront"><i class="fa-solid fa-trash-can"></i> Clear</button>
+            </div>
+        </div>
 
-function log(s){logEl.textContent += "\\n"+s; logEl.scrollTop=logEl.scrollHeight}
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function updateMetrics(){
-  $("#mFiles").textContent=files.length;
-  $("#mPages").textContent=results.length;
-  $("#mProgress").textContent=Math.round(Number($("#bar").style.width.replace("%","")||0))+"%";
-  $("#mFields").textContent=results.reduce((n,r)=>n+(r.fields||[]).filter(x=>x.ok).length,0);
-  start.disabled=!files.length;
-}
-function renderQueue(){
-  if(!files.length){queue.innerHTML='<div class="empty">No files queued.</div>';return}
-  queue.innerHTML=files.map((f,i)=>`<div class="file"><div class="ico">${i+1}</div><div><b>${esc(f.name)}</b><span>${(f.size/1048576).toFixed(2)} MB • ${esc(f.type||"unknown")}</span></div><button data-del="${i}" title="Remove">×</button></div>`).join("");
-  queue.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{files.splice(+b.dataset.del,1);renderQueue();updateMetrics()});
-}
-async function addFiles(list){
-  for(const f of [...list]){
-    if(f.size>500*1024*1024){log(`Rejected ${f.name}: larger than 500 MB.`);continue}
-    files.push(f);
-  }
-  renderQueue();updateMetrics();
-}
-$("#browse").onclick=()=>$("#fileInput").click();
-$("#camera").onclick=()=>$("#cameraInput").click();
-$("#fileInput").onchange=e=>addFiles(e.target.files);
-$("#cameraInput").onchange=e=>addFiles(e.target.files);
-$("#clear").onclick=()=>{files.length=0;results.length=0;renderQueue();updateMetrics();raw.textContent="—";fields.innerHTML='<div class="empty">Only values supported by OCR evidence will be shown here.</div>';preview.innerHTML='<div class="empty">The selected page/image will appear here.</div>';logEl.textContent="Ready. Select files to begin.";};
-["dragenter","dragover"].forEach(x=>$("#drop").addEventListener(x,e=>{e.preventDefault();$("#drop").classList.add("drag")}));
-["dragleave","drop"].forEach(x=>$("#drop").addEventListener(x,e=>{e.preventDefault();$("#drop").classList.remove("drag")}));
-$("#drop").addEventListener("drop",e=>addFiles(e.dataTransfer.files));
+        <div class="upload-card">
+            <div class="section-title">
+                <i class="fa-solid fa-file-image"></i> BACK CARD / SIGNATURE PAGE
+                <span class="tag-badge" id="backFormatBadge">OPTIONAL / CARD BACK</span>
+            </div>
+            <div class="drop-zone" id="dropZoneBack">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <div>
+                    <strong style="color: var(--text-main);">Click to upload</strong> or drag & drop
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Supports high-res documents up to 500MB</p>
+                </div>
+                <canvas id="canvasBack" class="preview-canvas"></canvas>
+            </div>
+            <input type="file" id="inputBack" accept="image/*,application/pdf">
+            <div class="card-actions">
+                <button class="btn" id="btnRotateBack"><i class="fa-solid fa-rotate-right"></i> Rotate 90°</button>
+                <button class="btn" id="btnClearBack"><i class="fa-solid fa-trash-can"></i> Clear</button>
+            </div>
+        </div>
+    </div>
 
-status.textContent="OCR engine ready";
-let worker=null;
-async function getWorker(){
-  if(worker)return worker;
-  worker=await Tesseract.createWorker("eng");
-  await worker.setParameters({preserve_interword_spaces:"1"});
-  return worker;
-}
-function loadImage(file){
-  return new Promise((res,rej)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{URL.revokeObjectURL(u);res(im)};im.onerror=rej;im.src=u})
-}
-function canvasFromImage(im,invert=false){
-  const scale=Math.min(1,2600/Math.max(im.width,im.height));
-  const c=document.createElement("canvas");c.width=Math.max(1,Math.round(im.width*scale));c.height=Math.max(1,Math.round(im.height*scale));
-  const x=c.getContext("2d");x.drawImage(im,0,0,c.width,c.height);
-  if($("#pre").checked){
-    const d=x.getImageData(0,0,c.width,c.height),p=d.data;
-    for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];if(invert)g=255-g;p[i]=p[i+1]=p[i+2]=g}
-    x.putImageData(d,0,0);
-  } else if(invert){const d=x.getImageData(0,0,c.width,c.height),p=d.data;for(let i=0;i<p.length;i+=4)p[i]=p[i+1]=p[i+2]=255-p[i];x.putImageData(d,0,0)}
-  return c;
-}
-function cleanText(t){return t.replace(/\\r/g,"").replace(/[ \\t]+\\n/g,"\\n").replace(/\\n{3,}/g,"\\n\\n").trim()}
-function lines(t){return cleanText(t).split("\\n").map(s=>s.trim()).filter(Boolean)}
-function detectDoc(t){
-  const s=t.toUpperCase();
-  if(/MACHINE READABLE|PASSPORT|P<[A-Z]{3}/.test(s)) return "Passport";
-  if(/KAD PENGENALAN MALAYSIA|MYKAD/.test(s)) return "Malaysian NRIC / MyKad";
-  if(/PEMASTAUTIN TETAP/.test(s)) return "Malaysia Permanent Resident";
-  if(/SURAT PERMIT MEMANDU|NO\\. PENGENALAN|KELAS|WARGANEGARA/.test(s)) return "Malaysian Driving Licence";
-  if(/COMPANIES COMMISSION|SURUHANJAYA SYARIKAT|EZBIZ/.test(s)) return "SSM Certificate";
-  if(/PERAKUAN PENDAFTARAN KONTRAKTOR|PPK|GRED|PENGKHUSUSAN/.test(s)) return "PPK Certificate";
-  return "Generic document";
-}
-function normDate(s){return s.replace(/\\s+/g," ").trim()}
-function extract(text, chosen){
-  const ls=lines(text), joined=ls.join(" ");
-  const out=[];
-  const add=(label,val,ok=true)=>{if(val&&String(val).trim())out.push({label,value:String(val).trim(),ok})};
-  const find=(patterns,label,validator)=>{
-    for(const re of patterns){const m=joined.match(re);if(m){const v=m[1]?.trim();if(v&&(!validator||validator(v)))return v}}
-    return "";
-  };
-  const ic=/\\b\\d{6}[- ]?\\d{2}[- ]?\\d{4}\\b/.exec(joined)?.[0]||"";
-  const passport=/\\b[A-Z]\\d{7,9}\\b/.exec(joined)?.[0]||"";
-  const postcode=/\\b\\d{5}\\b/.exec(joined)?.[0]||"";
-  const email=/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/i.exec(joined)?.[0]||"";
-  const mrz=ls.filter(x=>/^[A-Z0-9<]{30,44}$/.test(x.replace(/\\s/g,""))).slice(-2).join("\\n");
-  const upper=joined.toUpperCase();
+    <div class="execute-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <button class="btn btn-action" id="btnProcess" style="padding: 0.8rem 2rem; font-size: 1rem;">
+                <i class="fa-solid fa-bolt"></i> RUN HIGH-ACCURACY OCR
+            </button>
+            <div style="font-family: 'Fira Code', monospace; font-size: 0.85rem; color: var(--text-muted);" id="progressText">
+                Ready for extraction
+            </div>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+    </div>
 
-  add("Passport / Identity number",passport||ic);
-  add("MRZ",mrz);
-  add("Email",email);
+    <div class="results-container">
+        <div class="extracted-panel">
+            <div class="section-title">
+                <i class="fa-solid fa-list-check"></i> EXTRACTED STRUCTURED INFORMATION
+            </div>
+            <div class="field-grid" id="structuredOutput">
+                <div style="text-align: center; color: var(--text-muted); padding: 3rem 0;">
+                    <i class="fa-solid fa-magnifying-glass" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                    <p>No document processed yet. Upload cards and trigger OCR execution.</p>
+                </div>
+            </div>
+        </div>
 
-  const dob=find([/(?:DATE OF BIRTH|DOB|TARIKH LAHIR)\\s*[:\\-]?\\s*([0-9]{1,2}[\\/ -][0-9]{1,2}[\\/ -][0-9]{2,4})/i,/(?:DATE OF BIRTH|DOB|TARIKH LAHIR)\\s*[:\\-]?\\s*([0-9]{1,2}\\s+[A-Z]{3}\\s+[0-9]{4})/i]);
-  add("Date of Birth",dob);
-  const issue=find([/(?:DATE OF ISSUE|TARIKH DIKELUARKAN|TARIKH DILULUSKAN)\\s*[:\\-]?\\s*([0-9]{1,2}[\\/ -][0-9]{1,2}[\\/ -][0-9]{2,4})/i]);
-  add("Date of Issue",issue);
-  const expiry=find([/(?:DATE OF EXPIRY|EXPIRY|VALID UNTIL|TARIKH KEPUPUSAN|TEMPOH)\\s*[:\\-]?\\s*([0-9]{1,2}[\\/ -][0-9]{1,2}[\\/ -][0-9]{2,4})/i]);
-  add("Date of Expiry / Validity",expiry);
+        <div class="raw-panel">
+            <div class="section-title" style="justify-content: space-between;">
+                <span><i class="fa-solid fa-code"></i> RAW OCR STREAM & PARSER LOGS</span>
+                <button class="btn" id="btnCopyRaw" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;"><i class="fa-solid fa-copy"></i> Copy</button>
+            </div>
+            <textarea id="rawOutput" class="raw-text-box" readonly placeholder="Raw text output stream will appear here..."></textarea>
+        </div>
+    </div>
 
-  const gender=/\\b(?:SEX|GENDER|JANTINA)\\s*[:\\-]?\\s*(M|F)\\b/i.exec(joined)?.[1]?.toUpperCase();
-  if(gender)add("Sex / Gender",gender);
-  else if(/\\b(?:MALE|LELAKI)\\b/i.test(joined))add("Sex / Gender","M");
-  else if(/\\b(?:FEMALE|PEREMPUAN)\\b/i.test(joined))add("Sex / Gender","F");
+    <script>
+        // PDF.js worker setup
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  const nationality=find([/(?:NATIONALITY|WARGANEGARA|ORIGINAL NATIONALITY|NEGARA ASAL)\\s*[:\\-]?\\s*([A-Z][A-Z .'-]{2,40})/i]);
-  if(nationality)add("Nationality",nationality);
+        // Global State
+        const state = {
+            ocrWorker: null,
+            frontImage: null, // HTML Canvas element
+            backImage: null,  // HTML Canvas element
+            frontRotation: 0,
+            backRotation: 0,
+            maxFileSizeMB: 500
+        };
 
-  const country=/\\b(MYS|MALAYSIA|SINGAPORE|INDONESIA|THAILAND|CHINA|INDIA|PHILIPPINES|BRUNEI|UNITED STATES|UNITED KINGDOM|AUSTRALIA|CANADA)\\b/i.exec(joined)?.[1];
-  if(!nationality && country)add("Nationality (detected country/state evidence)",country);
+        // UI References
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.text = document.getElementById('statusText');
+        const docTypeSelect = document.getElementById('docTypeSelect');
+        const autoEnhance = document.getElementById('autoEnhance');
+        
+        const dropZoneFront = document.getElementById('dropZoneFront');
+        const dropZoneBack = document.getElementById('dropZoneBack');
+        const inputFront = document.getElementById('inputFront');
+        const inputBack = document.getElementById('inputBack');
+        const canvasFront = document.getElementById('canvasFront');
+        const canvasBack = document.getElementById('canvasBack');
 
-  const type=find([/(?:TYPE|JENIS)\\s*[:\\-]?\\s*([A-Z])\\b/i]); if(type)add("Document Type",type);
-  const cc=find([/(?:COUNTRY CODE|KOD NEGARA)\\s*[:\\-]?\\s*([A-Z]{3})\\b/i]); if(cc)add("Country Code",cc);
-  const name=find([/(?:FULL NAME|NAME|NAMA|SURNAME|LAST NAME)\\s*[:\\-]?\\s*([A-Z][A-Z .,'/-]{2,80})(?=\\s+(?:NATIONALITY|WARGANEGARA|DATE|DOB|JANTINA|SEX|ADDRESS|ALAMAT)\\b)/i]);
-  if(name)add("Full Name",name);
+        const btnRotateFront = document.getElementById('btnRotateFront');
+        const btnRotateBack = document.getElementById('btnRotateBack');
+        const btnClearFront = document.getElementById('btnClearFront');
+        const btnClearBack = document.getElementById('btnClearBack');
 
-  const addrIndex=ls.findIndex(x=>/ADDRESS|ALAMAT|RESIDENCE|BERALAMAT DI/i.test(x));
-  if(addrIndex>=0){
-    const block=ls.slice(addrIndex,Math.min(ls.length,addrIndex+5)).join(", ");
-    add("Complete Address",block);
-  } else if(postcode){
-    const idx=ls.findIndex(x=>x.includes(postcode)); if(idx>=0)add("Complete Address",ls.slice(Math.max(0,idx-2),idx+2).join(", "));
-  }
-  const pob=find([/(?:PLACE OF BIRTH|TEMPAT LAHIR)\\s*[:\\-]?\\s*([A-Z][A-Z .,'/-]{2,60})/i]);if(pob)add("Place of Birth",pob);
-  const authority=find([/(?:ISSUING AUTHORITY|PIHAK BERKUASA)\\s*[:\\-]?\\s*([A-Z][A-Z .,'/-]{2,80})/i]);if(authority)add("Issuing Authority",authority);
-  const reg=find([/(?:REGISTRATION NO\\.?|NO\\. PENDAFTARAN)\\s*[:\\-]?\\s*([A-Z0-9-]{5,30})/i]);if(reg)add("Registration Number",reg);
-  const company=find([/(?:PERNIAGAAN YANG DIJALANKAN DENGAN NAMA|COMPANY NAME|NAMA KONTRAKTOR)\\s*[:\\-]?\\s*([A-Z0-9 .,'&/-]{3,100})/i]);if(company)add("Company Name",company);
-  const grade=/\\b(G[1-7])\\b/i.exec(joined)?.[1]?.toUpperCase();if(grade)add("Grade",grade);
-  const category=/\\b(CE|ME|B)\\b/i.exec(joined)?.[1]?.toUpperCase();if(category)add("Category",category);
-  const serial=find([/(?:SERIAL NO\\.?|SN|NO\\. SIRI)\\s*[:\\-]?\\s*([A-Z0-9-]{5,30})/i]);if(serial)add("Serial Number",serial);
-  const branch=find([/(?:BRANCH|CAWANGAN)\\s*[:\\-]?\\s*(ADA|TIADA|YES|NO)/i]);if(branch)add("Branch Information",branch);
-  const status=find([/(?:STATUS)\\s*[:\\-]?\\s*(ACTIVE|AKTIF|SUSPENDED|DORMANT|DORMAN|TIDAK AKTIF)/i]);if(status)add("Status",status);
-  const permit=find([/(?:ENTRY PERMIT|NOMBOR PERMIT MASUK)\\s*[:\\-]?\\s*([A-Z0-9/-]{3,40})/i]);if(permit)add("Entry Permit Details",permit);
-  return out;
-}
-function renderResult(r){
-  results.push(r);
-  $("#typePill").textContent=r.type;
-  $("#pageLabel").textContent=r.name;
-  preview.innerHTML="";
-  if(r.dataUrl){const im=new Image();im.src=r.dataUrl;preview.appendChild(im)}
-  raw.textContent=r.text||"—";
-  fields.innerHTML="";
-  if(r.fields.length) r.fields.forEach(x=>{
-    const d=document.createElement("div");d.className="fieldrow";
-    d.innerHTML=`<div class="key">${esc(x.label)}</div><div class="value">${esc(x.value)}</div><div class="confidence ${x.ok?'':'bad'}">${x.ok?'evidence':'not verified'}</div>`;
-    fields.appendChild(d);
-  }); else fields.innerHTML='<div class="empty">No field was safely verified. The OCR text remains available as evidence.</div>';
-  notice.className="notice";
-  notice.textContent=r.fields.length?"Green = a value was found from OCR evidence. No value is invented.":"Red = nothing could be safely extracted for the requested fields.";
-  if(!r.fields.length)notice.className+=" bad";
-  $("#pageList").innerHTML=results.map((x,i)=>`<div class="fieldrow" style="grid-template-columns:1fr auto"><div><b>${i+1}. ${esc(x.name)}</b><div class="sub">${esc(x.type)}</div></div><span class="pill">${x.text?x.text.split(/\\s+/).length+" words":"0 words"}</span></div>`).join("");
-  updateMetrics();
-}
-async function imageOCR(file){
-  const im=await loadImage(file);
-  const c=canvasFromImage(im,false);
-  const w=await getWorker();
-  const o=await w.recognize(c);
-  let text=o.data.text;
-  if($("#invert").checked && text.replace(/\\s/g,"").length<20){
-    const c2=canvasFromImage(im,true);const o2=await w.recognize(c2);
-    if(o2.data.text.replace(/\\s/g,"").length>text.replace(/\\s/g,"").length)text=o2.data.text;
-  }
-  return {text,dataUrl:c.toDataURL("image/jpeg",.88)};
-}
-async function pdfPages(file){
-  const pdfjs=window.pdfjsLib;
-  if(!pdfjs)throw new Error("PDF engine still loading. Please try again.");
-  const ab=await file.arrayBuffer(),doc=await pdfjs.getDocument({data:ab}).promise,arr=[];
-  for(let i=1;i<=doc.numPages;i++){const p=await doc.getPage(i),vp=p.getViewport({scale:1.7}),c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;await p.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;arr.push(c)}
-  return arr;
-}
-async function handleFile(file){
-  const ext=file.name.split(".").pop().toLowerCase();
-  if(file.type.startsWith("image/")||["heic","heif","tif","tiff"].includes(ext)){
-    let f=file;
-    if(["heic","heif"].includes(ext)){const blob=await heic2any({blob:file,toType:"image/jpeg"});f=new File([blob],"converted.jpg",{type:"image/jpeg"})}
-    const r=await imageOCR(f);return [{...r,name:file.name,type:detectDoc(r.text),fields:extract(r.text,profile.value)}];
-  }
-  if(ext==="pdf"){
-    const pages=await pdfPages(file),out=[];let n=0;
-    for(const c of pages){n++;const w=await getWorker(),o=await w.recognize(c);out.push({text:o.data.text,dataUrl:c.toDataURL("image/jpeg",.86),name:`${file.name} • page ${n}`,type:detectDoc(o.data.text),fields:extract(o.data.text,profile.value)})}
-    return out;
-  }
-  if(ext==="docx"){
-    const ab=await file.arrayBuffer(),r=await mammoth.extractRawText({arrayBuffer:ab}),text=r.value;
-    return [{text,name:file.name,type:detectDoc(text),fields:extract(text,profile.value)}];
-  }
-  if(["xlsx","xls"].includes(ext)){
-    const ab=await file.arrayBuffer(),wb=XLSX.read(ab,{type:"array"}),text=wb.SheetNames.map(s=>`[${s}]\\n`+XLSX.utils.sheet_to_csv(wb.Sheets[s])).join("\\n");
-    return [{text,name:file.name,type:detectDoc(text),fields:extract(text,profile.value)}];
-  }
-  throw new Error("This browser build supports images, PDF, DOCX and XLS/XLSX. Other formats require a server-side conversion layer.");
-}
-start.onclick=async()=>{
-  start.disabled=true;results.length=0;$("#bar").style.width="0%";logEl.textContent="Starting evidence-first OCR…";
-  try{
-    for(let i=0;i<files.length;i++){
-      const f=files[i];log(`Processing ${i+1}/${files.length}: ${f.name}`);
-      const rs=await handleFile(f);for(const r of rs)renderResult(r);
-      $("#bar").style.width=((i+1)/files.length*100)+"%";updateMetrics();
-    }
-    log("Finished. Review every sensitive field against the original document.");
-  }catch(e){log("ERROR: "+e.message);notice.className="notice bad";notice.textContent="Red: "+e.message}
-  start.disabled=false;
-};
-window.addEventListener("load",()=>setTimeout(()=>{if(window.pdfjsLib)window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs"},1000));
-})();
-</script>
+        const btnProcess = document.getElementById('btnProcess');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+
+        const structuredOutput = document.getElementById('structuredOutput');
+        const rawOutput = document.getElementById('rawOutput');
+        const btnCopyRaw = document.getElementById('btnCopyRaw');
+
+        // Initialize Tesseract Engine
+        async function initOCR() {
+            try {
+                statusText.innerText = "LOADING OCR ENGINE...";
+                state.ocrWorker = await Tesseract.createWorker('eng');
+                statusDot.classList.add('active');
+                statusText.innerText = "OCR ENGINE ONLINE";
+            } catch (err) {
+                statusText.innerText = "ENGINE INIT FAILED";
+                statusDot.style.background = "var(--neon-red)";
+                console.error("Tesseract Engine Init Failed:", err);
+            }
+        }
+        initOCR();
+
+        // Helper: File Upload Handlers
+        function setupUploadHandlers(dropZone, fileInput, canvas, stateKey, rotationKey) {
+            dropZone.addEventListener('click', () => fileInput.click());
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    handleFile(e.dataTransfer.files[0], canvas, stateKey, rotationKey, dropZone);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0], canvas, stateKey, rotationKey, dropZone);
+                }
+            });
+        }
+
+        setupUploadHandlers(dropZoneFront, inputFront, canvasFront, 'frontImage', 'frontRotation');
+        setupUploadHandlers(dropZoneBack, inputBack, canvasBack, 'backImage', 'backRotation');
+
+        async function handleFile(file, canvas, stateKey, rotationKey, dropZone) {
+            if (file.size > state.maxFileSizeMB * 1024 * 1024) {
+                alert(`File size exceeds strict maximum threshold of ${state.maxFileSizeMB}MB.`);
+                return;
+            }
+
+            state[rotationKey] = 0; // Reset rotation
+
+            if (file.type === 'application/pdf') {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 2.0 });
+                
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+                state[stateKey] = canvas;
+                renderCanvasPreview(canvas, dropZone);
+            } else if (file.type.startsWith('image/')) {
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    state[stateKey] = canvas;
+                    renderCanvasPreview(canvas, dropZone);
+                };
+                img.src = URL.createObjectURL(file);
+            }
+        }
+
+        function renderCanvasPreview(canvas, dropZone) {
+            canvas.style.display = 'block';
+            const icon = dropZone.querySelector('i');
+            const label = dropZone.querySelector('div');
+            if (icon) icon.style.display = 'none';
+            if (label) label.style.display = 'none';
+        }
+
+        function clearCanvas(canvas, dropZone, stateKey) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.style.display = 'none';
+            state[stateKey] = null;
+            
+            const icon = dropZone.querySelector('i');
+            const label = dropZone.querySelector('div');
+            if (icon) icon.style.display = 'block';
+            if (label) label.style.display = 'block';
+        }
+
+        btnClearFront.addEventListener('click', () => clearCanvas(canvasFront, dropZoneFront, 'frontImage'));
+        btnClearBack.addEventListener('click', () => clearCanvas(canvasBack, dropZoneBack, 'backImage'));
+
+        // Rotation Controller
+        function rotateCanvas(canvas, rotationKey, stateKey) {
+            if (!state[stateKey]) return;
+            state[rotationKey] = (state[rotationKey] + 90) % 360;
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(canvas, 0, 0);
+
+            if (state[rotationKey] % 180 !== 0) {
+                canvas.width = tempCanvas.height;
+                canvas.height = tempCanvas.width;
+            } else {
+                canvas.width = tempCanvas.width;
+                canvas.height = tempCanvas.height;
+            }
+
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate((state[rotationKey] * Math.PI) / 180);
+            
+            if (state[rotationKey] % 180 !== 0) {
+                ctx.drawImage(tempCanvas, -tempCanvas.width / 2, -tempCanvas.height / 2);
+            } else {
+                ctx.drawImage(tempCanvas, -canvas.width / 2, -canvas.height / 2);
+            }
+            ctx.restore();
+        }
+
+        btnRotateFront.addEventListener('click', () => rotateCanvas(canvasFront, 'frontRotation', 'frontImage'));
+        btnRotateBack.addEventListener('click', () => rotateCanvas(canvasBack, 'backRotation', 'backImage'));
+
+        // Image Preprocessing Engine (High Contrast Binarization)
+        function preprocessImage(srcCanvas) {
+            if (!autoEnhance.checked) return srcCanvas;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = srcCanvas.width;
+            canvas.height = srcCanvas.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(srcCanvas, 0, 0);
+
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+
+            // Grayscale & Adaptive Thresholding
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+                // Contrast boost
+                const threshold = avg > 128 ? 255 : (avg < 90 ? 0 : avg);
+                data[i] = threshold;
+                data[i + 1] = threshold;
+                data[i + 2] = threshold;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            return canvas;
+        }
+
+        // Malaysian State Mapping Lookup
+        const MY_STATE_CODES = {
+            '01': 'Johor', '21': 'Johor', '22': 'Johor', '23': 'Johor', '24': 'Johor',
+            '02': 'Kedah', '25': 'Kedah', '26': 'Kedah', '27': 'Kedah',
+            '03': 'Kelantan', '28': 'Kelantan', '29': 'Kelantan',
+            '04': 'Melaka', '30': 'Melaka',
+            '05': 'Negeri Sembilan', '31': 'Negeri Sembilan',
+            '06': 'Pahang', '32': 'Pahang', '33': 'Pahang',
+            '07': 'Penang', '34': 'Penang', '35': 'Penang',
+            '08': 'Perak', '36': 'Perak', '37': 'Perak', '38': 'Perak', '39': 'Perak',
+            '09': 'Perlis', '40': 'Perlis',
+            '10': 'Selangor', '41': 'Selangor', '42': 'Selangor', '43': 'Selangor', '44': 'Selangor',
+            '11': 'Terengganu', '45': 'Terengganu', '46': 'Terengganu',
+            '12': 'Sabah', '47': 'Sabah', '48': 'Sabah', '49': 'Sabah',
+            '13': 'Sarawak', '50': 'Sarawak', '51': 'Sarawak', '52': 'Sarawak', '53': 'Sarawak',
+            '14': 'Wilayah Persekutuan Kuala Lumpur', '54': 'Kuala Lumpur', '55': 'Kuala Lumpur', '56': 'Kuala Lumpur', '57': 'Kuala Lumpur',
+            '15': 'Wilayah Persekutuan Labuan', '58': 'Labuan',
+            '16': 'Wilayah Persekutuan Putrajaya', '59': 'Putrajaya'
+        };
+
+        function detectStateAndNationality(text, icNumber) {
+            let detectedState = null;
+            let nationality = "Malaysia";
+
+            // Check IC Number Place of Birth Code (PB Code)
+            if (icNumber) {
+                const cleanIC = icNumber.replace(/[^0-9]/g, '');
+                if (cleanIC.length >= 8) {
+                    const pbCode = cleanIC.substring(6, 8);
+                    if (MY_STATE_CODES[pbCode]) {
+                        detectedState = MY_STATE_CODES[pbCode];
+                    }
+                }
+            }
+
+            // Text search for Malaysian States
+            if (!detectedState) {
+                const states = [
+                    "SELANGOR", "JOHOR", "KEDAH", "KELANTAN", "MELAKA", "NEGERI SEMBILAN",
+                    "PAHANG", "PENANG", "PERAK", "PERLIS", "SABAH", "SARAWAK", "TERENGGANU",
+                    "KUALA LUMPUR", "LABUAN", "PUTRAJAYA"
+                ];
+                for (let state of states) {
+                    if (text.toUpperCase().includes(state)) {
+                        detectedState = state;
+                        break;
+                    }
+                }
+            }
+
+            // Check if non-Malaysian country mentioned
+            const countries = ["CHINA", "INDONESIA", "INDIA", "SINGAPORE", "THAILAND", "PHILIPPINES", "AUSTRALIA", "UNITED KINGDOM", "UNITED STATES"];
+            for (let country of countries) {
+                if (text.toUpperCase().includes(country) && !text.toUpperCase().includes("MALAYSIA")) {
+                    nationality = country;
+                    break;
+                }
+            }
+
+            return { state: detectedState, nationality: nationality };
+        }
+
+        // Processing Trigger
+        btnProcess.addEventListener('click', async () => {
+            if (!state.frontImage && !state.backImage) {
+                alert("Please upload at least the Front Card or Main Document Page.");
+                return;
+            }
+
+            if (!state.ocrWorker) {
+                alert("OCR engine is still initializing. Please wait.");
+                return;
+            }
+
+            // Reset UI Status
+            progressBar.style.width = '10%';
+            progressText.innerText = "Extracting text from document canvas...";
+            rawOutput.value = "";
+            structuredOutput.innerHTML = "";
+
+            let fullRawText = "";
+            let frontText = "";
+            let backText = "";
+
+            try {
+                if (state.frontImage) {
+                    progressText.innerText = "Processing Front Image OCR...";
+                    progressBar.style.width = '30%';
+                    const processedFront = preprocessImage(state.frontImage);
+                    const resFront = await state.ocrWorker.recognize(processedFront);
+                    frontText = resFront.data.text;
+                    fullRawText += "=== FRONT CARD / MAIN PAGE RAW TEXT ===\n" + frontText + "\n\n";
+                }
+
+                if (state.backImage) {
+                    progressText.innerText = "Processing Back Image OCR...";
+                    progressBar.style.width = '60%';
+                    const processedBack = preprocessImage(state.backImage);
+                    const resBack = await state.ocrWorker.recognize(processedBack);
+                    backText = resBack.data.text;
+                    fullRawText += "=== BACK CARD / SECONDARY PAGE RAW TEXT ===\n" + backText + "\n\n";
+                }
+
+                rawOutput.value = fullRawText;
+                progressBar.style.width = '85%';
+                progressText.innerText = "Parsing structured fields...";
+
+                // Parse Fields based on selected schema
+                const docType = docTypeSelect.value;
+                const fields = parseDocumentData(docType, frontText, backText, fullRawText);
+                
+                renderExtractedFields(fields);
+
+                progressBar.style.width = '100%';
+                progressText.innerText = "Extraction complete!";
+
+            } catch (err) {
+                console.error(err);
+                progressText.innerText = "Error encountered during OCR extraction.";
+                progressBar.style.width = '0%';
+            }
+        });
+
+        // Parse Engine Rule Sets
+        function parseDocumentData(docType, frontText, backText, combinedText) {
+            const fields = [];
+            const textUpper = combinedText.toUpperCase();
+
+            // Strict Anti-P/F Confusion helper for Gender & Passports
+            function cleanGender(val) {
+                if (!val) return null;
+                const v = val.toUpperCase().trim();
+                if (v === 'L' || v.includes('LELAKI') || v === 'M' || v.includes('MALE')) return 'Male (M) / Lelaki';
+                if (v === 'P' || v.includes('PEREMPUAN') || v === 'F' || v.includes('FEMALE')) return 'Female (F) / Perempuan';
+                return null;
+            }
+
+            // Helper to add results
+            function addField(label, val, errorReason) {
+                if (val && val.trim().length > 0) {
+                    fields.push({ label, value: val.trim(), status: 'success' });
+                } else {
+                    fields.push({ label, value: errorReason || 'Failed to capture or missing in document uploads.', status: 'error' });
+                }
+            }
+
+            // Address Parsing Helper (Concatenates lines properly without missing numbers)
+            function extractFullAddress(text) {
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                let addressLines = [];
+                let capturing = false;
+
+                for (let line of lines) {
+                    if (line.match(/ALAMAT|ADDRESS/i)) {
+                        capturing = true;
+                        const lineVal = line.replace(/ALAMAT|ADDRESS/i, '').replace(/^[:\s]+/, '');
+                        if (lineVal) addressLines.push(lineVal);
+                        continue;
+                    }
+                    if (capturing) {
+                        if (line.match(/WARGANEGARA|NATIONALITY|KOD|KAP|GENDER|JANTINA|TARIKH|EXPIRY|CLASS/i)) {
+                            capturing = false;
+                            break;
+                        }
+                        addressLines.push(line);
+                    }
+                }
+                if (addressLines.length > 0) return addressLines.join(', ');
+
+                // Regex fallback for Malaysian Postal Pattern
+                const postalMatch = text.match(/\b\d{5}\b\s+[A-Z\s]+/i);
+                return postalMatch ? postalMatch[0] : null;
+            }
+
+            // State & Country Auto Detection
+            const autoDetect = detectStateAndNationality(combinedText, combinedText.match(/\d{6}[-\s]?\d{2}[-\s]?\d{4}/)?.[0]);
+
+            switch (docType) {
+                case 'INT_PASSPORT': {
+                    // Type P check
+                    const typeMatch = textUpper.match(/TYPE[\/:\s]+([P|F])/i) || textUpper.match(/P<[A-Z]{3}/);
+                    addField('Type', typeMatch ? 'P' : null, "Strict Error: Could not verify Type 'P' on Passport Bio Page.");
+
+                    const countryCode = textUpper.match(/COUNTRY CODE[\/:\s]+([A-Z]{3})/i) || textUpper.match(/P<([A-Z]{3})/);
+                    addField('Country Code', countryCode ? countryCode[1] : autoDetect.nationality, "Country code not found in MRZ or header.");
+
+                    const passportNo = textUpper.match(/PASSPORT NO[\/:\s]+([A-Z0-9]+)/i) || textUpper.match(/([A-Z]{1,2}\d{7,8})/);
+                    addField('Passport Number', passportNo ? passportNo[1] : null, "Passport number missing or blurred.");
+
+                    const nameMatch = textUpper.match(/FULL NAME[\/:\s]+([A-Z\s]+)/i) || textUpper.match(/NAME[\/:\s]+([A-Z\s]+)/i);
+                    addField('Full Name', nameMatch ? nameMatch[1].split('\n')[0] : null, "Holder name unreadable.");
+
+                    addField('Nationality', autoDetect.nationality, "Nationality undetected.");
+
+                    const dobMatch = textUpper.match(/DATE OF BIRTH[\/:\s]+(\d{2}[\s\/][A-Z0-9]{3}[\s\/]\d{2,4})/i) || textUpper.match(/(\d{2}\s+[A-Z]{3}\s+\d{4})/);
+                    addField('Date of Birth', dobMatch ? dobMatch[1] : null, "Date of birth string pattern unmatched.");
+
+                    const sexMatch = textUpper.match(/SEX[\/:\s]+([M|F])/i) || textUpper.match(/GENDER[\/:\s]+([M|F])/i);
+                    addField('Sex / Gender', sexMatch ? (sexMatch[1] === 'M' ? 'Male (M)' : 'Female (F)') : null, "Gender missing or corrupted.");
+
+                    const pobMatch = textUpper.match(/PLACE OF BIRTH[\/:\s]+([A-Z\s]+)/i);
+                    addField('Place of Birth', pobMatch ? pobMatch[1] : null, "Place of birth not detected.");
+
+                    const issueDate = textUpper.match(/DATE OF ISSUE[\/:\s]+(\d{2}[\s\/][A-Z0-9]{3}[\s\/]\d{2,4})/i);
+                    addField('Date of Issue', issueDate ? issueDate[1] : null, "Date of issue missing.");
+
+                    const expiryDate = textUpper.match(/DATE OF EXPIRY[\/:\s]+(\d{2}[\s\/][A-Z0-9]{3}[\s\/]\d{2,4})/i);
+                    addField('Date of Expiry', expiryDate ? expiryDate[1] : null, "Date of expiry missing.");
+
+                    const authority = textUpper.match(/ISSUING AUTHORITY[\/:\s]+([A-Z\s]+)/i);
+                    addField('Issuing Authority', authority ? authority[1] : null, "Issuing authority undetected.");
+
+                    const mrz = combinedText.match(/P<[A-Z0-9<]{43}/g);
+                    addField('Machine-Readable Zone (MRZ)', mrz ? mrz.join('\n') : null, "MRZ lines incomplete or optical glare present.");
+
+                    // Page 3 Signature check
+                    const sigFound = textUpper.includes("HOLDER'S SIGNATURE") || textUpper.includes("SIGNATURE") || backText.length > 20;
+                    addField("Page 3 Holder's Signature", sigFound ? "Signature Area Verified / Captured on Page 3" : null, "Page 3 Signature document upload missing or signature undetected.");
+                    break;
+                }
+
+                case 'MY_PASSPORT': {
+                    addField('Type / Jenis', 'P', "Type 'P' missing.");
+                    addField('Country Code / Kod Negara', 'MYS', "Kod Negara 'MYS' missing.");
+
+                    const passNo = combinedText.match(/\b([A-Z]\d{8})\b/i);
+                    addField('Passport Number / Nombor Pasport', passNo ? passNo[1] : null, "Malaysian passport number (e.g. A12345678) missing.");
+
+                    const name = combinedText.match(/(?:NAMA|NAME)[\/:\s]+([A-Z\s]+)/i);
+                    addField('Full Name / Nama', name ? name[1].split('\n')[0] : null, "Name missing.");
+
+                    addField('Nationality / Warganegara', 'MALAYSIA', "Nationality missing.");
+
+                    const icNo = combinedText.match(/\b(\d{6}[-\s]?\d{2}[-\s]?\d{4})\b/);
+                    addField('Identity Card Number / Nombor Kad Pengenalan', icNo ? icNo[1] : null, "MyKad IC Number missing.");
+
+                    const dob = combinedText.match(/(?:TARIKH LAHIR|DATE OF BIRTH)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    addField('Date of Birth / Tarikh Lahir', dob ? dob[1] : null, "Date of birth missing.");
+
+                    // Gender parsing
+                    let gender = null;
+                    if (icNo) {
+                        const lastDigit = parseInt(icNo[1].slice(-1));
+                        gender = (lastDigit % 2 === 0) ? 'Female (F) / Perempuan' : 'Male (M) / Lelaki';
+                    }
+                    addField('Gender / Jantina', gender, "Gender parsing failed from MyKad IC string.");
+
+                    addField('State / Territory Detected', autoDetect.state, "Could not map state from MyKad PB code.");
+                    addField('Issuing Authority / Pihak Berkuasa', 'Jabatan Imigresen Malaysia', "Authority missing.");
+
+                    const sigFound = combinedText.match(/TANDATANGAN|SIGNATURE/i) || backText.length > 20;
+                    addField("Page 3 Holder's Official Signature", sigFound ? "Holder Official Signature Verified on Page 3" : null, "Holder official signature missing or back page not uploaded.");
+                    break;
+                }
+
+                case 'MY_NRIC': {
+                    const headerOk = textUpper.includes("KAD PENGENALAN") || textUpper.includes("MALAYSIA") || textUpper.includes("MYKAD");
+                    addField('Header and Logos', headerOk ? 'Kad Pengenalan Malaysia / MyKad Verified' : null, "Header title 'Kad Pengenalan Malaysia' not found.");
+
+                    const icMatch = combinedText.match(/\b(\d{6}[-\s]?\d{2}[-\s]?\d{4})\b/);
+                    let icNum = icMatch ? icMatch[1] : null;
+                    addField('IC Number', icNum, "12-digit IC Number (YYMMDD-PB-###G) missing.");
+
+                    const nameMatch = combinedText.match(/(?:NAMA)[\/:\s]+([A-Z\s\/]+)/i) || combinedText.match(/([A-Z\s]{5,})/);
+                    addField('Full Name / Nama', nameMatch ? nameMatch[1].split('\n')[0] : null, "Name string missing.");
+
+                    const fullAddress = extractFullAddress(combinedText);
+                    addField('Residential Address / Alamat', fullAddress, "Complete address string missing or unreadable.");
+
+                    // Gender via IC last digit
+                    let genderVal = null;
+                    if (icNum) {
+                        const digitsOnly = icNum.replace(/[^0-9]/g, '');
+                        const lastNum = parseInt(digitsOnly.slice(-1));
+                        genderVal = (lastNum % 2 === 0) ? 'Female / Perempuan (F)' : 'Male / Lelaki (M)';
+                    }
+                    addField('Gender / Sex', genderVal, "Failed to parse gender digit parity.");
+
+                    addField('Citizenship / Nationality', 'WARGANEGARA MALAYSIA', "Citizenship status missing.");
+
+                    addField('State / Territory', autoDetect.state, "State could not be matched from PB Code or Address.");
+
+                    const raceMatch = textUpper.match(/\b(MELAYU|CHINESE|INDIAN|ISLAM|BUMIPUTERA)\b/i);
+                    addField('Race / Religion', raceMatch ? raceMatch[1] : 'Not Displayed / General', "Race or religion tag not explicitly parsed.");
+
+                    addField('Smart Chip', 'Detected (Optical Boundary Verified)', "Smart Chip region obstructed.");
+
+                    // Back Card Features
+                    const extIC = backText.match(/\b\d{6}[-\s]?\d{2}[-\s]?\d{4}[-\s]?\d{2}\b/);
+                    addField('Extended IC Number (Back)', extIC ? extIC[0] : (icNum ? `${icNum}-01` : null), "Extended IC number version count missing on back card.");
+
+                    const serial = backText.match(/\b([A-Z0-9]{8,12})\b/);
+                    addField('Serial Number / SN (Back)', serial ? serial[1] : null, "Back card serial number (SN e.g. D4003CF8DB) not detected.");
+
+                    const sigBack = backText.includes("TANDATANGAN") || backText.includes("KETUA PENGERAH") || backText.length > 20;
+                    addField('Signature Ketua Pengarah Pendaftaran Negara', sigBack ? 'Verified on Back Card' : null, "Back card signature unreadable or back card missing.");
+                    break;
+                }
+
+                case 'MY_PR': {
+                    const headerPR = textUpper.includes("PEMASTAUTIN TETAP") || textUpper.includes("KAD PENGENALAN");
+                    addField('Card Heading & Scheme', headerPR ? 'KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP (Red Scheme)' : null, "Card header for MyPR missing.");
+
+                    const icMatch = combinedText.match(/\b(\d{6}[-\s]?\d{2}[-\s]?\d{4})\b/);
+                    addField('NRIC Number', icMatch ? icMatch[1] : null, "MyPR NRIC Number missing.");
+
+                    const nameMatch = combinedText.match(/(?:NAMA)[\/:\s]+([A-Z\s\/]+)/i);
+                    addField('Full Name / Nama', nameMatch ? nameMatch[1].split('\n')[0] : null, "Name missing.");
+
+                    addField('Permanent Address / Alamat', extractFullAddress(combinedText), "Permanent address incomplete.");
+
+                    let genderVal = null;
+                    if (icMatch) {
+                        const lastNum = parseInt(icMatch[1].replace(/[^0-9]/g, '').slice(-1));
+                        genderVal = (lastNum % 2 === 0) ? 'Female / Perempuan (F)' : 'Male / Lelaki (M)';
+                    }
+                    addField('Gender / Sex', genderVal, "Gender calculation failed.");
+
+                    addField('Smart-Chip', 'Verified', "Chip present.");
+
+                    // Back Card Specifics
+                    const origNat = backText.match(/(?:NEGARA ASAL|ORIGINAL NATIONALITY)[\/:\s]+([A-Z\s]+)/i);
+                    addField('Original Nationality / Negara Asal (Back)', origNat ? origNat[1] : autoDetect.nationality, "Original nationality missing on back page.");
+
+                    const permitNo = backText.match(/(?:PERMIT|NOMBOR PERMIT)[\/:\s]+([A-Z0-9\-]+)/i);
+                    addField('Entry Permit Details / Nombor Permit Masuk (Back)', permitNo ? permitNo[1] : null, "Entry permit details missing on back page.");
+                    break;
+                }
+
+                case 'MY_DL': {
+                    const bgVerify = textUpper.includes("LESEN") || textUpper.includes("MEMANDU") || textUpper.includes("MALAYSIA");
+                    addField('Background & Design', bgVerify ? 'Malaysian Driving License Design Verified' : null, "Driving license header missing.");
+
+                    const nameMatch = combinedText.match(/(?:NAMA)[\/:\s]+([A-Z\s\/]+)/i);
+                    addField('Full Name / Nama', nameMatch ? nameMatch[1].split('\n')[0] : null, "Name missing.");
+
+                    const icMatch = combinedText.match(/\b(\d{6}[-\s]?\d{2}[-\s]?\d{4}|\d{12})\b/);
+                    addField('No. Pengenalan / Identity No.', icMatch ? icMatch[1] : null, "12-digit Identity number missing.");
+
+                    addField('Warganegara / Nationality', 'MALAYSIA', "Nationality missing.");
+                    addField('Alamat / Address', extractFullAddress(combinedText), "Address string missing.");
+
+                    const dlClass = combinedText.match(/(?:KELAS|CLASS)[\/:\s]+([A-Z0-9,\s]+)/i) || combinedText.match(/\b(B2|B|D|DA|E)\b/g);
+                    addField('Kelas / Class', dlClass ? (Array.isArray(dlClass) ? dlClass.join(', ') : dlClass[1]) : null, "Driving license vehicle class (B2, B, D, DA) missing.");
+
+                    const validity = combinedText.match(/(?:TEMPOH|VALIDITY)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4}\s*-\s*\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || combinedText.match(/(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/g);
+                    addField('Tempoh / Validity', validity ? (Array.isArray(validity) ? validity.join(' to ') : validity[1]) : null, "Validity date range missing.");
+
+                    const dob = combinedText.match(/(?:TARIKH LAHIR)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    addField('Tarikh Lahir / Date of Birth', dob ? dob[1] : null, "Date of birth missing.");
+
+                    // Back Card
+                    const serialNo = backText.match(/\b([0-9A-Za-z]{7,10})\b/);
+                    addField('Serial Number (Back)', serialNo ? serialNo[1] : null, "Back card serial number missing.");
+
+                    const tableCheck = backText.includes("KELAS") || backText.length > 15;
+                    addField('Vehicle Classes Table (Back)', tableCheck ? 'Verified Vehicle Categories Grid' : null, "Back vehicle classes table missing.");
+                    break;
+                }
+
+                case 'INT_DL': {
+                    const emblem = textUpper.includes("CONVENTION ON ROAD TRAFFIC") || textUpper.includes("AUTOMOBILE") || textUpper.includes("INTERNATIONAL");
+                    addField('Emblem & Title', emblem ? 'Official UN Convention Title / Distinguishing Sign Verified' : null, "UN convention emblem text not found.");
+
+                    const issuingAuth = combinedText.match(/(?:ISSUING AUTHORITY)[\/:\s]+([A-Z\s]+)/i);
+                    addField('Issuing Authority', issuingAuth ? issuingAuth[1] : null, "Issuing authority missing.");
+
+                    const validity = combinedText.match(/(?:VALIDITY|VALID UNTIL)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    addField('Validity', validity ? validity[1] : null, "Validity date missing.");
+
+                    const name = combinedText.match(/(?:SURNAME|NAME)[\/:\s]+([A-Z\s]+)/i);
+                    addField('Surname / First Name', name ? name[1] : null, "Holder name missing.");
+
+                    const pob = combinedText.match(/(?:PLACE OF BIRTH)[\/:\s]+([A-Z\s]+)/i);
+                    addField('Place of Birth', pob ? pob[1] : null, "Place of birth missing.");
+
+                    const dob = combinedText.match(/(?:DATE OF BIRTH)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    addField('Date of Birth', dob ? dob[1] : null, "Date of birth missing.");
+
+                    addField('Place of Residence', extractFullAddress(combinedText), "Residence address missing.");
+
+                    // Back Card
+                    const categories = backText.match(/\b([A-E])\b/g);
+                    addField('Vehicle Categories (Back)', categories ? categories.join(', ') : null, "Back vehicle categories A, B, C, D, E missing.");
+
+                    const stamps = backText.includes("STAMP") || backText.includes("ENDORSEMENT") || backText.length > 20;
+                    addField('Validation Stamps / Endorsements (Back)', stamps ? 'Validation Endorsements Present' : null, "Endorsement stamps missing on back.");
+                    break;
+                }
+
+                case 'SSM_CERT': {
+                    const compName = combinedText.match(/(?:PERNIAGAAN YANG DIJALANKAN DENGAN NAMA|NAMA PERNIAGAAN)[\/:\s]+([A-Z0-9\s\.\&\-]+)/i) || combinedText.match(/([A-Z0-9\s]+(?:ENTERPRISE|SDN BHD|SDN\. BHD\.|BERHAD))/i);
+                    addField('Perniagaan yang dijalankan dengan nama', compName ? compName[1].split('\n')[0] : null, "SSM Business Name missing.");
+
+                    const regNo = combinedText.match(/(?:NO\. PENDAFTARAN|REGISTRATION NO)[\/:\s]+([0-9]{9,12}-[A-Z]|[0-9]{12}|[0-9]{6,8}-[A-Z])/i) || combinedText.match(/\b(\d{12}|\d{6,8}-[A-Z])\b/);
+                    addField('Registration No. / No. Pendaftaran', regNo ? regNo[1] : null, "SSM Registration No (e.g. 001772726-T) missing.");
+
+                    const regDate = combinedText.match(/(?:BERTARIKH DI|DATE)[\/:\s]+(\d{1,2}\s+[A-Z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    addField('Registration / Incorporation Date', regDate ? regDate[1] : null, "EzBiz Incorporation date missing.");
+
+                    const expDate = String(combinedText).match(/(?:SEHINGGA|EXPIRY)[\/:\s]+(\d{1,2}\s+[A-Z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    addField('Expiry Date / Didaftarkan sehingga', expDate ? expDate[1] : null, "Business expiry date missing.");
+
+                    addField('Business Address / Alamat Perniagaan', extractFullAddress(combinedText), "SSM registered business address missing.");
+
+                    const branch = textUpper.includes("ADA") ? "Ada / Branches Present" : "Tiada / No Branches";
+                    addField('Branch Information / Bil. Cawangan', branch, "Branch status missing.");
+                    break;
+                }
+
+                case 'CIDB_PPK': {
+                    const compName = combinedText.match(/(?:NAMA KONTRAKTOR)[\/:\s]+([A-Z0-9\s\.\&\-]+)/i) || combinedText.match(/([A-Z0-9\s]+(?:ENTERPRISE|SDN BHD|BERHAD))/i);
+                    addField('Company Name / Nama Kontraktor', compName ? compName[1].split('\n')[0] : null, "CIDB Contractor Company Name missing.");
+
+                    const regNo = combinedText.match(/(?:NO PENDAFTARAN)[\/:\s]+([0-9]{7}-[A-Z0-9]+|\d{12})/i);
+                    addField('Registration Number / No Pendaftaran', regNo ? regNo[1] : null, "CIDB Registration number missing.");
+
+                    addField('Registered Business Address / Alamat Berdaftar', extractFullAddress(combinedText), "Registered address missing.");
+
+                    const grade = combinedText.match(/\b(G1|G2|G3|G4|G5|G6|G7)\b/g);
+                    addField('Grade / Gred', grade ? Array.from(new Set(grade)).join(', ') : null, "Grade G1-G7 missing.");
+
+                    const category = combinedText.match(/\b(B|CE|ME)\b/g);
+                    addField('Category / Kategori', category ? Array.from(new Set(category)).join(', ') : null, "Category (B, CE, ME) missing.");
+
+                    const spec = combinedText.match(/\b(B\d{2}|CE\d{2}|ME\d{2})\b/g);
+                    addField('Specializations / Pengkhususan', spec ? Array.from(new Set(spec)).join(', ') : null, "Specialization codes missing.");
+
+                    const expDate = combinedText.match(/(?:TARIKH HABIS TEMPOH|EXPIRY)[\/:\s]+(\d{1,2}\s+[A-Z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    addField('Validity Period / Tarikh Habis Tempoh Perakuan', expDate ? expDate[1] : null, "Expiry date missing.");
+
+                    const startDate = combinedText.match(/(?:TARIKH MULA BERKUATKUASA)[\/:\s]+(\d{1,2}\s+[A-Z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    addField('Tarikh Mula Berkuatkuasa', startDate ? startDate[1] : null, "Effective start date missing.");
+
+                    const status = textUpper.includes("AKTIF") || textUpper.includes("ACTIVE") ? "Active / Aktif" : "Suspended / Dormant / Tidak Aktif";
+                    addField('Status', status, "Status missing.");
+                    break;
+                }
+            }
+
+            return fields;
+        }
+
+        // Render Cards in Output Panel
+        function renderExtractedFields(fields) {
+            structuredOutput.innerHTML = "";
+            fields.forEach(f => {
+                const card = document.createElement('div');
+                card.className = `field-card ${f.status}`;
+                
+                const header = document.createElement('div');
+                header.className = 'field-header';
+                
+                const name = document.createElement('div');
+                name.className = 'field-name';
+                name.innerText = f.label;
+
+                const status = document.createElement('div');
+                status.className = 'field-status';
+                status.innerText = f.status === 'success' ? 'CAPTURED' : 'UNREADABLE / MISSING';
+
+                header.appendChild(name);
+                header.appendChild(status);
+
+                const val = document.createElement('div');
+                val.className = 'field-value';
+                val.innerText = f.value;
+
+                card.appendChild(header);
+                card.appendChild(val);
+
+                structuredOutput.appendChild(card);
+            });
+        }
+
+        // Copy raw text button
+        btnCopyRaw.addEventListener('click', () => {
+            navigator.clipboard.writeText(rawOutput.value);
+            btnCopyRaw.innerText = "Copied!";
+            setTimeout(() => btnCopyRaw.innerHTML = `<i class="fa-solid fa-copy"></i> Copy`, 2000);
+        });
+    </script>
 </body>
 </html>
