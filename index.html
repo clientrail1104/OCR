@@ -803,7 +803,7 @@
                     data['Old Company Name / Nama Syarikat Lama'] = extractRegex(front, /(?:Nama Lama|Old Name)\s*[:\s]*([A-Z0-9\s\.\&]+)/i) || 'N/A';
                     data['Registration No / No. Pendaftaran'] = extractRegex(front, /(?:No\. Pendaftaran|Registration No)\s*[:\s]*([0-9]{12}|[0-9]{6}-[A-Z])/i);
                     data['Incorporation Date / Tarikh Perbadanan'] = extractRegex(front, /(\d{2}[-\/]\d{2}[-\/]\d{4})/i);
-                    data['Business Structure'] = extractRegex(front, /(Sdn\. Bhd\.|Sole Proprietorship|Partnership|Sendirian Berhad)/i) || 'Private Limited (Sdn. Bhd.)';
+                    data['Business Structure'] = extractRegex(front, /(Sdn\. Bhd\.|Sole Proprietorship|Partnership|Sendirian Berhad|ENTERPRISE)/i) || 'Private Limited (Sdn. Bhd.)';
                     data['Business Status & Expiry Date'] = extractRegex(front, /(?:sehingga|expiry)\s*[:\s]*(\d{2}[\/\.-][A-Za-z0-9]+[\/\.-]\d{4})/i) || 'ACTIVE';
                     data['Registered Address / Alamat Daftar'] = extract5LineAddress(front);
                     data['Nature of Business / Jenis Perniagaan'] = extractRegex(front, /(?:Jenis Perniagaan|Nature of Business)\s*[:\s]*([^\n]+)/i);
