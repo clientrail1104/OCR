@@ -801,7 +801,7 @@
                 case 'ssm':
                     data['Company Name / Nama Syarikat'] = extractRegex(front, /(?:Nama Syarikat|Company Name)\s*[:\s]*([A-Z0-9\s\.\&\(\)]+(?:SDN BHD|BHD|ENTERPRISE|PLT))/i) || extractRegex(front, /([A-Z0-9\s\.\&]+(?:SDN BHD|ENTERPRISE))/i);
                     data['Old Company Name / Nama Syarikat Lama'] = extractRegex(front, /(?:Nama Lama|Old Name)\s*[:\s]*([A-Z0-9\s\.\&]+)/i) || 'N/A';
-                    data['Registration No / No Pendaftaran'] = extractRegex(front, /(?:No\. Pendaftaran|Registration No)\s*[:\s]*([0-9]{12}|[0-9]{6}-[A-Z])/i);
+                    data['Registration No / No. Pendaftaran'] = extractRegex(front, /(?:No\. Pendaftaran|Registration No)\s*[:\s]*([0-9]{12}|[0-9]{6}-[A-Z])/i);
                     data['Incorporation Date / Tarikh Perbadanan'] = extractRegex(front, /(\d{2}[-\/]\d{2}[-\/]\d{4})/i);
                     data['Business Structure'] = extractRegex(front, /(Sdn\. Bhd\.|Sole Proprietorship|Partnership|Sendirian Berhad)/i) || 'Private Limited (Sdn. Bhd.)';
                     data['Business Status & Expiry Date'] = extractRegex(front, /(?:sehingga|expiry)\s*[:\s]*(\d{2}[\/\.-][A-Za-z0-9]+[\/\.-]\d{4})/i) || 'ACTIVE';
@@ -812,7 +812,7 @@
 
                 case 'cidb':
                     data['Company Name / Nama Kontraktor'] = extractRegex(front, /(?:Nama Kontraktor|Contractor Name)\s*[:\s]*([A-Z0-9\s\.\&\(\)]+)/i);
-                    data['Registration Number / No Pendaftaran'] = extractRegex(front, /(?:No Pendaftaran|Reg No)\s*[:\s]*([0-9A-Z-]+)/i);
+                    data['Registration Number / No. Pendaftaran'] = extractRegex(front, /(?:No. Pendaftaran|Reg No)\s*[:\s]*([0-9A-Z-]+)/i);
                     data['Registered Address'] = extract5LineAddress(front);
                     const grade = extractRegex(front, /(G[1-7])/i) || 'G7';
                     const limits = { 'G1': 'RM200,000', 'G2': 'RM500,000', 'G3': 'RM1,000,000', 'G4': 'RM3,000,000', 'G5': 'RM5,000,000', 'G6': 'RM10,000,000', 'G7': 'Unlimited / No Limit' };
