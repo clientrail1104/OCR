@@ -42,6 +42,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
     <input id="fileInput" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv">
   </div>
   <div class="controls">
+    <button id="autoEnhanceBtn" title="Enable/disable HD preprocessing">✦ HD Enhance: ON</button>
     <button class="primary" id="processBtn">▶ Process Selected</button>
     <button id="processAllBtn">Process All</button>
     <button class="danger" id="clearBtn">Clear</button>
@@ -62,6 +63,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
     <div class="canvaswrap" id="canvasWrap"><div class="empty" id="emptyPreview">Upload a document to begin.<br><br>OCR bounding boxes will appear after processing.</div><canvas id="previewCanvas" class="hidden"></canvas></div>
     <div>
       <div class="stage" id="stage">READY</div>
+      <div id="enhanceStatus" style="font-size:8px;color:var(--muted);margin-top:2px">Original preserved · HD OCR working copy ready when processing starts</div>
       <div class="progress"><i id="progressBar"></i></div>
       <div class="viewerfoot"><span id="pageStatus">0 pages</span><span id="timing">0 ms</span></div>
     </div>
@@ -93,6 +95,21 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
   <div class="controls"><button class="primary" id="saveTpl">Save Template</button><button id="useTpl">Use Template</button></div>
   <div class="settingrow"><label>Saved templates</label><div class="templateList" id="templateList"></div></div>
   <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
+  <div class="settingrow"><label>HD preprocessing</label>
+    <select class="select" id="enhanceMode">
+      <option value="auto">Auto — quality-adaptive</option>
+      <option value="strong">Strong — difficult/blurry scans</option>
+      <option value="light">Light — already sharp documents</option>
+    </select>
+  </div>
+  <div class="settingrow"><label>Render scale</label>
+    <select class="select" id="renderScale">
+      <option value="2">2× — balanced</option>
+      <option value="2.5">2.5× — high clarity</option>
+      <option value="3">3× — maximum clarity</option>
+    </select>
+  </div>
+  <div class="notice">HD processing creates a separate OCR working image. The original upload is preserved unchanged. It uses contrast normalization, upscaling, local sharpening, denoising, adaptive thresholding and optional grayscale—not artificial text invention.</div>
   <div class="settingrow"><label>OCR language</label><select class="select" id="ocrLang"><option value="eng">English</option><option value="msa">Malay (requires language asset support)</option></select></div>
   <div class="notice">For maximum accuracy, this browser build uses Tesseract.js. PaddleOCR/EasyOCR/OpenCV/PyMuPDF are server-side Python technologies and cannot be genuinely embedded into a static GitHub Pages HTML file. This build does not pretend otherwise.</div>
 </div>
@@ -116,7 +133,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
 
 const $=id=>document.getElementById(id);
 const MAX=500*1024*1024;
-const state={files:[],selected:null,page:0,zoom:1,boxes:true,rotation:0,templates:JSON.parse(localStorage.getItem("neonocr.templates")||"[]"),activeTemplate:null,worker:null,processing:false};
+const state={files:[],selected:null,page:0,zoom:1,boxes:true,rotation:0,templates:JSON.parse(localStorage.getItem("neonocr.templates")||"[]"),activeTemplate:null,worker:null,processing:false,enhance:true};
 
 const supported=["png","jpg","jpeg","webp","tif","tiff","bmp","heic","heif","pdf","doc","docx","xls","xlsx","ppt","pptx","txt","csv"];
 const builtIn={
@@ -138,6 +155,7 @@ function confidence(n){return typeof n==="number"&&Number.isFinite(n)?Math.round
 function statusFor(v,c){if(!v||!v.trim())return["NOT DETECTED","red"];if(c!==null&&c<65)return["NEEDS REVIEW","amber"];return["DETECTED","green"]}
 
 $("settingsBtn").onclick=()=>$("settings").classList.toggle("open");
+$("autoEnhanceBtn").onclick=()=>{state.enhance=!state.enhance;$("autoEnhanceBtn").textContent=state.enhance?"✦ HD Enhance: ON":"✦ HD Enhance: OFF";toast(state.enhance?"HD preprocessing enabled.":"HD preprocessing disabled.");};
 $("closeSettings").onclick=()=>$("settings").classList.remove("open");
 $("drop").onclick=e=>{if(e.target.tagName!=="BUTTON")$("fileInput").click()};
 $("drop").ondragover=e=>{e.preventDefault();$("drop").classList.add("drag")};
@@ -205,11 +223,14 @@ async function fileToPages(f){
  if(["png","jpg","jpeg","webp","tif","tiff","bmp","heic","heif"].includes(f.ext)){
    let blob=file;
    if(["heic","heif"].includes(f.ext)){if(!window.heic2any)throw Error("HEIC decoder is unavailable in this browser session.");blob=await heic2any({blob:file,toType:"image/png"});if(Array.isArray(blob))blob=blob[0]}
-   const url=URL.createObjectURL(blob);f.previewURL=url;pages.push({url});return pages;
+   const url=URL.createObjectURL(blob);f.previewURL=url;
+   const sourceCanvas=await imageToCanvas(url);
+   pages.push({canvas:sourceCanvas,originalCanvas:cloneCanvas(sourceCanvas)});return pages;
  }
  if(f.ext==="pdf"){
    const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;
-   for(let i=1;i<=pdf.numPages;i++){setStage(`Reading PDF page ${i}/${pdf.numPages}`);const pg=await pdf.getPage(i);const vp=pg.getViewport({scale:2});const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;pages.push({canvas:c});}
+   const scale=Number($("renderScale").value||2);
+   for(let i=1;i<=pdf.numPages;i++){setStage(`Rendering HD PDF page ${i}/${pdf.numPages}`);const pg=await pdf.getPage(i);const vp=pg.getViewport({scale});const c=document.createElement("canvas");c.width=Math.round(vp.width);c.height=Math.round(vp.height);await pg.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;pages.push({canvas:c,originalCanvas:cloneCanvas(c)});}
    return pages;
  }
  if(f.ext==="docx"){
@@ -231,6 +252,119 @@ async function fileToPages(f){
  if(["txt"].includes(f.ext)){pages.push({canvas:textCanvas(await file.text())});return pages}
  throw Error("This format cannot be processed by this browser build.");
 }
+
+async function imageToCanvas(url){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      // Decode at native dimensions; never downsample the original.
+      const c=document.createElement("canvas");
+      c.width=img.naturalWidth;c.height=img.naturalHeight;
+      c.getContext("2d",{willReadFrequently:true}).drawImage(img,0,0);
+      resolve(c);
+    };
+    img.onerror=()=>reject(new Error("Image could not be decoded."));
+    img.src=url;
+  });
+}
+function cloneCanvas(src){const c=document.createElement("canvas");c.width=src.width;c.height=src.height;c.getContext("2d").drawImage(src,0,0);return c}
+function imageSharpness(canvas){
+  const w=Math.min(canvas.width,1200), scale=w/canvas.width;
+  const h=Math.max(1,Math.round(canvas.height*scale));
+  const c=document.createElement("canvas");c.width=w;c.height=h;
+  const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(canvas,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data;
+  let sum=0,sum2=0,n=0;
+  for(let y=1;y<h;y+=2)for(let x0=1;x0<w;x0+=2){
+    const i=(y*w+x0)*4, j=(y*w+x0-1)*4, k=((y-1)*w+x0)*4;
+    const a=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+    const b=.299*d[j]+.587*d[j+1]+.114*d[j+2];
+    const q=.299*d[k]+.587*d[k+1]+.114*d[k+2];
+    const lap=a*4-b-q-(.299*d[i+4]+.587*d[i+5]+.114*d[i+6])-((y+1<h)?(.299*d[(i+4*w)]+.587*d[(i+4*w)+1]+.114*d[(i+4*w)+2]):a);
+    sum+=lap;sum2+=lap*lap;n++;
+  }
+  return n?Math.max(0,sum2/n-(sum/n)**2):0;
+}
+function enhanceForOCR(src){
+  const mode=$("enhanceMode").value;
+  const sharp=imageSharpness(src);
+  const isSmall=src.width<1800||src.height<1200;
+  const needsStrong=mode==="strong"||(mode==="auto"&&(isSmall||sharp<650));
+  const scale=isSmall?(needsStrong?2.4:1.7):(needsStrong?1.35:1.05);
+  const w=Math.min(7000,Math.round(src.width*scale)),h=Math.min(7000,Math.round(src.height*scale));
+  const sx=w/src.width,sy=h/src.height;
+  const c=document.createElement("canvas");c.width=w;c.height=h;
+  const ctx=c.getContext("2d",{willReadFrequently:true});
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+  ctx.drawImage(src,0,0,w,h);
+  const img=ctx.getImageData(0,0,w,h),d=img.data;
+  // Luma + local contrast preparation.
+  let mean=0,count=0;
+  for(let i=0;i<d.length;i+=16){mean+=.299*d[i]+.587*d[i+1]+.114*d[i+2];count++}
+  mean/=Math.max(1,count);
+  const contrast=needsStrong?1.18:1.08;
+  for(let i=0;i<d.length;i+=4){
+    let y=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+    y=128+(y-128)*contrast;
+    y=Math.max(0,Math.min(255,y));
+    // Keep RGB grayscale for stable OCR while retaining every pixel's luminance.
+    d[i]=d[i+1]=d[i+2]=y;
+  }
+  ctx.putImageData(img,0,0);
+
+  // Gentle unsharp mask using a temporary low-resolution blur. This improves
+  // character edges without inventing missing characters.
+  if(needsStrong){
+    const blur=document.createElement("canvas");blur.width=w;blur.height=h;
+    const bctx=blur.getContext("2d");
+    bctx.filter="blur(0.8px)";bctx.drawImage(c,0,0);
+    ctx.globalCompositeOperation="lighter";ctx.globalAlpha=.16;ctx.drawImage(c,0,0);
+    ctx.globalCompositeOperation="destination-out";ctx.globalAlpha=.06;ctx.drawImage(blur,0,0);
+    ctx.globalCompositeOperation="source-over";ctx.globalAlpha=1;
+  }
+  // Adaptive threshold is generated as a SECOND OCR candidate, never replacing
+  // the enhanced grayscale candidate.
+  const threshold=needsStrong?adaptiveThreshold(c):null;
+  return {gray:c,threshold,scale,sharp};
+}
+function adaptiveThreshold(src){
+  const c=document.createElement("canvas");c.width=src.width;c.height=src.height;
+  const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(src,0,0);
+  const d=ctx.getImageData(0,0,c.width,c.height),out=new Uint8ClampedArray(d.data);
+  const W=c.width,H=c.height,r=Math.max(8,Math.round(Math.min(W,H)/120));
+  // Fast local mean sampled in a coarse grid, then bilinear-ish nearest lookup.
+  const step=8,gw=Math.ceil(W/step),gh=Math.ceil(H/step),means=new Float32Array(gw*gh);
+  for(let gy=0;gy<gh;gy++)for(let gx=0;gx<gw;gx++){
+    const x0=Math.max(0,gx*step-r),x1=Math.min(W-1,gx*step+r);
+    const y0=Math.max(0,gy*step-r),y1=Math.min(H-1,gy*step+r);
+    let sum=0,n=0;
+    for(let y=y0;y<=y1;y+=Math.max(1,Math.floor(r/3)))for(let x=x0;x<=x1;x+=Math.max(1,Math.floor(r/3))){
+      const i=(y*W+x)*4;sum+=d.data[i];n++;
+    }
+    means[gy*gw+gx]=sum/Math.max(1,n);
+  }
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const gx=Math.min(gw-1,Math.floor(x/step)),gy=Math.min(gh-1,Math.floor(y/step));
+    const i=(y*W+x)*4,m=means[gy*gw+gx],v=d.data[i];
+    const q=v>m-10?255:0;out[i]=out[i+1]=out[i+2]=q;out[i+3]=255;
+  }
+  d.data.set(out);ctx.putImageData(d,0,0);return c;
+}
+async function recognizeBest(worker,page){
+  // Candidate 1: enhanced grayscale. Candidate 2: adaptive threshold for hard scans.
+  const enh=state.enhance?enhanceForOCR(page.originalCanvas||page.canvas):{gray:page.canvas,threshold:null,scale:1,sharp:0};
+  $("enhanceStatus").textContent=`HD working copy · ${Math.round(enh.scale*100)}% scale · sharpness ${Math.round(enh.sharp)} · original preserved`;
+  const candidates=[enh.gray];if(enh.threshold)candidates.push(enh.threshold);
+  let best=null;
+  for(let i=0;i<candidates.length;i++){
+    setStage(`OCR clarity pass ${i+1}/${candidates.length}`,42);
+    const r=await worker.recognize(candidates[i],{rotateAuto:true});
+    const score=(r.data.confidence||0)*.75+(r.data.words||[]).filter(w=>w.text.trim()).length*.02;
+    if(!best||score>best.score)best={r,score,canvas:candidates[i],enh};
+  }
+  page.ocrCanvas=best.canvas;page.words=(best.r.data.words||[]).map(w=>({text:w.text,conf:w.confidence,bbox:w.bbox}));
+  return best.r;
+}
 function textCanvas(text){
  const lines=String(text||"").split(/\r?\n/),c=document.createElement("canvas"),ctx=c.getContext("2d");ctx.font="20px Arial";const width=Math.min(2200,Math.max(900,...lines.map(x=>ctx.measureText(x).width+80)));c.width=width;c.height=Math.max(400,lines.length*30+50);ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle="#111";ctx.font="20px Arial";lines.forEach((l,i)=>ctx.fillText(l,25,35+i*30));return c}
 
@@ -242,20 +376,18 @@ async function processFile(f){
    const worker=await getWorker();const pageResults=[];
    for(let i=0;i<pages.length;i++){
      state.page=i;await showPage(f,i);setStage(`Detecting orientation · page ${i+1}/${pages.length}`,25+Math.round(i/pages.length*10));
-     const source=pages[i].canvas||pages[i].url;
-     // Tesseract OSD is not universally reliable in browser workers. We run OCR on the
-     // original source and preserve it; no guessed rotation is applied to source data.
-     setStage(`Running OCR · page ${i+1}/${pages.length}`,35+Math.round(i/pages.length*40));
-     const r=await worker.recognize(source,{rotateAuto:true});
+     setStage(`Creating HD OCR working copy · page ${i+1}/${pages.length}`,35+Math.round(i/pages.length*40));
+     const r=await recognizeBest(worker,pages[i]);
      pageResults.push({text:r.data.text,words:(r.data.words||[]).map(w=>({text:w.text,conf:w.confidence,bbox:w.bbox})),confidence:r.data.confidence});
      pages[i].words=pageResults[i].words;
-     if(pages[i].canvas)drawProcessedCanvas(pages[i]);
+     pages[i].ocrCanvas=pages[i].ocrCanvas||pages[i].canvas;
+     if(pages[i].ocrCanvas)drawProcessedCanvas({...pages[i],canvas:pages[i].ocrCanvas});
    }
    setStage("Reconstructing layout",78);f.ocr=pageResults;setStage("Extracting fields",84);
    const classification=classify(f,joinPages(pageResults));setStage("Validating fields",90);
    const extracted=extractFields(f,classification);setStage("Cross-checking",95);
    extracted.conflicts=consistency(extracted,f);
-   f.result={classification,fields:extracted.fields,conflicts:extracted.conflicts,allText:joinPages(pageResults),confidence:avg(pageResults.map(x=>x.confidence))};
+   f.result={classification,fields:extracted.fields,conflicts:extracted.conflicts,allText:joinPages(pageResults),confidence:avg(pageResults.map(x=>x.confidence)),hd:state.enhance};
    f.elapsed=Math.round(performance.now()-start);f.status="COMPLETE";setStage("COMPLETE",100);$("timing").textContent=`${f.elapsed} ms`;renderResult(f);renderFiles();updateBottom(f);
  }catch(e){
    console.error(e);f.status="ERROR";f.error=userError(e);setStage("ERROR",0);toast(f.error);renderFiles();renderResult(f)
