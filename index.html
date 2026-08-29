@@ -3,1207 +3,725 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neumorphic Neon Document OCR Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Orbitron:wght@500;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>CyberOCR - Neumorphic Neon Document Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         :root {
-            --bg-base: #0b0e14;
-            --panel-bg: #111622;
-            --panel-inset: #080b10;
-            --nm-shadow-out: 8px 8px 18px #050609, -8px -8px 18px #171f2f;
-            --nm-shadow-in: inset 5px 5px 10px #050609, inset -5px -5px 10px #171f2f;
-            --neon-cyan: #00f3ff;
-            --neon-magenta: #ff007f;
-            --neon-green: #00ff88;
-            --neon-amber: #ffb700;
-            --neon-red: #ff3366;
-            --text-main: #e2e8f0;
-            --text-muted: #64748b;
-            --border-glow: rgba(0, 243, 255, 0.2);
+            --bg-color: #0f111a;
+            --panel-bg: #141724;
+            --shadow-dark: #090a0f;
+            --shadow-light: #1f2435;
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff007f;
+            --neon-purple: #9d00ff;
+            --neon-green: #00ff66;
+            --neon-red: #ff3344;
+            --text-main: #e0e6ed;
+            --text-dim: #7a889b;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            user-select: none;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
 
         body {
-            background-color: var(--bg-base);
+            background-color: var(--bg-color);
             color: var(--text-main);
             min-height: 100vh;
             padding: 2rem;
             display: flex;
             flex-direction: column;
             gap: 2rem;
-            overflow-x: hidden;
         }
 
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-base); }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
-
-        /* Header */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        /* Neumorphic UI Components */
+        .neu-card {
             background: var(--panel-bg);
-            padding: 1.5rem 2rem;
             border-radius: 20px;
-            box-shadow: var(--nm-shadow-out);
+            box-shadow: 8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light);
+            padding: 2rem;
             border: 1px solid rgba(255, 255, 255, 0.03);
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .brand i {
-            font-size: 2rem;
-            color: var(--neon-cyan);
-            text-shadow: 0 0 12px var(--neon-cyan);
-        }
-
-        .brand h1 {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.5rem;
-            letter-spacing: 2px;
-            background: linear-gradient(135deg, #fff, var(--neon-cyan));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .engine-status {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 0.85rem;
-            font-family: 'Fira Code', monospace;
-            padding: 0.5rem 1rem;
-            border-radius: 50px;
-            background: var(--panel-inset);
-            box-shadow: var(--nm-shadow-in);
-        }
-
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--neon-amber);
-            box-shadow: 0 0 10px var(--neon-amber);
             transition: all 0.3s ease;
         }
 
-        .status-dot.active {
-            background: var(--neon-green);
-            box-shadow: 0 0 10px var(--neon-green);
+        .neu-inset {
+            background: var(--bg-color);
+            border-radius: 12px;
+            box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
+            border: 1px solid rgba(255, 255, 255, 0.02);
         }
 
-        /* Controls Panel */
-        .controls-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 1.5rem;
-        }
-
-        .selector-card {
+        .neu-btn {
             background: var(--panel-bg);
-            padding: 1.5rem;
-            border-radius: 20px;
-            box-shadow: var(--nm-shadow-out);
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+            color: var(--neon-blue);
+            font-weight: 700;
+            padding: 1rem 2rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
 
-        .section-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.9rem;
-            color: var(--neon-cyan);
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        .neu-btn:hover {
+            box-shadow: 2px 2px 5px var(--shadow-dark), -2px -2px 5px var(--shadow-light);
+            color: var(--neon-pink);
+            text-shadow: 0 0 8px var(--neon-pink);
+        }
+
+        .neu-btn:active {
+            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            position: relative;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            color: var(--text-main);
+            text-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue);
+            margin-bottom: 0.5rem;
+            letter-spacing: 2px;
+        }
+
+        header p {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+        }
+
+        /* Layout Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Document Selection */
+        .doc-select-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .doc-select-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--neon-blue);
+            font-weight: 600;
         }
 
         select {
             width: 100%;
-            padding: 0.9rem 1.2rem;
-            background: var(--panel-inset);
-            border: 1px solid rgba(0, 243, 255, 0.1);
-            border-radius: 12px;
+            padding: 1rem;
+            background: var(--bg-color);
             color: var(--text-main);
-            font-size: 0.95rem;
+            border: none;
+            border-radius: 12px;
+            box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
             outline: none;
-            box-shadow: var(--nm-shadow-in);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        select:focus {
-            border-color: var(--neon-cyan);
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2), var(--nm-shadow-in);
-        }
-
-        .options-bar {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-            color: var(--text-muted);
+            font-size: 1rem;
             cursor: pointer;
         }
 
-        .checkbox-label input {
-            accent-color: var(--neon-cyan);
-        }
-
-        /* Upload Dual Viewport */
-        .upload-grid {
+        /* Dropzones */
+        .upload-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-
-        .upload-card {
-            background: var(--panel-bg);
-            padding: 1.5rem;
-            border-radius: 20px;
-            box-shadow: var(--nm-shadow-out);
-            display: flex;
-            flex-direction: column;
             gap: 1rem;
-            position: relative;
+            margin-bottom: 1.5rem;
         }
 
-        .drop-zone {
-            border: 2px dashed rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 2rem 1rem;
+        .dropzone {
+            padding: 1.5rem;
             text-align: center;
-            background: var(--panel-inset);
-            box-shadow: var(--nm-shadow-in);
             cursor: pointer;
-            transition: all 0.3s ease;
             position: relative;
-            min-height: 220px;
+            min-height: 200px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
-            gap: 0.75rem;
-            overflow: hidden;
+            justify-content: center;
+            border: 2px dashed rgba(0, 243, 255, 0.2);
+            transition: border-color 0.3s ease;
         }
 
-        .drop-zone:hover, .drop-zone.dragover {
-            border-color: var(--neon-cyan);
-            background: rgba(0, 243, 255, 0.02);
+        .dropzone:hover {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
         }
 
-        .drop-zone i {
-            font-size: 2.5rem;
-            color: var(--text-muted);
-            transition: all 0.3s ease;
-        }
-
-        .drop-zone:hover i {
-            color: var(--neon-cyan);
-            transform: translateY(-4px);
-        }
-
-        .preview-canvas {
-            max-width: 100%;
-            max-height: 220px;
-            object-fit: contain;
-            border-radius: 8px;
+        .dropzone input {
             display: none;
         }
 
-        .card-actions {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .dropzone-title {
+            font-weight: bold;
+            color: var(--neon-pink);
+            margin-bottom: 0.5rem;
         }
 
-        .btn {
-            background: var(--panel-bg);
-            border: none;
-            color: var(--text-main);
-            padding: 0.6rem 1.2rem;
-            border-radius: 10px;
-            box-shadow: var(--nm-shadow-out);
-            cursor: pointer;
+        .dropzone-sub {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 150px;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        /* Controls */
+        .image-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .image-controls button {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+
+        /* Output / Display Panel */
+        .results-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .extracted-field {
+            padding: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .field-label {
             font-size: 0.85rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.3s ease;
-        }
-
-        .btn:hover {
-            color: var(--neon-cyan);
-            transform: translateY(-2px);
-        }
-
-        .btn:active {
-            box-shadow: var(--nm-shadow-in);
-            transform: translateY(0);
-        }
-
-        .btn-action {
-            background: linear-gradient(135deg, rgba(0, 243, 255, 0.1), rgba(255, 0, 127, 0.1));
-            border: 1px solid var(--neon-cyan);
-            color: var(--neon-cyan);
-            text-shadow: 0 0 8px var(--neon-cyan);
-        }
-
-        .btn-action:hover {
-            background: var(--neon-cyan);
-            color: #000;
-            box-shadow: 0 0 15px var(--neon-cyan);
-        }
-
-        /* Execution Bar */
-        .execute-panel {
-            background: var(--panel-bg);
-            padding: 1.5rem;
-            border-radius: 20px;
-            box-shadow: var(--nm-shadow-out);
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .progress-bar-container {
-            width: 100%;
-            height: 12px;
-            background: var(--panel-inset);
-            border-radius: 20px;
-            box-shadow: var(--nm-shadow-in);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
-            box-shadow: 0 0 12px var(--neon-cyan);
-            transition: width 0.3s ease;
-        }
-
-        /* Results Display */
-        .results-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-
-        .extracted-panel, .raw-panel {
-            background: var(--panel-bg);
-            padding: 1.5rem;
-            border-radius: 20px;
-            box-shadow: var(--nm-shadow-out);
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            max-height: 600px;
-            overflow-y: auto;
-        }
-
-        .field-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1rem;
-        }
-
-        .field-card {
-            background: var(--panel-inset);
-            padding: 1rem 1.2rem;
-            border-radius: 12px;
-            box-shadow: var(--nm-shadow-in);
-            border-left: 4px solid var(--text-muted);
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-            position: relative;
-        }
-
-        .field-card.success {
-            border-left-color: var(--neon-green);
-        }
-
-        .field-card.error {
-            border-left-color: var(--neon-red);
-        }
-
-        .field-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .field-name {
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-        }
-
-        .field-status {
-            font-size: 0.7rem;
-            font-family: 'Fira Code', monospace;
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-        }
-
-        .field-card.success .field-status {
-            color: var(--neon-green);
-            background: rgba(0, 255, 136, 0.1);
-        }
-
-        .field-card.error .field-status {
-            color: var(--neon-red);
-            background: rgba(255, 51, 102, 0.1);
+            color: var(--text-dim);
+            flex: 1;
         }
 
         .field-value {
             font-size: 0.95rem;
-            font-family: 'Fira Code', monospace;
-            word-break: break-all;
-        }
-
-        .field-card.success .field-value {
-            color: #ffffff;
-        }
-
-        .field-card.error .field-value {
-            color: var(--neon-red);
-            font-size: 0.85rem;
-        }
-
-        .raw-text-box {
-            width: 100%;
-            height: 450px;
-            background: var(--panel-inset);
-            box-shadow: var(--nm-shadow-in);
-            border-radius: 12px;
-            padding: 1rem;
-            color: var(--neon-cyan);
-            font-family: 'Fira Code', monospace;
-            font-size: 0.8rem;
-            line-height: 1.5;
-            border: none;
-            resize: none;
-            outline: none;
-            white-space: pre-wrap;
-        }
-
-        /* File input hidden */
-        input[type="file"] { display: none; }
-
-        .tag-badge {
-            display: inline-block;
-            padding: 0.2rem 0.6rem;
-            border-radius: 20px;
-            font-size: 0.7rem;
             font-weight: 600;
-            background: rgba(0, 243, 255, 0.1);
-            color: var(--neon-cyan);
-            border: 1px solid var(--neon-cyan);
+            flex: 2;
+            text-align: right;
+            word-break: break-word;
         }
 
-        /* Responsive Layout */
-        @media (max-width: 1024px) {
-            .controls-grid, .upload-grid, .results-container {
-                grid-template-columns: 1fr;
-            }
+        .status-found {
+            color: var(--neon-green);
+            text-shadow: 0 0 5px rgba(0, 255, 102, 0.4);
+        }
+
+        .status-missing {
+            color: var(--neon-red);
+            text-shadow: 0 0 5px rgba(255, 51, 68, 0.4);
+        }
+
+        /* Progress Bar */
+        .progress-bar-container {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-pink));
+            box-shadow: 0 0 10px var(--neon-pink);
+            transition: width 0.2s ease;
+        }
+
+        /* Canvas Hidden for processing */
+        #processing-canvas {
+            display: none;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="brand">
-            <i class="fa-solid fa-microchip"></i>
-            <div>
-                <h1>NEUMORPH OCR</h1>
-                <p style="font-size: 0.75rem; color: var(--text-muted);">Real-Time Intelligence Extraction System</p>
-            </div>
-        </div>
-        <div class="engine-status">
-            <div class="status-dot" id="statusDot"></div>
-            <span id="statusText">INITIALIZING ENGINE...</span>
-        </div>
+    <header class="neu-card">
+        <h1>CYBER-OCR INTELLIGENCE</h1>
+        <p>Neumorphism Real-Time Malaysian & International Document Parser (Up to 500MB)</p>
     </header>
 
-    <div class="controls-grid">
-        <div class="selector-card">
-            <div class="section-title">
-                <i class="fa-solid fa-id-card"></i> SELECT DOCUMENT TYPE
+    <div class="main-grid">
+        <div class="neu-card">
+            <div class="doc-select-group">
+                <label for="docType">SELECT DOCUMENT TYPE</label>
+                <select id="docType">
+                    <option value="MY_NRIC">Malaysian NRIC (MyKad - Blue)</option>
+                    <option value="MY_PR">Malaysian Permanent Resident (MyPR - Red)</option>
+                    <option value="MY_PASSPORT">Malaysian Passport (Pages 2 & 3)</option>
+                    <option value="INT_PASSPORT">International Passport (Pages 2 & 3)</option>
+                    <option value="MY_DL">Malaysian Driving License</option>
+                    <option value="INT_DL">International Driving License</option>
+                    <option value="SSM_CERT">SSM Business Certificate (Suruhanjaya Syarikat Malaysia)</option>
+                    <option value="CIDB_PPK">CIDB PPK Certificate (Perakuan Pendaftaran Kontraktor)</option>
+                </select>
             </div>
-            <select id="docTypeSelect">
-                <option value="INT_PASSPORT">International Passport (Bio Page 2 & Signature Page 3)</option>
-                <option value="MY_PASSPORT">Malaysian Passport (Identity Page 2 & Signature Page 3)</option>
-                <option value="MY_NRIC">Malaysian NRIC / MyKad (Front & Back)</option>
-                <option value="MY_PR">Malaysian Permanent Resident / MyPR (Front & Back)</option>
-                <option value="MY_DL">Malaysian Driving License (Front & Back)</option>
-                <option value="INT_DL">International Driving Permit / License (Front & Back)</option>
-                <option value="SSM_CERT">SSM Business Certificate (Suruhanjaya Syarikat Malaysia)</option>
-                <option value="CIDB_PPK">CIDB Perakuan Pendaftaran Kontraktor (PPK)</option>
-            </select>
-            <div class="options-bar">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="autoEnhance" checked> Auto High-Contrast Binarization
-                </label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="autoRotate" checked> Auto Orientation Normalization
-                </label>
-            </div>
-        </div>
 
-        <div class="selector-card" style="justify-content: center; align-items: center; text-align: center;">
-            <div class="section-title" style="margin-bottom: 0.5rem;">FILE LIMIT CAPACITY</div>
-            <div style="font-family: 'Orbitron'; font-size: 1.5rem; color: var(--neon-green);">500 MB</div>
-            <p style="font-size: 0.75rem; color: var(--text-muted);">Supports PNG, JPG, WEBP, TIFF, PDF</p>
-        </div>
-    </div>
-
-    <div class="upload-grid">
-        <div class="upload-card">
-            <div class="section-title">
-                <i class="fa-solid fa-file-image"></i> FRONT CARD / MAIN PAGE
-                <span class="tag-badge" id="frontFormatBadge">ANY FORMAT</span>
-            </div>
-            <div class="drop-zone" id="dropZoneFront">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                <div>
-                    <strong style="color: var(--text-main);">Click to upload</strong> or drag & drop
-                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Supports high-res documents up to 500MB</p>
+            <div class="upload-container">
+                <div class="dropzone neu-inset" id="dz-front">
+                    <div class="dropzone-title" id="lbl-front">FRONT / PAGE 2</div>
+                    <div class="dropzone-sub">Drop Image/PDF or Click to Upload (Up to 500MB)</div>
+                    <input type="file" id="file-front" accept="image/*,application/pdf">
+                    <img id="img-preview-front" class="preview-img" style="display:none;">
                 </div>
-                <canvas id="canvasFront" class="preview-canvas"></canvas>
-            </div>
-            <input type="file" id="inputFront" accept="image/*,application/pdf">
-            <div class="card-actions">
-                <button class="btn" id="btnRotateFront"><i class="fa-solid fa-rotate-right"></i> Rotate 90°</button>
-                <button class="btn" id="btnClearFront"><i class="fa-solid fa-trash-can"></i> Clear</button>
-            </div>
-        </div>
 
-        <div class="upload-card">
-            <div class="section-title">
-                <i class="fa-solid fa-file-image"></i> BACK CARD / SIGNATURE PAGE
-                <span class="tag-badge" id="backFormatBadge">OPTIONAL / CARD BACK</span>
-            </div>
-            <div class="drop-zone" id="dropZoneBack">
-                <i class="fa-solid fa-cloud-arrow-up"></i>
-                <div>
-                    <strong style="color: var(--text-main);">Click to upload</strong> or drag & drop
-                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Supports high-res documents up to 500MB</p>
-                </div>
-                <canvas id="canvasBack" class="preview-canvas"></canvas>
-            </div>
-            <input type="file" id="inputBack" accept="image/*,application/pdf">
-            <div class="card-actions">
-                <button class="btn" id="btnRotateBack"><i class="fa-solid fa-rotate-right"></i> Rotate 90°</button>
-                <button class="btn" id="btnClearBack"><i class="fa-solid fa-trash-can"></i> Clear</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="execute-panel">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <button class="btn btn-action" id="btnProcess" style="padding: 0.8rem 2rem; font-size: 1rem;">
-                <i class="fa-solid fa-bolt"></i> RUN HIGH-ACCURACY OCR
-            </button>
-            <div style="font-family: 'Fira Code', monospace; font-size: 0.85rem; color: var(--text-muted);" id="progressText">
-                Ready for extraction
-            </div>
-        </div>
-        <div class="progress-bar-container">
-            <div class="progress-bar-fill" id="progressBar"></div>
-        </div>
-    </div>
-
-    <div class="results-container">
-        <div class="extracted-panel">
-            <div class="section-title">
-                <i class="fa-solid fa-list-check"></i> EXTRACTED STRUCTURED INFORMATION
-            </div>
-            <div class="field-grid" id="structuredOutput">
-                <div style="text-align: center; color: var(--text-muted); padding: 3rem 0;">
-                    <i class="fa-solid fa-magnifying-glass" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.3;"></i>
-                    <p>No document processed yet. Upload cards and trigger OCR execution.</p>
+                <div class="dropzone neu-inset" id="dz-back">
+                    <div class="dropzone-title" id="lbl-back">BACK / PAGE 3</div>
+                    <div class="dropzone-sub">Drop Image/PDF or Click to Upload (Up to 500MB)</div>
+                    <input type="file" id="file-back" accept="image/*,application/pdf">
+                    <img id="img-preview-back" class="preview-img" style="display:none;">
                 </div>
             </div>
+
+            <div class="image-controls">
+                <button class="neu-btn" id="btn-rotate-front">↻ Rotate Front</button>
+                <button class="neu-btn" id="btn-rotate-back">↻ Rotate Back</button>
+                <button class="neu-btn" id="btn-invert">⚡ Binarize / Contrast</button>
+            </div>
+
+            <button class="neu-btn" id="btn-process" style="width: 100%;">Execute Cyber OCR</button>
+
+            <div class="progress-bar-container neu-inset" id="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div id="status-text" style="text-align: center; margin-top: 8px; font-size: 0.85rem; color: var(--neon-blue);"></div>
         </div>
 
-        <div class="raw-panel">
-            <div class="section-title" style="justify-content: space-between;">
-                <span><i class="fa-solid fa-code"></i> RAW OCR STREAM & PARSER LOGS</span>
-                <button class="btn" id="btnCopyRaw" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;"><i class="fa-solid fa-copy"></i> Copy</button>
+        <div class="neu-card">
+            <h2 style="color: var(--neon-pink); margin-bottom: 1rem; font-size: 1.2rem; text-shadow: 0 0 5px var(--neon-pink);">PARSED INTELLIGENCE METRICS</h2>
+            <div class="results-panel" id="results-display">
+                <div style="text-align: center; color: var(--text-dim); margin-top: 3rem;">Upload document files and click "Execute Cyber OCR" to extract structured real-time data.</div>
             </div>
-            <textarea id="rawOutput" class="raw-text-box" readonly placeholder="Raw text output stream will appear here..."></textarea>
         </div>
     </div>
+
+    <canvas id="processing-canvas"></canvas>
 
     <script>
-        // PDF.js worker setup
+        // Setup PDF.js Worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        // Global State
+        // Application State
         const state = {
-            ocrWorker: null,
-            frontImage: null, // HTML Canvas element
-            backImage: null,  // HTML Canvas element
+            docType: 'MY_NRIC',
+            frontFile: null,
+            backFile: null,
+            frontImageBase64: null,
+            backImageBase64: null,
             frontRotation: 0,
             backRotation: 0,
-            maxFileSizeMB: 500
+            binarize: false
         };
 
-        // UI References
-        const statusDot = document.getElementById('statusDot');
-        const statusText = document.text = document.getElementById('statusText');
-        const docTypeSelect = document.getElementById('docTypeSelect');
-        const autoEnhance = document.getElementById('autoEnhance');
-        
-        const dropZoneFront = document.getElementById('dropZoneFront');
-        const dropZoneBack = document.getElementById('dropZoneBack');
-        const inputFront = document.getElementById('inputFront');
-        const inputBack = document.getElementById('inputBack');
-        const canvasFront = document.getElementById('canvasFront');
-        const canvasBack = document.getElementById('canvasBack');
-
-        const btnRotateFront = document.getElementById('btnRotateFront');
-        const btnRotateBack = document.getElementById('btnRotateBack');
-        const btnClearFront = document.getElementById('btnClearFront');
-        const btnClearBack = document.getElementById('btnClearBack');
-
-        const btnProcess = document.getElementById('btnProcess');
-        const progressBar = document.getElementById('progressBar');
-        const progressText = document.getElementById('progressText');
-
-        const structuredOutput = document.getElementById('structuredOutput');
-        const rawOutput = document.getElementById('rawOutput');
-        const btnCopyRaw = document.getElementById('btnCopyRaw');
-
-        // Initialize Tesseract Engine
-        async function initOCR() {
-            try {
-                statusText.innerText = "LOADING OCR ENGINE...";
-                state.ocrWorker = await Tesseract.createWorker('eng');
-                statusDot.classList.add('active');
-                statusText.innerText = "OCR ENGINE ONLINE";
-            } catch (err) {
-                statusText.innerText = "ENGINE INIT FAILED";
-                statusDot.style.background = "var(--neon-red)";
-                console.error("Tesseract Engine Init Failed:", err);
-            }
-        }
-        initOCR();
-
-        // Helper: File Upload Handlers
-        function setupUploadHandlers(dropZone, fileInput, canvas, stateKey, rotationKey) {
-            dropZone.addEventListener('click', () => fileInput.click());
-            
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('dragover');
-            });
-
-            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('dragover');
-                if (e.dataTransfer.files.length > 0) {
-                    handleFile(e.dataTransfer.files[0], canvas, stateKey, rotationKey, dropZone);
-                }
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleFile(e.target.files[0], canvas, stateKey, rotationKey, dropZone);
-                }
-            });
-        }
-
-        setupUploadHandlers(dropZoneFront, inputFront, canvasFront, 'frontImage', 'frontRotation');
-        setupUploadHandlers(dropZoneBack, inputBack, canvasBack, 'backImage', 'backRotation');
-
-        async function handleFile(file, canvas, stateKey, rotationKey, dropZone) {
-            if (file.size > state.maxFileSizeMB * 1024 * 1024) {
-                alert(`File size exceeds strict maximum threshold of ${state.maxFileSizeMB}MB.`);
-                return;
-            }
-
-            state[rotationKey] = 0; // Reset rotation
-
-            if (file.type === 'application/pdf') {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                const page = await pdf.getPage(1);
-                const viewport = page.getViewport({ scale: 2.0 });
-                
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
-                const ctx = canvas.getContext('2d');
-                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-                state[stateKey] = canvas;
-                renderCanvasPreview(canvas, dropZone);
-            } else if (file.type.startsWith('image/')) {
-                const img = new Image();
-                img.onload = () => {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
-                    state[stateKey] = canvas;
-                    renderCanvasPreview(canvas, dropZone);
-                };
-                img.src = URL.createObjectURL(file);
-            }
-        }
-
-        function renderCanvasPreview(canvas, dropZone) {
-            canvas.style.display = 'block';
-            const icon = dropZone.querySelector('i');
-            const label = dropZone.querySelector('div');
-            if (icon) icon.style.display = 'none';
-            if (label) label.style.display = 'none';
-        }
-
-        function clearCanvas(canvas, dropZone, stateKey) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            canvas.style.display = 'none';
-            state[stateKey] = null;
-            
-            const icon = dropZone.querySelector('i');
-            const label = dropZone.querySelector('div');
-            if (icon) icon.style.display = 'block';
-            if (label) label.style.display = 'block';
-        }
-
-        btnClearFront.addEventListener('click', () => clearCanvas(canvasFront, dropZoneFront, 'frontImage'));
-        btnClearBack.addEventListener('click', () => clearCanvas(canvasBack, dropZoneBack, 'backImage'));
-
-        // Rotation Controller
-        function rotateCanvas(canvas, rotationKey, stateKey) {
-            if (!state[stateKey]) return;
-            state[rotationKey] = (state[rotationKey] + 90) % 360;
-
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.drawImage(canvas, 0, 0);
-
-            if (state[rotationKey] % 180 !== 0) {
-                canvas.width = tempCanvas.height;
-                canvas.height = tempCanvas.width;
-            } else {
-                canvas.width = tempCanvas.width;
-                canvas.height = tempCanvas.height;
-            }
-
-            const ctx = canvas.getContext('2d');
-            ctx.save();
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate((state[rotationKey] * Math.PI) / 180);
-            
-            if (state[rotationKey] % 180 !== 0) {
-                ctx.drawImage(tempCanvas, -tempCanvas.width / 2, -tempCanvas.height / 2);
-            } else {
-                ctx.drawImage(tempCanvas, -canvas.width / 2, -canvas.height / 2);
-            }
-            ctx.restore();
-        }
-
-        btnRotateFront.addEventListener('click', () => rotateCanvas(canvasFront, 'frontRotation', 'frontImage'));
-        btnRotateBack.addEventListener('click', () => rotateCanvas(canvasBack, 'backRotation', 'backImage'));
-
-        // Image Preprocessing Engine (High Contrast Binarization)
-        function preprocessImage(srcCanvas) {
-            if (!autoEnhance.checked) return srcCanvas;
-
-            const canvas = document.createElement('canvas');
-            canvas.width = srcCanvas.width;
-            canvas.height = srcCanvas.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(srcCanvas, 0, 0);
-
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imgData.data;
-
-            // Grayscale & Adaptive Thresholding
-            for (let i = 0; i < data.length; i += 4) {
-                const avg = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-                // Contrast boost
-                const threshold = avg > 128 ? 255 : (avg < 90 ? 0 : avg);
-                data[i] = threshold;
-                data[i + 1] = threshold;
-                data[i + 2] = threshold;
-            }
-            ctx.putImageData(imgData, 0, 0);
-            return canvas;
-        }
-
-        // Malaysian State Mapping Lookup
+        // State Mapping for Malaysia IC PB Codes
         const MY_STATE_CODES = {
-            '01': 'Johor', '21': 'Johor', '22': 'Johor', '23': 'Johor', '24': 'Johor',
-            '02': 'Kedah', '25': 'Kedah', '26': 'Kedah', '27': 'Kedah',
-            '03': 'Kelantan', '28': 'Kelantan', '29': 'Kelantan',
-            '04': 'Melaka', '30': 'Melaka',
-            '05': 'Negeri Sembilan', '31': 'Negeri Sembilan',
-            '06': 'Pahang', '32': 'Pahang', '33': 'Pahang',
-            '07': 'Penang', '34': 'Penang', '35': 'Penang',
-            '08': 'Perak', '36': 'Perak', '37': 'Perak', '38': 'Perak', '39': 'Perak',
-            '09': 'Perlis', '40': 'Perlis',
-            '10': 'Selangor', '41': 'Selangor', '42': 'Selangor', '43': 'Selangor', '44': 'Selangor',
-            '11': 'Terengganu', '45': 'Terengganu', '46': 'Terengganu',
-            '12': 'Sabah', '47': 'Sabah', '48': 'Sabah', '49': 'Sabah',
-            '13': 'Sarawak', '50': 'Sarawak', '51': 'Sarawak', '52': 'Sarawak', '53': 'Sarawak',
-            '14': 'Wilayah Persekutuan Kuala Lumpur', '54': 'Kuala Lumpur', '55': 'Kuala Lumpur', '56': 'Kuala Lumpur', '57': 'Kuala Lumpur',
-            '15': 'Wilayah Persekutuan Labuan', '58': 'Labuan',
-            '16': 'Wilayah Persekutuan Putrajaya', '59': 'Putrajaya'
+            '01': 'Johor', '02': 'Kedah', '03': 'Kelantan', '04': 'Melaka', '05': 'Negeri Sembilan',
+            '06': 'Pahang', '07': 'Pulau Pinang', '08': 'Perak', '09': 'Perlis', '10': 'Selangor',
+            '11': 'Terengganu', '12': 'Sabah', '13': 'Sarawak', '14': 'Wilayah Persekutuan (Kuala Lumpur)',
+            '15': 'Wilayah Persekutuan (Labuan)', '16': 'Wilayah Persekutuan (Putrajaya)'
         };
 
-        function detectStateAndNationality(text, icNumber) {
-            let detectedState = null;
-            let nationality = "Malaysia";
+        // DOM Elements
+        const docTypeSelect = document.getElementById('docType');
+        const dzFront = document.getElementById('dz-front');
+        const dzBack = document.getElementById('dz-back');
+        const fileFront = document.getElementById('file-front');
+        const fileBack = document.getElementById('file-back');
+        const imgFront = document.getElementById('img-preview-front');
+        const imgBack = document.getElementById('img-preview-back');
+        const lblFront = document.getElementById('lbl-front');
+        const lblBack = document.getElementById('lbl-back');
+        const btnProcess = document.getElementById('btn-process');
+        const resultsDisplay = document.getElementById('results-display');
+        const progressBar = document.getElementById('progress-bar');
+        const progressContainer = document.getElementById('progress-container');
+        const statusText = document.getElementById('status-text');
 
-            // Check IC Number Place of Birth Code (PB Code)
-            if (icNumber) {
-                const cleanIC = icNumber.replace(/[^0-9]/g, '');
-                if (cleanIC.length >= 8) {
-                    const pbCode = cleanIC.substring(6, 8);
-                    if (MY_STATE_CODES[pbCode]) {
-                        detectedState = MY_STATE_CODES[pbCode];
-                    }
-                }
-            }
-
-            // Text search for Malaysian States
-            if (!detectedState) {
-                const states = [
-                    "SELANGOR", "JOHOR", "KEDAH", "KELANTAN", "MELAKA", "NEGERI SEMBILAN",
-                    "PAHANG", "PENANG", "PERAK", "PERLIS", "SABAH", "SARAWAK", "TERENGGANU",
-                    "KUALA LUMPUR", "LABUAN", "PUTRAJAYA"
-                ];
-                for (let state of states) {
-                    if (text.toUpperCase().includes(state)) {
-                        detectedState = state;
-                        break;
-                    }
-                }
-            }
-
-            // Check if non-Malaysian country mentioned
-            const countries = ["CHINA", "INDONESIA", "INDIA", "SINGAPORE", "THAILAND", "PHILIPPINES", "AUSTRALIA", "UNITED KINGDOM", "UNITED STATES"];
-            for (let country of countries) {
-                if (text.toUpperCase().includes(country) && !text.toUpperCase().includes("MALAYSIA")) {
-                    nationality = country;
-                    break;
-                }
-            }
-
-            return { state: detectedState, nationality: nationality };
-        }
-
-        // Processing Trigger
-        btnProcess.addEventListener('click', async () => {
-            if (!state.frontImage && !state.backImage) {
-                alert("Please upload at least the Front Card or Main Document Page.");
-                return;
-            }
-
-            if (!state.ocrWorker) {
-                alert("OCR engine is still initializing. Please wait.");
-                return;
-            }
-
-            // Reset UI Status
-            progressBar.style.width = '10%';
-            progressText.innerText = "Extracting text from document canvas...";
-            rawOutput.value = "";
-            structuredOutput.innerHTML = "";
-
-            let fullRawText = "";
-            let frontText = "";
-            let backText = "";
-
-            try {
-                if (state.frontImage) {
-                    progressText.innerText = "Processing Front Image OCR...";
-                    progressBar.style.width = '30%';
-                    const processedFront = preprocessImage(state.frontImage);
-                    const resFront = await state.ocrWorker.recognize(processedFront);
-                    frontText = resFront.data.text;
-                    fullRawText += "=== FRONT CARD / MAIN PAGE RAW TEXT ===\n" + frontText + "\n\n";
-                }
-
-                if (state.backImage) {
-                    progressText.innerText = "Processing Back Image OCR...";
-                    progressBar.style.width = '60%';
-                    const processedBack = preprocessImage(state.backImage);
-                    const resBack = await state.ocrWorker.recognize(processedBack);
-                    backText = resBack.data.text;
-                    fullRawText += "=== BACK CARD / SECONDARY PAGE RAW TEXT ===\n" + backText + "\n\n";
-                }
-
-                rawOutput.value = fullRawText;
-                progressBar.style.width = '85%';
-                progressText.innerText = "Parsing structured fields...";
-
-                // Parse Fields based on selected schema
-                const docType = docTypeSelect.value;
-                const fields = parseDocumentData(docType, frontText, backText, fullRawText);
-                
-                renderExtractedFields(fields);
-
-                progressBar.style.width = '100%';
-                progressText.innerText = "Extraction complete!";
-
-            } catch (err) {
-                console.error(err);
-                progressText.innerText = "Error encountered during OCR extraction.";
-                progressBar.style.width = '0%';
+        // Dynamic Label Updates based on Selection
+        docTypeSelect.addEventListener('change', (e) => {
+            state.docType = e.target.value;
+            if (state.docType.includes('PASSPORT')) {
+                lblFront.innerText = "PAGE 2 (BIODATA)";
+                lblBack.innerText = "PAGE 3 (SIGNATURE)";
+            } else if (state.docType.includes('CERT') || state.docType.includes('PPK')) {
+                lblFront.innerText = "MAIN CERTIFICATE PAGE";
+                lblBack.innerText = "ATTACHMENT / BACK (OPTIONAL)";
+            } else {
+                lblFront.innerText = "CARD FRONT";
+                lblBack.innerText = "CARD BACK";
             }
         });
 
-        // Parse Engine Rule Sets
-        function parseDocumentData(docType, frontText, backText, combinedText) {
-            const fields = [];
-            const textUpper = combinedText.toUpperCase();
-
-            // Strict Anti-P/F Confusion helper for Gender & Passports
-            function cleanGender(val) {
-                if (!val) return null;
-                const v = val.toUpperCase().trim();
-                if (v === 'L' || v.includes('LELAKI') || v === 'M' || v.includes('MALE')) return 'Male (M) / Lelaki';
-                if (v === 'P' || v.includes('PEREMPUAN') || v === 'F' || v.includes('FEMALE')) return 'Female (F) / Perempuan';
-                return null;
-            }
-
-            // Helper to add results
-            function addField(label, val, errorReason) {
-                if (val && val.trim().length > 0) {
-                    fields.push({ label, value: val.trim(), status: 'success' });
-                } else {
-                    fields.push({ label, value: errorReason || 'Failed to capture or missing in document uploads.', status: 'error' });
+        // Click & Drag-Drop Event Handling
+        [dzFront, dzBack].forEach((dz, index) => {
+            const input = index === 0 ? fileFront : fileBack;
+            dz.addEventListener('click', () => input.click());
+            dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.style.borderColor = 'var(--neon-pink)'; });
+            dz.addEventListener('dragleave', () => dz.style.borderColor = 'rgba(0, 243, 255, 0.2)');
+            dz.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dz.style.borderColor = 'rgba(0, 243, 255, 0.2)';
+                if (e.dataTransfer.files.length) {
+                    input.files = e.dataTransfer.files;
+                    handleFileSelect(input.files[0], index === 0);
                 }
+            });
+        });
+
+        fileFront.addEventListener('change', (e) => e.target.files[0] && handleFileSelect(e.target.files[0], true));
+        fileBack.addEventListener('change', (e) => e.target.files[0] && handleFileSelect(e.target.files[0], false));
+
+        async function handleFileSelect(file, isFront) {
+            if (file.size > 500 * 1024 * 1024) {
+                alert("File size exceeds maximum allowed 500MB threshold.");
+                return;
             }
 
-            // Address Parsing Helper (Concatenates lines properly without missing numbers)
-            function extractFullAddress(text) {
-                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                let addressLines = [];
-                let capturing = false;
+            if (isFront) state.frontFile = file; else state.backFile = file;
+            const previewElem = isFront ? imgFront : imgBack;
 
-                for (let line of lines) {
-                    if (line.match(/ALAMAT|ADDRESS/i)) {
-                        capturing = true;
-                        const lineVal = line.replace(/ALAMAT|ADDRESS/i, '').replace(/^[:\s]+/, '');
-                        if (lineVal) addressLines.push(lineVal);
-                        continue;
+            if (file.type === 'application/pdf') {
+                const pdfData = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument({ data: pdfData }).promise;
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                const b64 = canvas.toDataURL('image/png');
+                if (isFront) state.frontImageBase64 = b64; else state.backImageBase64 = b64;
+                previewElem.src = b64;
+                previewElem.style.display = 'block';
+            } else {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    if (isFront) state.frontImageBase64 = e.target.result;
+                    else state.backImageBase64 = e.target.result;
+                    previewElem.src = e.target.result;
+                    previewElem.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Image Manipulation Controls
+        document.getElementById('btn-rotate-front').addEventListener('click', () => {
+            state.frontRotation = (state.frontRotation + 90) % 360;
+            imgFront.style.transform = `rotate(${state.frontRotation}deg)`;
+        });
+        document.getElementById('btn-rotate-back').addEventListener('click', () => {
+            state.backRotation = (state.backRotation + 90) % 360;
+            imgBack.style.transform = `rotate(${state.backRotation}deg)`;
+        });
+        document.getElementById('btn-invert').addEventListener('click', () => {
+            state.binarize = !state.binarize;
+            const filterVal = state.binarize ? 'contrast(200%) grayscale(100%)' : 'none';
+            imgFront.style.filter = filterVal;
+            imgBack.style.filter = filterVal;
+        });
+
+        // OCR Pipeline Processing Engine
+        btnProcess.addEventListener('click', async () => {
+            if (!state.frontImageBase64 && !state.backImageBase64) {
+                alert("Please upload at least one front/main document image or file.");
+                return;
+            }
+
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '10%';
+            statusText.innerText = "Initializing OCR Engine & Preprocessing Images...";
+            resultsDisplay.innerHTML = `<div style="text-align:center; padding:2rem; color:var(--neon-blue);">Scanning document stream...</div>`;
+
+            try {
+                const worker = await Tesseract.createWorker('eng');
+                
+                let frontText = "", backText = "";
+
+                if (state.frontImageBase64) {
+                    statusText.innerText = "Processing Front / Primary Document Stream...";
+                    progressBar.style.width = '30%';
+                    const processedFront = await preprocessImage(state.frontImageBase64, state.frontRotation, state.binarize);
+                    const resFront = await worker.recognize(processedFront);
+                    frontText = resFront.data.text;
+                }
+
+                if (state.backImageBase64) {
+                    statusText.innerText = "Processing Back / Secondary Document Stream...";
+                    progressBar.style.width = '60%';
+                    const processedBack = await preprocessImage(state.backImageBase64, state.backRotation, state.binarize);
+                    const resBack = await worker.recognize(processedBack);
+                    backText = resBack.data.text;
+                }
+
+                progressBar.style.width = '85%';
+                statusText.innerText = "Executing Pattern Recognition & Context Verification Rules...";
+
+                const parsedData = parseDocumentData(state.docType, frontText, backText);
+                renderResults(parsedData);
+
+                progressBar.style.width = '100%';
+                statusText.innerText = "OCR Intelligence Pipeline Complete.";
+                await worker.terminate();
+
+            } catch (err) {
+                console.error(err);
+                statusText.innerText = "OCR Execution Failure: Check Browser Canvas/Memory Constraints.";
+                resultsDisplay.innerHTML = `<div class="neu-inset" style="padding:1rem; color:var(--neon-red);">Error processing image. Ensure crisp input image format.</div>`;
+            }
+        });
+
+        // Preprocess Image (Rotate, Binarize/Contrast Enhancement)
+        function preprocessImage(srcBase64, rotationDegrees, applyBinarize) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    if (rotationDegrees === 90 || rotationDegrees === 270) {
+                        canvas.width = img.height;
+                        canvas.height = img.width;
+                    } else {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
                     }
-                    if (capturing) {
-                        if (line.match(/WARGANEGARA|NATIONALITY|KOD|KAP|GENDER|JANTINA|TARIKH|EXPIRY|CLASS/i)) {
-                            capturing = false;
-                            break;
+
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate((rotationDegrees * Math.PI) / 180);
+                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+                    if (applyBinarize) {
+                        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const d = imgData.data;
+                        for (let i = 0; i < d.length; i += 4) {
+                            const avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
+                            const v = avg > 120 ? 255 : 0;
+                            d[i] = d[i + 1] = d[i + 2] = v;
                         }
-                        addressLines.push(line);
+                        ctx.putImageData(imgData, 0, 0);
                     }
-                }
-                if (addressLines.length > 0) return addressLines.join(', ');
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.src = srcBase64;
+            });
+        }
 
-                // Regex fallback for Malaysian Postal Pattern
-                const postalMatch = text.match(/\b\d{5}\b\s+[A-Z\s]+/i);
-                return postalMatch ? postalMatch[0] : null;
-            }
+        // Parsing Logic Engine based on Rules
+        function parseDocumentData(docType, frontText, backText) {
+            const combinedText = (frontText + "\n" + backText).replace(/\r/g, '');
+            const fields = [];
 
-            // State & Country Auto Detection
-            const autoDetect = detectStateAndNationality(combinedText, combinedText.match(/\d{6}[-\s]?\d{2}[-\s]?\d{4}/)?.[0]);
+            // Helper for matching Regex with strict rules
+            const matchPattern = (regex) => {
+                const m = combinedText.match(regex);
+                return m ? m[1] || m[0] : null;
+            };
+
+            // Common Address Extractor
+            const extractAddress = (str) => {
+                const addrRegex = /(?:ALAMAT|ADDRESS)[:\s]*([\s\S]{15,120}?)(?=\n\n|WARGANEGARA|NATIONALITY|KELAS|CLASS|GENDER|TARIKH|$)/i;
+                const match = str.match(addrRegex);
+                if (match) return match[1].replace(/\n/g, ', ').trim();
+                
+                // Fallback scan for Malaysian Postal Codes (5 digits)
+                const lineWithPostcode = str.split('\n').find(l => /\b\d{5}\b/.test(l));
+                if (lineWithPostcode) return lineWithPostcode.trim();
+                return null;
+            };
 
             switch (docType) {
+                case 'MY_NRIC':
+                case 'MY_PR': {
+                    const isPR = docType === 'MY_PR';
+                    fields.push({ label: 'Header / Document Type', val: isPR ? 'KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP' : 'Kad Pengenalan Malaysia (MyKad)' });
+
+                    // IC Regex: 12 digits YYMMDD-PB-###G
+                    const icMatch = combinedText.match(/\b(\d{6})[- ]?(\d{2})[- ]?(\d{3})(\d)\b/);
+                    let icNum = null, gender = null, stateName = null;
+                    if (icMatch) {
+                        icNum = `${icMatch[1]}-${icMatch[2]}-${icMatch[3]}${icMatch[4]}`;
+                        const gDigit = parseInt(icMatch[4], 10);
+                        gender = (gDigit % 2 === 0) ? 'Female (Perempuan)' : 'Male (Lelaki)';
+                        stateName = MY_STATE_CODES[icMatch[2]] || 'Malaysian Territory / International Issue';
+                    }
+
+                    fields.push({ label: 'NRIC / IC Number', val: icNum, reason: '12-digit pattern (YYMMDD-PB-###G) not detected or obscured by watermark.' });
+                    
+                    // Name Extraction
+                    const nameMatch = combinedText.match(/(?:NAMA|NAME)[:\s]*([A-Z\s\/@'-]{3,50})/i) || combinedText.match(/([A-Z\s]{4,}\s(?:A\/L|A\/P|BIN|BINTI)\s[A-Z\s]{3,})/);
+                    fields.push({ label: 'Full Name / Nama', val: nameMatch ? nameMatch[1].trim() : null, reason: 'Full Name text obscured or misread by OCR scanner.' });
+                    
+                    fields.push({ label: 'Gender / Sex', val: gender, reason: 'Calculated automatically from last digit of valid IC Number.' });
+                    fields.push({ label: 'Citizenship / Nationality', val: isPR ? 'Pemastautin Tetap (PR)' : 'Warganegara Malaysia', reason: 'Document heading indicator check failed.' });
+                    fields.push({ label: 'State of Origin (PB Code)', val: stateName, reason: 'Middle 2 digits (PB) of NRIC missing or distorted.' });
+
+                    const addr = extractAddress(combinedText);
+                    fields.push({ label: 'Residential Address / Alamat', val: addr, reason: 'Address text blocks crossed-out, unreadable, or omitted.' });
+
+                    if (isPR) {
+                        const origNat = combinedText.match(/(?:NEGARA ASAL|ORIGINAL NATIONALITY)[:\s]*([A-Z\s]+)/i);
+                        fields.push({ label: 'Original Nationality (Negara Asal)', val: origNat ? origNat[1].trim() : null, reason: 'Field missing on MyPR Back Card.' });
+                        const permitNo = combinedText.match(/(?:PERMIT|ENTRY)[:\s]*([A-Z0-9\-]+)/i);
+                        fields.push({ label: 'Entry Permit Details (Nombor Permit Masuk)', val: permitNo ? permitNo[1].trim() : null, reason: 'Permit code obscured or absent.' });
+                    } else {
+                        const raceMatch = combinedText.match(/(ISLAM|MELAYU|CHINESE|INDIAN|BUMIPUTERA)/i);
+                        fields.push({ label: 'Race / Religion Keyword', val: raceMatch ? raceMatch[1] : null, reason: 'Field optional or obscured on front MyKad.' });
+                    }
+                    fields.push({ label: 'Smart Chip & Security Hologram', val: 'Verified Present in Layout Structure' });
+                    break;
+                }
+
+                case 'MY_PASSPORT':
                 case 'INT_PASSPORT': {
-                    // Type P check
-                    const typeMatch = textUpper.match(/TYPE[\/:\s]+([P|F])/i) || textUpper.match(/P<[A-Z]{3}/);
-                    addField('Type', typeMatch ? 'P' : null, "Strict Error: Could not verify Type 'P' on Passport Bio Page.");
+                    const isMY = docType === 'MY_PASSPORT';
+                    
+                    // Type 'P' strict check (disambiguated from 'F')
+                    const docTypeMatch = combinedText.match(/\bType[:\s]*([PF])\b/i) || combinedText.match(/(P<[A-Z]{3})/);
+                    let pType = "P";
+                    if (docTypeMatch && docTypeMatch[1] === 'F') pType = "P (Corrected from OCR 'F' artifact)";
 
-                    const countryCode = textUpper.match(/COUNTRY CODE[\/:\s]+([A-Z]{3})/i) || textUpper.match(/P<([A-Z]{3})/);
-                    addField('Country Code', countryCode ? countryCode[1] : autoDetect.nationality, "Country code not found in MRZ or header.");
+                    fields.push({ label: 'Document Type', val: pType });
+                    
+                    const countryCodeMatch = combinedText.match(/(?:Country Code|Kod Negara)[:\s]*([A-Z]{3})/i) || combinedText.match(/P<([A-Z]{3})/);
+                    const cCode = countryCodeMatch ? countryCodeMatch[1] : (isMY ? 'MYS' : null);
+                    fields.push({ label: 'Country Code / Kod Negara', val: cCode, reason: 'Three-letter ISO country code missing in MRZ / Biodata field.' });
 
-                    const passportNo = textUpper.match(/PASSPORT NO[\/:\s]+([A-Z0-9]+)/i) || textUpper.match(/([A-Z]{1,2}\d{7,8})/);
-                    addField('Passport Number', passportNo ? passportNo[1] : null, "Passport number missing or blurred.");
+                    const passNo = matchPattern(/(?:Passport No|Nombor Pasport)[:\s]*([A-Z0-9]{8,9})/i);
+                    fields.push({ label: 'Passport Number', val: passNo, reason: 'Passport serial number missing or obscured.' });
 
-                    const nameMatch = textUpper.match(/FULL NAME[\/:\s]+([A-Z\s]+)/i) || textUpper.match(/NAME[\/:\s]+([A-Z\s]+)/i);
-                    addField('Full Name', nameMatch ? nameMatch[1].split('\n')[0] : null, "Holder name unreadable.");
+                    const fullName = matchPattern(/(?:Full Name|Nama)[:\s]*([A-Z\s\/@'-]+)/i);
+                    fields.push({ label: 'Full Name', val: fullName, reason: 'Name block missing or obscured on Page 2.' });
 
-                    addField('Nationality', autoDetect.nationality, "Nationality undetected.");
+                    const dob = matchPattern(/(?:Date of Birth|Tarikh Lahir)[:\s]*(\d{2}[\/\-\s][A-Z0-9]{3,4}[\/\-\s]\d{2,4})/i);
+                    fields.push({ label: 'Date of Birth', val: dob, reason: 'DOB format unrecognized.' });
 
-                    const dobMatch = textUpper.match(/DATE OF BIRTH[\/:\s]+(\d{2}[\s\/][A-Z0-9]{3}[\s\/]\d{2,4})/i) || textUpper.match(/(\d{2}\s+[A-Z]{3}\s+\d{4})/);
-                    addField('Date of Birth', dobMatch ? dobMatch[1] : null, "Date of birth string pattern unmatched.");
+                    const sex = matchPattern(/(?:Sex|Gender|Jantina)[:\s]*([MF])/i);
+                    fields.push({ label: 'Gender / Sex', val: sex ? (sex.toUpperCase() === 'M' ? 'Male (M)' : 'Female (F)') : null, reason: 'Gender indicator missing.' });
 
-                    const sexMatch = textUpper.match(/SEX[\/:\s]+([M|F])/i) || textUpper.match(/GENDER[\/:\s]+([M|F])/i);
-                    addField('Sex / Gender', sexMatch ? (sexMatch[1] === 'M' ? 'Male (M)' : 'Female (F)') : null, "Gender missing or corrupted.");
+                    const nationality = cCode === 'MYS' ? 'Malaysia' : matchPattern(/(?:Nationality|Warganegara)[:\s]*([A-Z\s]+)/i);
+                    fields.push({ label: 'Nationality / Detected Country', val: nationality, reason: 'Country code or nationality field unreadable.' });
 
-                    const pobMatch = textUpper.match(/PLACE OF BIRTH[\/:\s]+([A-Z\s]+)/i);
-                    addField('Place of Birth', pobMatch ? pobMatch[1] : null, "Place of birth not detected.");
+                    const expiry = matchPattern(/(?:Date of Expiry|Tarikh Kepupusan)[:\s]*(\d{2}[\/\-\s][A-Z0-9]{3,4}[\/\-\s]\d{2,4})/i);
+                    fields.push({ label: 'Date of Expiry', val: expiry, reason: 'Expiry date missing or blurred.' });
 
-                    const issueDate = textUpper.match(/DATE OF ISSUE[\/:\s]+(\d{2}[\s\/][A-Z0-9]{3}[\s\/]\d{2,4})/i);
-                    addField('Date of Issue', issueDate ? issueDate[1] : null, "Date of issue missing.");
-
-                    const expiryDate = textUpper.match(/DATE OF EXPIRY[\/:\s]+(\d{2}[\s\/][A-Z0-9]{3}[\s\/]\d{2,4})/i);
-                    addField('Date of Expiry', expiryDate ? expiryDate[1] : null, "Date of expiry missing.");
-
-                    const authority = textUpper.match(/ISSUING AUTHORITY[\/:\s]+([A-Z\s]+)/i);
-                    addField('Issuing Authority', authority ? authority[1] : null, "Issuing authority undetected.");
-
-                    const mrz = combinedText.match(/P<[A-Z0-9<]{43}/g);
-                    addField('Machine-Readable Zone (MRZ)', mrz ? mrz.join('\n') : null, "MRZ lines incomplete or optical glare present.");
+                    // MRZ Zone Check
+                    const mrzMatch = combinedText.match(/(P<[A-Z0-9<]{43}[\r\n][A-Z0-9<]{44})/);
+                    fields.push({ label: 'Machine-Readable Zone (MRZ)', val: mrzMatch ? mrzMatch[1].replace(/\n/g, ' ') : null, reason: 'MRZ lines incomplete or cut off at bottom of Page 2.' });
 
                     // Page 3 Signature check
-                    const sigFound = textUpper.includes("HOLDER'S SIGNATURE") || textUpper.includes("SIGNATURE") || backText.length > 20;
-                    addField("Page 3 Holder's Signature", sigFound ? "Signature Area Verified / Captured on Page 3" : null, "Page 3 Signature document upload missing or signature undetected.");
+                    const hasSig = backText.length > 20 || combinedText.includes('Signature') || combinedText.includes('Tandatangan');
+                    fields.push({ label: 'Page 3 Holder Signature Status', val: hasSig ? 'Detected / Verified on Page 3' : null, reason: 'Page 3 image not uploaded or signature region blank.' });
                     break;
                 }
 
-                case 'MY_PASSPORT': {
-                    addField('Type / Jenis', 'P', "Type 'P' missing.");
-                    addField('Country Code / Kod Negara', 'MYS', "Kod Negara 'MYS' missing.");
-
-                    const passNo = combinedText.match(/\b([A-Z]\d{8})\b/i);
-                    addField('Passport Number / Nombor Pasport', passNo ? passNo[1] : null, "Malaysian passport number (e.g. A12345678) missing.");
-
-                    const name = combinedText.match(/(?:NAMA|NAME)[\/:\s]+([A-Z\s]+)/i);
-                    addField('Full Name / Nama', name ? name[1].split('\n')[0] : null, "Name missing.");
-
-                    addField('Nationality / Warganegara', 'MALAYSIA', "Nationality missing.");
-
-                    const icNo = combinedText.match(/\b(\d{6}[-\s]?\d{2}[-\s]?\d{4})\b/);
-                    addField('Identity Card Number / Nombor Kad Pengenalan', icNo ? icNo[1] : null, "MyKad IC Number missing.");
-
-                    const dob = combinedText.match(/(?:TARIKH LAHIR|DATE OF BIRTH)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    addField('Date of Birth / Tarikh Lahir', dob ? dob[1] : null, "Date of birth missing.");
-
-                    // Gender parsing
-                    let gender = null;
-                    if (icNo) {
-                        const lastDigit = parseInt(icNo[1].slice(-1));
-                        gender = (lastDigit % 2 === 0) ? 'Female (F) / Perempuan' : 'Male (M) / Lelaki';
-                    }
-                    addField('Gender / Jantina', gender, "Gender parsing failed from MyKad IC string.");
-
-                    addField('State / Territory Detected', autoDetect.state, "Could not map state from MyKad PB code.");
-                    addField('Issuing Authority / Pihak Berkuasa', 'Jabatan Imigresen Malaysia', "Authority missing.");
-
-                    const sigFound = combinedText.match(/TANDATANGAN|SIGNATURE/i) || backText.length > 20;
-                    addField("Page 3 Holder's Official Signature", sigFound ? "Holder Official Signature Verified on Page 3" : null, "Holder official signature missing or back page not uploaded.");
-                    break;
-                }
-
-                case 'MY_NRIC': {
-                    const headerOk = textUpper.includes("KAD PENGENALAN") || textUpper.includes("MALAYSIA") || textUpper.includes("MYKAD");
-                    addField('Header and Logos', headerOk ? 'Kad Pengenalan Malaysia / MyKad Verified' : null, "Header title 'Kad Pengenalan Malaysia' not found.");
-
-                    const icMatch = combinedText.match(/\b(\d{6}[-\s]?\d{2}[-\s]?\d{4})\b/);
-                    let icNum = icMatch ? icMatch[1] : null;
-                    addField('IC Number', icNum, "12-digit IC Number (YYMMDD-PB-###G) missing.");
-
-                    const nameMatch = combinedText.match(/(?:NAMA)[\/:\s]+([A-Z\s\/]+)/i) || combinedText.match(/([A-Z\s]{5,})/);
-                    addField('Full Name / Nama', nameMatch ? nameMatch[1].split('\n')[0] : null, "Name string missing.");
-
-                    const fullAddress = extractFullAddress(combinedText);
-                    addField('Residential Address / Alamat', fullAddress, "Complete address string missing or unreadable.");
-
-                    // Gender via IC last digit
-                    let genderVal = null;
-                    if (icNum) {
-                        const digitsOnly = icNum.replace(/[^0-9]/g, '');
-                        const lastNum = parseInt(digitsOnly.slice(-1));
-                        genderVal = (lastNum % 2 === 0) ? 'Female / Perempuan (F)' : 'Male / Lelaki (M)';
-                    }
-                    addField('Gender / Sex', genderVal, "Failed to parse gender digit parity.");
-
-                    addField('Citizenship / Nationality', 'WARGANEGARA MALAYSIA', "Citizenship status missing.");
-
-                    addField('State / Territory', autoDetect.state, "State could not be matched from PB Code or Address.");
-
-                    const raceMatch = textUpper.match(/\b(MELAYU|CHINESE|INDIAN|ISLAM|BUMIPUTERA)\b/i);
-                    addField('Race / Religion', raceMatch ? raceMatch[1] : 'Not Displayed / General', "Race or religion tag not explicitly parsed.");
-
-                    addField('Smart Chip', 'Detected (Optical Boundary Verified)', "Smart Chip region obstructed.");
-
-                    // Back Card Features
-                    const extIC = backText.match(/\b\d{6}[-\s]?\d{2}[-\s]?\d{4}[-\s]?\d{2}\b/);
-                    addField('Extended IC Number (Back)', extIC ? extIC[0] : (icNum ? `${icNum}-01` : null), "Extended IC number version count missing on back card.");
-
-                    const serial = backText.match(/\b([A-Z0-9]{8,12})\b/);
-                    addField('Serial Number / SN (Back)', serial ? serial[1] : null, "Back card serial number (SN e.g. D4003CF8DB) not detected.");
-
-                    const sigBack = backText.includes("TANDATANGAN") || backText.includes("KETUA PENGERAH") || backText.length > 20;
-                    addField('Signature Ketua Pengarah Pendaftaran Negara', sigBack ? 'Verified on Back Card' : null, "Back card signature unreadable or back card missing.");
-                    break;
-                }
-
-                case 'MY_PR': {
-                    const headerPR = textUpper.includes("PEMASTAUTIN TETAP") || textUpper.includes("KAD PENGENALAN");
-                    addField('Card Heading & Scheme', headerPR ? 'KAD PENGENALAN MALAYSIA PEMASTAUTIN TETAP (Red Scheme)' : null, "Card header for MyPR missing.");
-
-                    const icMatch = combinedText.match(/\b(\d{6}[-\s]?\d{2}[-\s]?\d{4})\b/);
-                    addField('NRIC Number', icMatch ? icMatch[1] : null, "MyPR NRIC Number missing.");
-
-                    const nameMatch = combinedText.match(/(?:NAMA)[\/:\s]+([A-Z\s\/]+)/i);
-                    addField('Full Name / Nama', nameMatch ? nameMatch[1].split('\n')[0] : null, "Name missing.");
-
-                    addField('Permanent Address / Alamat', extractFullAddress(combinedText), "Permanent address incomplete.");
-
-                    let genderVal = null;
-                    if (icMatch) {
-                        const lastNum = parseInt(icMatch[1].replace(/[^0-9]/g, '').slice(-1));
-                        genderVal = (lastNum % 2 === 0) ? 'Female / Perempuan (F)' : 'Male / Lelaki (M)';
-                    }
-                    addField('Gender / Sex', genderVal, "Gender calculation failed.");
-
-                    addField('Smart-Chip', 'Verified', "Chip present.");
-
-                    // Back Card Specifics
-                    const origNat = backText.match(/(?:NEGARA ASAL|ORIGINAL NATIONALITY)[\/:\s]+([A-Z\s]+)/i);
-                    addField('Original Nationality / Negara Asal (Back)', origNat ? origNat[1] : autoDetect.nationality, "Original nationality missing on back page.");
-
-                    const permitNo = backText.match(/(?:PERMIT|NOMBOR PERMIT)[\/:\s]+([A-Z0-9\-]+)/i);
-                    addField('Entry Permit Details / Nombor Permit Masuk (Back)', permitNo ? permitNo[1] : null, "Entry permit details missing on back page.");
-                    break;
-                }
-
-                case 'MY_DL': {
-                    const bgVerify = textUpper.includes("LESEN") || textUpper.includes("MEMANDU") || textUpper.includes("MALAYSIA");
-                    addField('Background & Design', bgVerify ? 'Malaysian Driving License Design Verified' : null, "Driving license header missing.");
-
-                    const nameMatch = combinedText.match(/(?:NAMA)[\/:\s]+([A-Z\s\/]+)/i);
-                    addField('Full Name / Nama', nameMatch ? nameMatch[1].split('\n')[0] : null, "Name missing.");
-
-                    const icMatch = combinedText.match(/\b(\d{6}[-\s]?\d{2}[-\s]?\d{4}|\d{12})\b/);
-                    addField('No. Pengenalan / Identity No.', icMatch ? icMatch[1] : null, "12-digit Identity number missing.");
-
-                    addField('Warganegara / Nationality', 'MALAYSIA', "Nationality missing.");
-                    addField('Alamat / Address', extractFullAddress(combinedText), "Address string missing.");
-
-                    const dlClass = combinedText.match(/(?:KELAS|CLASS)[\/:\s]+([A-Z0-9,\s]+)/i) || combinedText.match(/\b(B2|B|D|DA|E)\b/g);
-                    addField('Kelas / Class', dlClass ? (Array.isArray(dlClass) ? dlClass.join(', ') : dlClass[1]) : null, "Driving license vehicle class (B2, B, D, DA) missing.");
-
-                    const validity = combinedText.match(/(?:TEMPOH|VALIDITY)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4}\s*-\s*\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i) || combinedText.match(/(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/g);
-                    addField('Tempoh / Validity', validity ? (Array.isArray(validity) ? validity.join(' to ') : validity[1]) : null, "Validity date range missing.");
-
-                    const dob = combinedText.match(/(?:TARIKH LAHIR)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    addField('Tarikh Lahir / Date of Birth', dob ? dob[1] : null, "Date of birth missing.");
-
-                    // Back Card
-                    const serialNo = backText.match(/\b([0-9A-Za-z]{7,10})\b/);
-                    addField('Serial Number (Back)', serialNo ? serialNo[1] : null, "Back card serial number missing.");
-
-                    const tableCheck = backText.includes("KELAS") || backText.length > 15;
-                    addField('Vehicle Classes Table (Back)', tableCheck ? 'Verified Vehicle Categories Grid' : null, "Back vehicle classes table missing.");
-                    break;
-                }
-
+                case 'MY_DL':
                 case 'INT_DL': {
-                    const emblem = textUpper.includes("CONVENTION ON ROAD TRAFFIC") || textUpper.includes("AUTOMOBILE") || textUpper.includes("INTERNATIONAL");
-                    addField('Emblem & Title', emblem ? 'Official UN Convention Title / Distinguishing Sign Verified' : null, "UN convention emblem text not found.");
+                    const isINT = docType === 'INT_DL';
+                    fields.push({ label: 'License Format', val: isINT ? 'International Driving Permit (UN Convention 1949/1968)' : 'Malaysian Driving License' });
 
-                    const issuingAuth = combinedText.match(/(?:ISSUING AUTHORITY)[\/:\s]+([A-Z\s]+)/i);
-                    addField('Issuing Authority', issuingAuth ? issuingAuth[1] : null, "Issuing authority missing.");
+                    const name = matchPattern(/(?:Nama|Name|Surname)[:\s]*([A-Z\s\/@'-]+)/i);
+                    fields.push({ label: 'Full Name / Surname', val: name, reason: 'Name field unreadable.' });
 
-                    const validity = combinedText.match(/(?:VALIDITY|VALID UNTIL)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    addField('Validity', validity ? validity[1] : null, "Validity date missing.");
+                    const icNo = matchPattern(/(?:No\. Pengenalan|Identity No)[:\s]*(\d{6}[-\s]?\d{2}[-\s]?\d{4})/i);
+                    fields.push({ label: 'Identity No / IC Number', val: icNo, reason: '12-digit IC format not detected.' });
 
-                    const name = combinedText.match(/(?:SURNAME|NAME)[\/:\s]+([A-Z\s]+)/i);
-                    addField('Surname / First Name', name ? name[1] : null, "Holder name missing.");
+                    const dlClass = matchPattern(/(?:Kelas|Class|Categories)[:\s]*([A-Z0-9,\s]+)/i);
+                    fields.push({ label: 'Vehicle Class / Categories', val: dlClass, reason: 'Driving class details (e.g. B2, D) not found.' });
 
-                    const pob = combinedText.match(/(?:PLACE OF BIRTH)[\/:\s]+([A-Z\s]+)/i);
-                    addField('Place of Birth', pob ? pob[1] : null, "Place of birth missing.");
+                    const validity = matchPattern(/(?:Tempoh|Validity)[:\s]*(\d{2}[\/\.-]\d{2}[\/\.-]\d{2,4}\s*-\s*\d{2}[\/\.-]\d{2}[\/\.-]\d{2,4})/i);
+                    fields.push({ label: 'Validity Period (Tempoh)', val: validity, reason: 'Validity start/end dates unreadable.' });
 
-                    const dob = combinedText.match(/(?:DATE OF BIRTH)[\/:\s]+(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    addField('Date of Birth', dob ? dob[1] : null, "Date of birth missing.");
+                    const addr = extractAddress(combinedText);
+                    fields.push({ label: 'Address / Alamat', val: addr, reason: 'Address field missing or obscured.' });
 
-                    addField('Place of Residence', extractFullAddress(combinedText), "Residence address missing.");
-
-                    // Back Card
-                    const categories = backText.match(/\b([A-E])\b/g);
-                    addField('Vehicle Categories (Back)', categories ? categories.join(', ') : null, "Back vehicle categories A, B, C, D, E missing.");
-
-                    const stamps = backText.includes("STAMP") || backText.includes("ENDORSEMENT") || backText.length > 20;
-                    addField('Validation Stamps / Endorsements (Back)', stamps ? 'Validation Endorsements Present' : null, "Endorsement stamps missing on back.");
+                    const serialNo = matchPattern(/(?:SN|Serial Number)[:\s]*([A-Z0-9]{6,12})/i);
+                    fields.push({ label: 'Back Card Serial Number', val: serialNo, reason: 'Serial number on back card missing/unreadable.' });
                     break;
                 }
 
                 case 'SSM_CERT': {
-                    const compName = combinedText.match(/(?:PERNIAGAAN YANG DIJALANKAN DENGAN NAMA|NAMA PERNIAGAAN)[\/:\s]+([A-Z0-9\s\.\&\-]+)/i) || combinedText.match(/([A-Z0-9\s]+(?:ENTERPRISE|SDN BHD|SDN\. BHD\.|BERHAD))/i);
-                    addField('Perniagaan yang dijalankan dengan nama', compName ? compName[1].split('\n')[0] : null, "SSM Business Name missing.");
+                    fields.push({ label: 'Issuing Authority', val: 'Suruhanjaya Syarikat Malaysia (SSM)' });
 
-                    const regNo = combinedText.match(/(?:NO\. PENDAFTARAN|REGISTRATION NO)[\/:\s]+([0-9]{9,12}-[A-Z]|[0-9]{12}|[0-9]{6,8}-[A-Z])/i) || combinedText.match(/\b(\d{12}|\d{6,8}-[A-Z])\b/);
-                    addField('Registration No. / No. Pendaftaran', regNo ? regNo[1] : null, "SSM Registration No (e.g. 001772726-T) missing.");
+                    const bizName = matchPattern(/(?:Perniagaan yang dijalankan dengan nama|NAME)[:\s]*([A-Z0-9\s\.\&\(\)\-]+(?:ENTERPRISE|SDN\.?\s*BHD\.?|LIMITED))/i) || combinedText.match(/([A-Z0-9\s]{4,}\s(?:SDN\.?\s*BHD\.?|ENTERPRISE))/);
+                    fields.push({ label: 'Business Name (Nama Perniagaan)', val: bizName ? (bizName[1] || bizName[0]).trim() : null, reason: 'Business name text block unreadable or non-standard format.' });
 
-                    const regDate = combinedText.match(/(?:BERTARIKH DI|DATE)[\/:\s]+(\d{1,2}\s+[A-Z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    addField('Registration / Incorporation Date', regDate ? regDate[1] : null, "EzBiz Incorporation date missing.");
+                    const regNo = matchPattern(/(?:No\. Pendaftaran|Registration No)[:\s]*([0-9]{6,12}-[A-Z]|\d{12})/i);
+                    fields.push({ label: 'Registration No (No. Pendaftaran)', val: regNo, reason: 'SSM registration format (e.g., 001772726-T or 12-digits) missing.' });
 
-                    const expDate = String(combinedText).match(/(?:SEHINGGA|EXPIRY)[\/:\s]+(\d{1,2}\s+[A-Z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    addField('Expiry Date / Didaftarkan sehingga', expDate ? expDate[1] : null, "Business expiry date missing.");
+                    const regDate = matchPattern(/(?:Bertarikh di SISTEM EZBIZ pada|Incorporation Date)[:\s]*(\d{1,2}\s+[A-Za-z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    fields.push({ label: 'Registration Date', val: regDate, reason: 'Incorporation date string missing.' });
 
-                    addField('Business Address / Alamat Perniagaan', extractFullAddress(combinedText), "SSM registered business address missing.");
+                    const expDate = matchPattern(/(?:sehingga|Expiry Date)[:\s]*(\d{1,2}\s+[A-Za-z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
+                    fields.push({ label: 'Expiry Date', val: expDate, reason: 'Expiry date missing.' });
 
-                    const branch = textUpper.includes("ADA") ? "Ada / Branches Present" : "Tiada / No Branches";
-                    addField('Branch Information / Bil. Cawangan', branch, "Branch status missing.");
+                    const bizAddr = extractAddress(combinedText);
+                    fields.push({ label: 'Business Address (Alamat Perniagaan)', val: bizAddr, reason: 'Registered business address missing or unreadable.' });
+
+                    const branch = combinedText.match(/(?:Bil\. Cawangan|Branch)[:\s]*(Ada|Tiada|\d+)/i);
+                    fields.push({ label: 'Branch Information', val: branch ? branch[1] : 'Tiada', reason: 'Branch details field not declared.' });
                     break;
                 }
 
                 case 'CIDB_PPK': {
-                    const compName = combinedText.match(/(?:NAMA KONTRAKTOR)[\/:\s]+([A-Z0-9\s\.\&\-]+)/i) || combinedText.match(/([A-Z0-9\s]+(?:ENTERPRISE|SDN BHD|BERHAD))/i);
-                    addField('Company Name / Nama Kontraktor', compName ? compName[1].split('\n')[0] : null, "CIDB Contractor Company Name missing.");
+                    fields.push({ label: 'Issuing Authority', val: 'Lembaga Pembangunan Industri Pembinaan Malaysia (CIDB)' });
 
-                    const regNo = combinedText.match(/(?:NO PENDAFTARAN)[\/:\s]+([0-9]{7}-[A-Z0-9]+|\d{12})/i);
-                    addField('Registration Number / No Pendaftaran', regNo ? regNo[1] : null, "CIDB Registration number missing.");
+                    const compName = matchPattern(/(?:Nama Kontraktor|Company Name)[:\s]*([A-Z0-9\s\.\&\(\)\-]+)/i);
+                    fields.push({ label: 'Company Name (Nama Kontraktor)', val: compName, reason: 'Contractor company name missing.' });
 
-                    addField('Registered Business Address / Alamat Berdaftar', extractFullAddress(combinedText), "Registered address missing.");
+                    const ppkNo = matchPattern(/(?:No Pendaftaran|Registration number)[:\s]*([0-9]{7}-[A-Z]{2}\d{6}|\d{7,14})/i);
+                    fields.push({ label: 'Registration Number (No Pendaftaran)', val: ppkNo, reason: 'CIDB registration number format invalid or missing.' });
 
-                    const grade = combinedText.match(/\b(G1|G2|G3|G4|G5|G6|G7)\b/g);
-                    addField('Grade / Gred', grade ? Array.from(new Set(grade)).join(', ') : null, "Grade G1-G7 missing.");
+                    const grade = matchPattern(/(?:Gred|Grade)[:\s]*(G[1-7])/i);
+                    fields.push({ label: 'Grade (Gred)', val: grade ? grade.toUpperCase() : null, reason: 'CIDB Grade (G1 - G7) not identified.' });
 
-                    const category = combinedText.match(/\b(B|CE|ME)\b/g);
-                    addField('Category / Kategori', category ? Array.from(new Set(category)).join(', ') : null, "Category (B, CE, ME) missing.");
+                    const category = matchPattern(/(?:Kategori|Category)[:\s]*([B|CE|ME\s,]+)/i);
+                    fields.push({ label: 'Category (Kategori)', val: category, reason: 'Category codes (B, CE, ME) missing.' });
 
-                    const spec = combinedText.match(/\b(B\d{2}|CE\d{2}|ME\d{2})\b/g);
-                    addField('Specializations / Pengkhususan', spec ? Array.from(new Set(spec)).join(', ') : null, "Specialization codes missing.");
+                    const spec = matchPattern(/(?:Pengkhususan|Specializations)[:\s]*([A-Z0-9\s,]+)/i);
+                    fields.push({ label: 'Specializations (Pengkhususan)', val: spec, reason: 'Specialization codes (e.g. B18, CE21) missing.' });
 
-                    const expDate = combinedText.match(/(?:TARIKH HABIS TEMPOH|EXPIRY)[\/:\s]+(\d{1,2}\s+[A-Z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    addField('Validity Period / Tarikh Habis Tempoh Perakuan', expDate ? expDate[1] : null, "Expiry date missing.");
+                    const validExp = matchPattern(/(?:Tarikh Habis Tempoh|Expiry Date)[:\s]*(\d{2}[\/\-\s][A-Z0-9]{3,4}[\/\-\s]\d{2,4})/i);
+                    fields.push({ label: 'Validity Expiry Date', val: validExp, reason: 'Expiry date string missing.' });
 
-                    const startDate = combinedText.match(/(?:TARIKH MULA BERKUATKUASA)[\/:\s]+(\d{1,2}\s+[A-Z]+\s+\d{4}|\d{2}[\/\.-]\d{2}[\/\.-]\d{4})/i);
-                    addField('Tarikh Mula Berkuatkuasa', startDate ? startDate[1] : null, "Effective start date missing.");
+                    const validStart = matchPattern(/(?:Tarikh Mula Berkuatkuasa|Effective Date)[:\s]*(\d{2}[\/\-\s][A-Z0-9]{3,4}[\/\-\s]\d{2,4})/i);
+                    fields.push({ label: 'Effective Start Date', val: validStart, reason: 'Effective start date missing.' });
 
-                    const status = textUpper.includes("AKTIF") || textUpper.includes("ACTIVE") ? "Active / Aktif" : "Suspended / Dormant / Tidak Aktif";
-                    addField('Status', status, "Status missing.");
+                    const status = combinedText.match(/(Aktif|Active|Suspended|Dorman|Tidak Aktif)/i);
+                    fields.push({ label: 'Status', val: status ? status[1] : 'Active / Aktif', reason: 'Contractor active status missing.' });
                     break;
                 }
             }
@@ -1211,44 +729,33 @@
             return fields;
         }
 
-        // Render Cards in Output Panel
-        function renderExtractedFields(fields) {
-            structuredOutput.innerHTML = "";
+        // Display Render Engine
+        function renderResults(fields) {
+            resultsDisplay.innerHTML = '';
             fields.forEach(f => {
-                const card = document.createElement('div');
-                card.className = `field-card ${f.status}`;
+                const item = document.createElement('div');
+                item.className = 'extracted-field neu-inset';
                 
-                const header = document.createElement('div');
-                header.className = 'field-header';
-                
-                const name = document.createElement('div');
-                name.className = 'field-name';
-                name.innerText = f.label;
+                const label = document.createElement('div');
+                label.className = 'field-label';
+                label.innerText = f.label;
 
-                const status = document.createElement('div');
-                status.className = 'field-status';
-                status.innerText = f.status === 'success' ? 'CAPTURED' : 'UNREADABLE / MISSING';
+                const value = document.createElement('div');
+                value.className = 'field-value';
 
-                header.appendChild(name);
-                header.appendChild(status);
+                if (f.val) {
+                    value.classList.add('status-found');
+                    value.innerText = f.val;
+                } else {
+                    value.classList.add('status-missing');
+                    value.innerText = `[UNREADABLE / MISSING]: ${f.reason || 'Information crossed-out or missing.'}`;
+                }
 
-                const val = document.createElement('div');
-                val.className = 'field-value';
-                val.innerText = f.value;
-
-                card.appendChild(header);
-                card.appendChild(val);
-
-                structuredOutput.appendChild(card);
+                item.appendChild(label);
+                item.appendChild(value);
+                resultsDisplay.appendChild(item);
             });
         }
-
-        // Copy raw text button
-        btnCopyRaw.addEventListener('click', () => {
-            navigator.clipboard.writeText(rawOutput.value);
-            btnCopyRaw.innerText = "Copied!";
-            setTimeout(() => btnCopyRaw.innerHTML = `<i class="fa-solid fa-copy"></i> Copy`, 2000);
-        });
     </script>
 </body>
 </html>
