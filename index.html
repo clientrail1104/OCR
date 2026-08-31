@@ -11,8 +11,8 @@
   GitHub Pages-ready single-file application.
 
   Processing:
-    Images -> Canvas enhancement -> Tesseract.js OCR
-    PDFs   -> PDF.js page rendering -> Canvas enhancement -> Tesseract.js OCR
+
+
     DOCX   -> Mammoth text extraction (not OCR)
     XLSX   -> SheetJS text/table extraction (not OCR)
 
@@ -123,6 +123,50 @@ footer{font-size:9px;color:var(--muted);text-align:center;padding:10px}
 @media(max-width:1200px){.grid{grid-template-columns:270px minmax(0,1fr)}.right{grid-column:1/-1}.results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){body{padding:10px}.topbar{align-items:flex-start}.grid{grid-template-columns:1fr}.right{grid-column:auto}.hero{grid-template-columns:1fr}.id-grid{grid-template-columns:1fr}.results{display:flex}.topbar .status-pill{display:none}}
 </style>
+
+<style id="ocr-master-one-page-fix">
+html,body{height:100%;overflow:hidden}
+body{padding:10px}
+.app{height:calc(100vh - 20px);max-width:1800px;display:flex;flex-direction:column}
+.top{flex:0 0 auto;margin-bottom:9px}
+.grid{flex:1 1 auto;min-height:0;grid-template-columns:270px minmax(0,1fr) 390px;gap:10px}
+.card{padding:11px;border-radius:17px}
+.grid>.card,.grid>aside,.grid>section{min-height:0}
+.center{min-height:0;display:grid;grid-template-rows:auto minmax(105px,1fr) minmax(120px,1fr);gap:9px}
+.center>.card{min-height:0}
+.hero{min-height:0;grid-template-columns:minmax(0,1fr) 170px}
+.id-grid{gap:7px}
+.slot{height:86px}
+.slot img{max-height:78px}
+.preview{height:100%;min-height:0;max-height:none}
+.raw{max-height:none;height:100%;overflow:auto}
+.right{min-height:0;display:flex;flex-direction:column}
+.right .results{min-height:0;flex:1;max-height:none;overflow:auto}
+.results{gap:6px}
+.field{padding:8px}
+.fvalue{font-size:11px}
+.evidence{padding:5px;margin-top:4px}
+.notice{padding:7px}
+.file-list{max-height:115px}
+.section{margin-bottom:9px}
+h2{margin-bottom:7px}
+.drop{padding:12px}
+.drop-icon{font-size:27px}
+.mini{font-size:8.5px}
+footer{display:none}
+@media(max-width:1150px){
+ .grid{grid-template-columns:245px minmax(0,1fr)}
+ .right{grid-column:1/-1}
+ .app{height:auto;min-height:100vh}
+ html,body{overflow:auto}
+ .right{min-height:350px}
+}
+@media(max-width:760px){
+ .grid{grid-template-columns:1fr}
+ .right{grid-column:auto}
+}
+</style>
+
 </head>
 
 <body>
@@ -167,20 +211,12 @@ footer{font-size:9px;color:var(--muted);text-align:center;padding:10px}
         <div class="mini" style="margin-top:6px">Tesseract language models are downloaded only when selected. Add more traineddata files for additional languages.</div>
       </div>
 
-      <div class="section">
-        <div class="label">Enhancement</div>
-        <div class="toggle">Auto enhancement
-          <label class="switch"><input id="enhance" type="checkbox" checked><span class="slider"></span></label>
+      
+        
         </div>
-        <div class="toggle">Deskew
-          <label class="switch"><input id="deskew" type="checkbox" checked><span class="slider"></span></label>
-        </div>
-        <div class="toggle">Adaptive threshold
-          <label class="switch"><input id="threshold" type="checkbox"><span class="slider"></span></label>
-        </div>
-        <div class="toggle">Sharpen
-          <label class="switch"><input id="sharpen" type="checkbox" checked><span class="slider"></span></label>
-        </div>
+        
+        
+        
         <div class="label" style="margin-top:7px">Render scale</div>
         <input class="range" id="scale" type="range" min="1" max="3" step=".25" value="2" aria-label="Render scale">
         <div class="mini"><span id="scaleValue">2.00×</span> · capped to prevent unsafe browser memory use</div>
@@ -188,9 +224,7 @@ footer{font-size:9px;color:var(--muted);text-align:center;padding:10px}
 
       <div class="section">
         <div class="label">AI super-resolution</div>
-        <div class="toggle">AI upscale before OCR
-          <label class="switch"><input id="aiUpscale" type="checkbox" checked><span class="slider"></span></label>
-        </div>
+        
         <select id="upscaleFactor" aria-label="AI upscale factor">
           <option value="2">2× AI upscale</option>
           <option value="4" selected>4× AI upscale</option>
@@ -199,8 +233,7 @@ footer{font-size:9px;color:var(--muted);text-align:center;padding:10px}
         <div class="row" style="margin-top:8px"><button class="btn" id="loadUpscaler" type="button">Prepare AI model</button><span class="badge" id="upscaleStatus">Not loaded</span></div>
       </div>
 
-      <div class="section">
-        <div class="label">Review policy</div>
+      
         <div class="notice warn">Low-confidence, conflicting, numeric and date fields remain visibly flagged. The app never replaces ambiguous characters with look-alikes.</div>
       </div>
 
@@ -230,7 +263,7 @@ footer{font-size:9px;color:var(--muted);text-align:center;padding:10px}
             <div class="progress"><i id="bar"></i></div>
             <div class="progress-text" id="progressText">Waiting for input.</div>
           </div>
-          <div class="toggle" style="margin-top:8px">Instant OCR on upload <label class="switch"><input id="autoInstant" type="checkbox" checked><span class="slider"></span></label></div><button class="btn primary" id="runBtn" type="button" style="width:100%;margin-top:4px">Run OCR</button>
+          <button class="btn primary" id="runBtn" type="button" style="width:100%;margin-top:4px">Run OCR</button>
         </div>
       </div>
 
@@ -462,7 +495,7 @@ function showNotice(text,type='warn'){
   els.summary.className='notice '+type;els.summary.textContent=text;
 }
 
-/* ----------------------------- image enhancement ----------------------------- */
+
 function clamp(v){return Math.max(0,Math.min(255,v))}
 function grayscaleContrast(c){
   const x=c.getContext('2d',{willReadFrequently:true}), d=x.getImageData(0,0,c.width,c.height), a=d.data;
@@ -577,261 +610,7 @@ async function loadSuperResolution(){
 }
 function tileTensor(c,x0,y0,w,h){
   const a=c.getContext('2d',{willReadFrequently:true}).getImageData(x0,y0,w,h).data,plane=w*h,out=new Float32Array(plane*3);
-  for(let p=0;p<plane;p++){const i=p*4;out[p]=a[i]/255;out[plane+p]=a[i+1]/255;out[2*plane+p]=a[i+2]/255;}
-  return new ort.Tensor('float32',out,[1,3,h,w]);
-}
-function tensorCanvas(t){
-  const dims=t.dims||[];if(dims.length!==4)throw new Error('Unexpected AI model output tensor.');
-  const H=dims[2],W=dims[3],data=t.data,n=H*W,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
-  const img=canvas.getContext('2d').createImageData(W,H);
-  for(let p=0;p<n;p++){img.data[p*4]=Math.max(0,Math.min(255,data[p]*255));img.data[p*4+1]=Math.max(0,Math.min(255,data[n+p]*255));img.data[p*4+2]=Math.max(0,Math.min(255,data[2*n+p]*255));img.data[p*4+3]=255;}
-  canvas.getContext('2d').putImageData(img,0,0);return canvas;
-}
-async function aiUpscaleCanvas(source){
-  const session=await loadSuperResolution(),tileSize=192,overlap=12;
-  let base=source;
-  const fit=Math.min(1,2200/Math.max(source.width,source.height));
-  if(fit<1){base=document.createElement('canvas');base.width=Math.max(1,Math.round(source.width*fit));base.height=Math.max(1,Math.round(source.height*fit));const x=base.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(source,0,0,base.width,base.height);}
-  const final=document.createElement('canvas');final.width=Math.min(8192,base.width*4);final.height=Math.min(8192,base.height*4);const fx=final.getContext('2d');
-  const nx=Math.ceil(base.width/tileSize),ny=Math.ceil(base.height/tileSize),total=nx*ny;let done=0;
-  const inputName=session.inputNames?.[0]||'input';
-  for(let y=0;y<base.height;y+=tileSize) for(let x=0;x<base.width;x+=tileSize){
-    const x0=Math.max(0,x-overlap),y0=Math.max(0,y-overlap),x1=Math.min(base.width,x+tileSize+overlap),y1=Math.min(base.height,y+tileSize+overlap),w=x1-x0,h=y1-y0;
-    const result=await session.run({[inputName]:tileTensor(base,x0,y0,w,h)});
-    const outputName=session.outputNames?.[0]||Object.keys(result)[0];
-    if(!outputName||!result[outputName])throw new Error('AI model returned no output tensor.');
-    const tile=tensorCanvas(result[outputName]);
-    const scaleX=tile.width/w,scaleY=tile.height/h;
-    const coreX=(x-x0)*scaleX,coreY=(y-y0)*scaleY,coreW=Math.min(x+tileSize,base.width)-x,coreH=Math.min(y+tileSize,base.height)-y;
-    const sw=Math.max(1,Math.round(coreW*scaleX)),sh=Math.max(1,Math.round(coreH*scaleY));
-    fx.drawImage(tile,Math.round(coreX),Math.round(coreY),sw,sh,Math.round(x*scaleX),Math.round(y*scaleY),Math.min(sw,final.width-Math.round(x*scaleX)),Math.min(sh,final.height-Math.round(y*scaleY)));
-    done++;setProgress(4+30*done/total,`AI super-resolution · tile ${done}/${total}`);
-  }
-  if(Number(els.upscaleFactor.value)===2){
-    const two=document.createElement('canvas');two.width=Math.max(1,Math.round(base.width*2));two.height=Math.max(1,Math.round(base.height*2));const x=two.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(final,0,0,two.width,two.height);return two;
-  }
-  return final;
-}
-els.loadUpscaler.onclick=async()=>{try{await loadSuperResolution()}catch(e){els.upscaleStatus.textContent='Unavailable';els.upscaleStatus.className='badge bad';showNotice(`AI upscaler unavailable: ${e.message}. OCR can still run without it.`,'bad')}};
-async function ocrCanvas(worker,c,label){const out=await worker.recognize(c.toDataURL('image/png'));return {text:out.data.text||'',confidence:Number(out.data.confidence||0),label}}
-function corroborate(a,b){if(!b)return a;const x=a.text.toUpperCase().replace(/\s+/g,' ').trim().split(' '),y=b.text.toUpperCase().replace(/\s+/g,' ').trim().split(' ');let same=0;for(let i=0;i<Math.min(x.length,y.length);i++)if(x[i]===y[i])same++;const agreement=Math.max(x.length,y.length)?same/Math.max(x.length,y.length):0;return {...a,secondaryText:b.text,secondaryConfidence:b.confidence,agreement,conflict:agreement<.65,confidence:Math.round(a.confidence*.55+b.confidence*.25+agreement*20)}}
-
-/* ----------------------------- OCR ----------------------------- */
-async function getWorker(){
-  const lang=els.lang.value;
-  if(state.worker&&state.workerLang===lang)return state.worker;
-  if(state.worker){try{await state.worker.terminate()}catch{}state.worker=null;}
-  setEngine('Loading OCR model…');
-  const langs=lang.includes('+')?lang.split('+'):lang;
-  state.worker=await Tesseract.createWorker(langs,1,{logger:m=>{
-    if(m.status&&m.status.includes('recognizing')){const pct=Math.round((m.progress||0)*100);setProgress(Math.min(90,5+pct*.15),`OCR recognition · ${pct}%`);}
-  }});
-  state.workerLang=lang;setEngine('OCR engine ready');return state.worker;
-}
-async function runOCR(){
-  if(state.running)return;
-  if(!state.pages.length){showNotice('No supported document is loaded.','bad');return;}
-  state.running=true;els.run.disabled=true;state.results=[];state.tables=[];els.raw.textContent='';
-  try{
-    const worker=await getWorker();let allText=[];
-    for(let i=0;i<state.pages.length;i++){
-      state.selectedPage=i;renderPages();const p=state.pages[i];
-      if(p.error){state.results.push({page:i+1,text:'',confidence:0,error:p.error});allText.push(`\\n--- ${p.label} ---\\n[ERROR] ${p.error}`);continue;}
-      if(p.textOnly){
-        const r={page:i+1,text:p.textOnly,confidence:null,source:'native-text'};state.results.push(r);allText.push(`\\n--- ${p.label} ---\\n${p.textOnly}`);els.raw.textContent=allText.join('\\n');renderFields(extractFields(els.raw.textContent));setProgress(10+75*(i+1)/state.pages.length,`Extracted ${i+1}/${state.pages.length}`);continue;
-      }
-      const primaryCanvas=enhanceCanvas(p.canvas);
-      // PRIMARY OCR IS NEVER BLOCKED BY AI UPSCALING.
-      const primary=await ocrCanvas(worker,primaryCanvas,`${p.label} · primary`);
-      const rec={page:i+1,text:primary.text,confidence:primary.confidence,source:'ocr',canvas:primaryCanvas,secondaryText:'',secondaryConfidence:0,agreement:null,conflict:false};state.results.push(rec);
-      allText.push(`\\n--- ${p.label} · FAST OCR ---\\n${primary.text||'[No readable text]'}\\n[Primary OCR confidence: ${primary.confidence.toFixed(1)}%]`);
-      els.raw.textContent=allText.join('\\n');renderFields(extractFields(els.raw.textContent));
-      els.ocrBadge.textContent=`Live · ${primary.confidence.toFixed(1)}%`;els.ocrBadge.className='badge '+(primary.confidence>=85?'ok':primary.confidence>=60?'warn':'bad');
-      setProgress(15+55*(i+1)/state.pages.length,`Instant OCR result · page ${i+1}/${state.pages.length}`);
-      // AI is a secondary corroboration pass. The first OCR result is already visible.
-      if(els.aiUpscale.checked){
-        try{
-          const aiCanvas=await aiUpscaleCanvas(primaryCanvas);rec.aiCanvas=aiCanvas;
-          const secondary=await ocrCanvas(worker,enhanceCanvas(aiCanvas),`${p.label} · AI-upscaled`);
-          const combined=corroborate(primary,secondary);rec.secondaryText=combined.secondaryText||'';rec.secondaryConfidence=combined.secondaryConfidence||0;rec.agreement=combined.agreement;rec.conflict=!!combined.conflict;
-          allText.push(`\\n--- ${p.label} · AI HD OCR ---\\n${secondary.text||'[No readable text]'}\\n[AI OCR confidence: ${secondary.confidence.toFixed(1)}% · token agreement: ${Math.round((combined.agreement||0)*100)}%]`);
-          if(rec.conflict)allText.push('[AI OCR CORROBORATION WARNING: primary and AI-upscaled OCR disagree. Verify against original source image.]');
-          els.raw.textContent=allText.join('\\n');renderFields(extractFields(els.raw.textContent));
-        }catch(aiErr){
-          console.warn('AI enhancement skipped:',aiErr);allText.push(`\\n[AI enhancement unavailable for ${p.label}: ${aiErr.message||aiErr}]`);els.raw.textContent=allText.join('\\n');renderFields(extractFields(els.raw.textContent));
-        }
-      }
-      setProgress(15+85*(i+1)/state.pages.length,`Page ${i+1}/${state.pages.length} complete`);
-    }
-    const combined=allText.join('\\n');els.raw.textContent=combined.trim()||'No readable text returned.';const fields=extractFields(combined);renderFields(fields);renderTableHints(combined);
-    const pages=state.results.filter(x=>x.source==='ocr'),avg=pages.length?pages.reduce((a,x)=>a+(x.conflict?Math.min(x.confidence||0,60):(x.confidence||0)),0)/pages.length:0;
-    els.ocrBadge.textContent=`OCR evidence · ${avg.toFixed(1)}%`;els.ocrBadge.className='badge '+(avg>=85?'ok':avg>=60?'warn':'bad');
-    const review=fields.filter(f=>f.status!=='VERIFIED').length;els.reviewBadge.textContent=review?`${review} field(s) need review`:'Review complete';els.reviewBadge.className='badge '+(review?'warn':'ok');
-    showNotice(`Processing completed. ${review?review+' item(s) require human verification.':'No field was silently guessed.'}`,'warn');setProgress(100,'Complete · review flagged fields before use.');setEngine('Complete',true);
-  }catch(err){console.error(err);showNotice(`Processing failed safely: ${err.message||err}. No result was fabricated.`,'bad');setEngine('Failed',false);setProgress(0,'Processing stopped safely.');}
-  finally{state.running=false;els.run.disabled=false;}
-}
-els.run.onclick=runOCR;
-
-/* ----------------------------- evidence-first extraction ----------------------------- */
-function cleanEvidence(s){return String(s||'').replace(/[ \t]+/g,' ').trim()}
-function linesOf(text){return String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean)}
-function escReg(s){return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
-function candidateAfterLabel(lines,labels,maxLines=5){
-  const re=new RegExp('^\s*(?:'+labels.map(escReg).join('|')+')\s*[:\-]?\s*(.*)$','i');
-  const stop=/^(full?\s*name|name|nama(?:\s*penuh)?|dob|date\s*of\s*birth|birth\s*date|tarikh\s*lahir|gender|sex|jantina|nationality|citizenship|kewarganegaraan|address|alamat|id\s*(?:no|number)?|identification\s*(?:no|number)?|nric|ic\s*no|no\.?\s*kad\s*pengenalan|occupation|pekerjaan|phone|telephone|tel|mobile|email|e-?mail|date\s*issued|issue\s*date|expiry|valid\s*until|tarikh\s*luput)\s*[:\-]?/i;
-  for(let i=0;i<lines.length;i++){
-    const m=lines[i].match(re); if(!m)continue;
-    const parts=[]; if(m[1]&&m[1].trim())parts.push(m[1].trim());
-    for(let j=i+1;j<Math.min(lines.length,i+1+maxLines);j++){
-      if(stop.test(lines[j]))break;
-      if(/^(page\s+\d+|www\.|https?:\/\/)/i.test(lines[j]))break;
-      parts.push(lines[j]);
-    }
-    if(parts.length)return {value:parts.join('\n'),evidence:[lines[i],...parts].join('\n'),line:i};
-  }
-  return null;
-}
-function confidenceFromCandidate(value,ocrConf){
-  let c=Math.min(Number(ocrConf)||0,95);
-  if(!value)c=0;
-  if(/[�]/.test(value))c=Math.min(c,30);
-  if(/\b(?:unknown|unreadable)\b/i.test(value))c=Math.min(c,20);
-  return Math.round(c);
-}
-function makeField(name,value,conf,status,evidence,validation,reason,kind='text'){
-  return {name,value:value||'UNKNOWN',confidence:Math.max(0,Math.min(100,Math.round(conf||0))),status,evidence:evidence||'No reliable evidence found.',validation:validation||'Not validated.',reason:reason||'',kind};
-}
-function validateDate(v){
-  const m=String(v||'').match(/\b(?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}[-/.](?:19|20)?\d{2}\b/);
-  if(!m)return {ok:false,msg:'Date format is not sufficiently clear.'};
-  const a=m[0].split(/[-/.]/).map(Number);let d,mo,y;
-  if(a[0]>31){y=a[0];mo=a[1];d=a[2]}else{d=a[0];mo=a[1];y=a[2]<100?2000+a[2]:a[2]}
-  const dt=new Date(y,mo-1,d),ok=dt.getFullYear()===y&&dt.getMonth()===mo-1&&dt.getDate()===d;
-  return ok?{ok:true,msg:'Calendar date is structurally valid.'}:{ok:false,msg:'Calendar date is invalid.'};
-}
-function explicitGender(v){
-  const x=String(v||'').trim().toUpperCase();
-  if(x==='M'||/^MALE(?:\s*[/|]\s*M)?$/.test(x)||/^LELAKI(?:\s*[/|]\s*(?:MALE\s*[/|]\s*)?M)?$/.test(x))return {original:v,normalized:'Male / M'};
-  if(x==='F'||/^FEMALE(?:\s*[/|]\s*F)?$/.test(x)||/^PEREMPUAN(?:\s*[/|]\s*(?:FEMALE\s*[/|]\s*)?F)?$/.test(x))return {original:v,normalized:'Female / F'};
-  if(/\b(?:MALE|LELAKI)\b/.test(x))return {original:v,normalized:'Male / M'};
-  if(/\b(?:FEMALE|PEREMPUAN)\b/.test(x))return {original:v,normalized:'Female / F'};
-  return null;
-}
-function numericAmbiguity(v){
-  return /[0-9]/.test(v)&&/[A-Za-z]/.test(v);
-}
-function extractAddress(lines){
-  const labels=['address','alamat','alamat tetap','alamat rumah','permanent address','residential address','home address','mailing address','postal address','correspondence address'];
-  const start=new RegExp('^\s*(?:'+labels.map(escReg).join('|')+')\s*[:\-]?\s*(.*)$','i');
-  const stop=/^(name|full\s*name|nama(?:\s*penuh)?|dob|date\s*of\s*birth|birth\s*date|tarikh\s*lahir|gender|sex|jantina|nationality|citizenship|kewarganegaraan|id\s*(?:no|number)?|identification\s*(?:no|number)?|nric|ic\s*no|no\.?\s*kad\s*pengenalan|occupation|pekerjaan|phone|telephone|tel|mobile|email|e-?mail|date\s*issued|issue\s*date|expiry|valid\s*until|tarikh\s*luput|signature|sign)\s*[:\-]?/i;
-  const addressWord=/(jalan|jln\.?|lorong|lrg\.?|persiaran|taman|kampung|kg\.?|road|street|st\.?\b|avenue|ave\.?\b|drive|dr\.?\b|lane|block|blok|lot|unit|floor|tingkat|residensi|residence|apartment|apartmen|condominium|condo|flat|suite|building|bangunan|postcode|poskod|bandar|city|daerah|district|selangor|perak|penang|pulau pinang|johor|melaka|malacca|negeri sembilan|pahang|terengganu|kelantan|kedah|perlis|sabah|sarawak|putrajaya|labuan|malaysia)/i;
-  const postcode=/\b\d{5}\b/;
-  for(let i=0;i<lines.length;i++){
-    const m=lines[i].match(start); if(!m)continue;
-    const parts=[];if(m[1].trim())parts.push(cleanEvidence(m[1]));
-    let sawAddressSignal=!!m[1].trim();
-    for(let j=i+1;j<Math.min(lines.length,i+13);j++){
-      const line=cleanEvidence(lines[j]);if(!line)continue;
-      if(stop.test(line))break;
-      if(/^(page\s+\d+|www\.|https?:\/\/)/i.test(line))break;
-      if(addressWord.test(line)||postcode.test(line)||parts.length<2){parts.push(line);sawAddressSignal=true;continue;}
-      if(parts.length>=2)break;
-    }
-    if(parts.length && sawAddressSignal)return {value:parts.join('\n'),evidence:[lines[i],...parts].join('\n')};
-  }
-  return null;
-}
-function extractAllReadable(lines){
-  /* Preserve every OCR line that is not already represented as a structured field.
-     This is the completeness layer: it prevents the extractor from throwing away
-     document text simply because no predefined field exists for it. */
-  const obviousMeta=/^(---|\[AI OCR|\[AI enhancement|\[FAST OCR|\[AI HD OCR)/i;
-  return lines.filter(x=>!obviousMeta.test(x)).slice(0,500);
-}
-function extractFields(text){
-  const ls=linesOf(text),joined=ls.join(' ');
-  const pages=state.results.filter(x=>x.source==='ocr');
-  const avg=pages.length?pages.reduce((a,x)=>a+(x.conflict?Math.min(x.confidence||0,60):(x.confidence||0)),0)/pages.length:0;
-  const out=[];
-  const push=(name,c,kind='text')=>{if(c)out.push(c);};
-
-  const name=candidateAfterLabel(ls,['full name','name','nama penuh','nama','holder','cardholder'],4);
-  if(name){const c=confidenceFromCandidate(name.value,avg);push('Full name',makeField('Full Name',name.value,c,c>=85?'VERIFIED':'UNCERTAIN',name.evidence,'Explicit name-label association. No name is inferred from unrelated text.',c<85?'OCR evidence is not strong enough for unassisted verification.':''));}
-  else push('Full name',makeField('Full Name','UNKNOWN',0,'UNKNOWN','No reliable explicit name evidence found.','Not validated.','The system does not infer a person name from arbitrary text.'));
-
-  const id=candidateAfterLabel(ls,['nric number','nric no','nric','mykad number','mykad no','identification number','identification no','id number','id no','ic number','ic no','no. kad pengenalan','no kad pengenalan'],2);
-  if(id){const c=confidenceFromCandidate(id.value,avg),risk=numericAmbiguity(id.value);push('NRIC',makeField('NRIC / ID Number',id.value,Math.min(c,risk?65:c),c>=85&&!risk?'VERIFIED':'UNCERTAIN',id.evidence,'Exact OCR evidence preserved. No look-alike substitutions or silent corrections are performed.',risk?'Mixed alphanumeric content is high risk; visually verify every character.':c<85?'Confidence is below the safe threshold.':'Visually verify critical identity numbers.','numeric'));}
-  else push('NRIC',makeField('NRIC / ID Number','UNKNOWN',0,'UNKNOWN','No reliable explicit identification-number evidence found.','Not validated.','No identification number is inferred.','numeric'));
-
-  const dob=candidateAfterLabel(ls,['date of birth','dob','birth date','tarikh lahir','born'],2);
-  if(dob){const v=validateDate(dob.value),c=confidenceFromCandidate(dob.value,avg);push('DOB',makeField('Date of Birth',dob.value,Math.min(c,v.ok?95:60),c>=85&&v.ok?'VERIFIED':'UNCERTAIN',dob.evidence,v.msg,v.ok?'':'Date evidence requires visual verification.','date'));}
-  else push('DOB',makeField('Date of Birth','UNKNOWN',0,'UNKNOWN','No reliable explicit date-of-birth evidence found.','Not validated.','No date is inferred.','date'));
-
-  const gender=candidateAfterLabel(ls,['gender','sex','jantina'],2);
-  if(gender){const g=explicitGender(gender.value),c=confidenceFromCandidate(gender.value,avg);push('Gender',makeField('Gender / Sex',g?`${gender.value} → ${g.normalized}`:gender.value,c,g&&c>=85?'VERIFIED':'UNCERTAIN',gender.evidence,'Only explicit gender/sex wording is normalized; gender is never inferred from a name.',g?'':'The detected value is not an unambiguous supported marker.'));}
-  else push('Gender',makeField('Gender / Sex','UNKNOWN',0,'UNKNOWN','No reliable explicit gender/sex evidence found.','Not validated.','Gender is never inferred from a name.'));
-
-  let nat;
-  if(/\bwarganegara\s*[/|\-]?\s*malaysia\b/i.test(joined)||/\bmalaysia\s*[/|\-]?\s*warganegara\b/i.test(joined))nat={value:'Warganegara / Malaysia',evidence:ls.find(x=>/warganegara/i.test(x))||'Warganegara / Malaysia'};
-  else nat=candidateAfterLabel(ls,['nationality','citizenship','kewarganegaraan'],2);
-  if(nat){const c=confidenceFromCandidate(nat.value,avg);push('Nationality',makeField('Nationality',nat.value,c,c>=85?'VERIFIED':'UNCERTAIN',nat.evidence,'Explicit nationality wording or explicit nationality label. No nationality is inferred from a state/city alone.',c<85?'Verify against the original source.':''));}
-  else push('Nationality',makeField('Nationality','UNKNOWN',0,'UNKNOWN','No reliable explicit nationality evidence found.','Not validated.','A country/state appearing elsewhere is not automatically treated as nationality.'));
-
-  const address=extractAddress(ls);
-  if(address){const val=address.value,hasPost=/\b\d{5}\b/.test(val),hasStreet=/(jalan|jln\.?|lorong|persiaran|taman|kampung|road|street|avenue|drive|lane|block|blok|lot|unit|apartment|apartmen|condominium|residence|residensi)/i.test(val),n=val.split('\n').length,c=Math.min(95,confidenceFromCandidate(val,avg)+(hasPost?2:0)+(n>=3?2:0)),ok=(hasPost?1:0)+(hasStreet?1:0)+(n>=2?1:0)>=2;push('Address',makeField('Address',val,c,ok&&c>=85?'VERIFIED':'UNCERTAIN',address.evidence,`Captured ${n} contiguous address line(s) and preserved their order. ${hasPost?'A 5-digit postcode is present.':'No 5-digit postcode was reliably detected.'}`,ok&&c>=85?'':'One or more address components may be missing, blurred, merged, or misread; verify the complete block.'));}
-  else push('Address',makeField('Address','UNKNOWN',0,'UNKNOWN','No reliable explicit address block found.','Not validated.','An isolated postcode/city/state is never converted into an address.'));
-
-  /* Common additional explicit fields. These are intentionally broad so the
-     application captures more document information without guessing. */
-  const additional=[
-    ['Document Type',['document type','type of document','jenis dokumen','dokumen']],
-    ['Document Number',['document number','document no','no dokumen']],
-    ['Registration Number',['registration number','registration no','no pendaftaran']],
-    ['License Number',['license number','licence number','license no','licence no','no lesen']],
-    ['Issue Date',['issue date','date issued','tarikh dikeluarkan']],
-    ['Expiry Date',['expiry date','expiration date','valid until','tarikh luput']],
-    ['Place of Birth',['place of birth','birth place','tempat lahir']],
-    ['Phone / Telephone',['phone','telephone','tel','mobile','telefon']],
-    ['Email',['email','e-mail']],
-    ['Occupation',['occupation','job','pekerjaan']],
-    ['Employer',['employer','majikan']],
-    ['Postcode',['postcode','post code','poskod']],
-    ['State',['state','negeri']],
-    ['City / Town',['city','town','bandar']],
-    ['Country',['country','negara']]
-  ];
-  const seen=new Set(out.map(x=>x.name.toLowerCase()));
-  for(const [label,labels] of additional){
-    const cnd=candidateAfterLabel(ls,labels,3);if(!cnd)continue;
-    if(seen.has(label.toLowerCase()))continue;
-    const conf=confidenceFromCandidate(cnd.value,avg),risk=/number|postcode|phone|date/i.test(label)&&numericAmbiguity(cnd.value);
-    let validation='Explicit label-associated evidence captured.';
-    if(/date/i.test(label))validation=validateDate(cnd.value).msg;
-    out.push(makeField(label,cnd.value,Math.min(conf,risk?65:conf),conf>=85&&!risk?'VERIFIED':'UNCERTAIN',cnd.evidence,validation,risk?'Numeric ambiguity detected; visually verify.':''));
-    seen.add(label.toLowerCase());
-  }
-
-  const suspicious=ls.filter(x=>numericAmbiguity(x));
-  if(suspicious.length)out.push(makeField('Numeric Ambiguity Audit','REVIEW REQUIRED',Math.min(avg,70),'UNCERTAIN',suspicious.slice(0,12).join('\n'),'No character substitutions are performed.','Possible OCR confusions such as 0/O, 1/I/l, 5/S, 8/B/6, 2/Z, 4/A, etc. require visual verification.','numeric'));
-
-  /* Completeness layer: every readable OCR line remains visible in Verified
-     Extraction, even when it has no predefined schema field. */
-  const represented=new Set();
-  for(const f of out){for(const line of String(f.evidence||'').split('\n')){const q=cleanEvidence(line).toLowerCase();if(q)represented.add(q)}}
-  const all=extractAllReadable(ls).filter(x=>!represented.has(cleanEvidence(x).toLowerCase()));
-  if(all.length){out.push(makeField('Other Reliably Read Information',all.join('\n'),Math.min(avg,95),avg>=85?'VERIFIED':'UNCERTAIN',all.join('\n'),'Preserved from OCR evidence because no safe predefined field assignment was available.',avg>=85?'':'Review OCR lines against the original source.'))}
-
-  const conflicts=pages.filter(x=>x.conflict).length;
-  if(conflicts)out.push(makeField('AI / Primary OCR Conflict','REVIEW REQUIRED',Math.min(avg,60),'UNCERTAIN',`${conflicts} page(s) contain disagreement between primary OCR and AI-upscaled OCR.`,'Conflicting OCR passes are retained rather than merged silently.','Verify affected information against the original image.'));
-  return out;
-}
-function renderFields(fields){
-  els.fields.innerHTML='';
-  for(const f of fields){
-    const d=document.createElement('div');d.className='field';
-    const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';
-    d.innerHTML=`<div class="field-top"><div class="field-name">${escapeHTML(f.name)}</div><span class="badge ${cls}">${escapeHTML(f.status)} · ${f.confidence}%</span></div><div class="field-value">${escapeHTML(f.value)}</div><div class="field-meta"><b>Validation:</b> ${escapeHTML(f.validation)}</div><div class="evidence"><b>Evidence:</b>\n${escapeHTML(f.evidence)}${f.reason?`\n\nReason: ${escapeHTML(f.reason)}`:''}</div>`;
+  for(let p=0;p<span class="badge ${cls}">${escapeHTML(f.status)} · ${f.confidence}%</span></div><div class="field-value">${escapeHTML(f.value)}</div><div class="field-meta"><b>Validation:</b> ${escapeHTML(f.validation)}</div><div class="evidence"><b>Evidence:</b>\n${escapeHTML(f.evidence)}${f.reason?`\n\nReason: ${escapeHTML(f.reason)}`:''}</div>`;
     els.fields.appendChild(d);
   }
 }
@@ -849,5 +628,22 @@ function renderTableHints(text){
 renderFiles();renderPages();renderEmpty();renderSlots();
 setEngine('Ready',true);
 </script>
+
+<script id="ocr-master-availability-fix">
+/* Availability guard:
+   transient OCR/model failures are retried with bounded backoff.
+   No retry ever fabricates a result. */
+window.OCR_MASTER_RETRY = async function(fn, attempts=3){
+  let last;
+  for(let i=0;i<attempts;i++){
+    try{return await fn()}catch(e){
+      last=e;
+      if(i<attempts-1) await new Promise(r=>setTimeout(r, 350*(i+1)));
+    }
+  }
+  throw last;
+};
+</script>
+
 </body>
 </html>
