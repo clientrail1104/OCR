@@ -27,6 +27,7 @@
 -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs" type="module"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -187,6 +188,19 @@ footer{font-size:9px;color:var(--muted);text-align:center;padding:10px}
       </div>
 
       <div class="section">
+        <div class="label">AI super-resolution</div>
+        <div class="toggle">AI upscale before OCR
+          <label class="switch"><input id="aiUpscale" type="checkbox" checked><span class="slider"></span></label>
+        </div>
+        <select id="upscaleFactor" aria-label="AI upscale factor">
+          <option value="2">2× AI upscale</option>
+          <option value="4" selected>4× AI upscale</option>
+        </select>
+        <div class="mini" style="margin-top:6px">Uses browser-side Real-ESRGAN general x4 through ONNX Runtime Web. AI reconstruction is corroboration only, never source truth.</div>
+        <div class="row" style="margin-top:8px"><button class="btn" id="loadUpscaler" type="button">Prepare AI model</button><span class="badge" id="upscaleStatus">Not loaded</span></div>
+      </div>
+
+      <div class="section">
         <div class="label">Review policy</div>
         <div class="notice warn">Low-confidence, conflicting, numeric and date fields remain visibly flagged. The app never replaces ambiguous characters with look-alikes.</div>
       </div>
@@ -258,13 +272,14 @@ footer{font-size:9px;color:var(--muted);text-align:center;padding:10px}
 const $ = s => document.querySelector(s);
 const state = {
   files: [], pages: [], selectedPage: 0, results: [], worker: null,
-  running: false, front: null, back: null, tables: []
+  running: false, front: null, back: null, tables: [], srSession: null
 };
 const els = {
   fileInput: $('#fileInput'), drop: $('#dropZone'), fileList: $('#fileList'),
   choose: $('#chooseBtn'), clear: $('#clearBtn'), run: $('#runBtn'),
   lang: $('#lang'), enhance: $('#enhance'), deskew: $('#deskew'),
   threshold: $('#threshold'), sharpen: $('#sharpen'), scale: $('#scale'),
+  aiUpscale: $('#aiUpscale'), upscaleFactor: $('#upscaleFactor'), loadUpscaler: $('#loadUpscaler'), upscaleStatus: $('#upscaleStatus'),
   scaleValue: $('#scaleValue'), bar: $('#bar'), progress: $('#progressText'),
   engine: $('#engineStatus'), front: $('#frontSlot'), back: $('#backSlot'),
   tabs: $('#pageTabs'), preview: $('#preview'), raw: $('#rawText'),
@@ -529,6 +544,40 @@ function enhanceCanvas(input){
   return c;
 }
 
+/* ----------------------------- AI super-resolution ----------------------------- */
+const SR_MODEL_URL='https://huggingface.co/CoderViking/realesr-general-x4v3-onnx/resolve/main/realesr-general-x4v3.onnx';
+async function loadSuperResolution(){
+  if(state.srSession)return state.srSession;
+  if(!window.ort)throw new Error('ONNX Runtime Web failed to load');
+  els.upscaleStatus.textContent='Loading…'; setEngine('Loading AI upscaler…');
+  const providers=navigator.gpu?['webgpu','wasm']:['wasm'];
+  ort.env.wasm.numThreads=Math.max(1,Math.min(4,navigator.hardwareConcurrency||2));
+  state.srSession=await ort.InferenceSession.create(SR_MODEL_URL,{executionProviders:providers,graphOptimizationLevel:'all'});
+  els.upscaleStatus.textContent='Ready';els.upscaleStatus.className='badge ok';setEngine('AI upscaler ready');return state.srSession;
+}
+function tileTensor(c,x0,y0,w,h){
+  const a=c.getContext('2d',{willReadFrequently:true}).getImageData(x0,y0,w,h).data, plane=w*h, out=new Float32Array(plane*3);let p=0;
+  for(let i=0;i<a.length;i+=4,p++){out[p]=a[i]/255;out[plane+p]=a[i+1]/255;out[2*plane+p]=a[i+2]/255}return new ort.Tensor('float32',out,[1,3,h,w]);
+}
+function tensorCanvas(t,w,h){const W=w*4,H=h*4,c=document.createElement('canvas');c.width=W;c.height=H;const a=t.data,img=c.getContext('2d').createImageData(W,H),n=W*H;for(let p=0;p<n;p++){img.data[p*4]=Math.max(0,Math.min(255,a[p]*255));img.data[p*4+1]=Math.max(0,Math.min(255,a[n+p]*255));img.data[p*4+2]=Math.max(0,Math.min(255,a[2*n+p]*255));img.data[p*4+3]=255}c.getContext('2d').putImageData(img,0,0);return c}
+async function aiUpscaleCanvas(source){
+  const session=await loadSuperResolution(), maxTile=192, overlap=12, scale=4;
+  let base=source;const fit=Math.min(1,2400/Math.max(source.width,source.height));
+  if(fit<1){base=document.createElement('canvas');base.width=Math.round(source.width*fit);base.height=Math.round(source.height*fit);const x=base.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(source,0,0,base.width,base.height)}
+  const final=document.createElement('canvas');final.width=Math.min(8192,base.width*scale);final.height=Math.min(8192,base.height*scale);const fx=final.getContext('2d');
+  const total=Math.ceil(base.width/maxTile)*Math.ceil(base.height/maxTile);let done=0;
+  for(let y=0;y<base.height;y+=maxTile)for(let x=0;x<base.width;x+=maxTile){
+    const x0=Math.max(0,x-overlap),y0=Math.max(0,y-overlap),x1=Math.min(base.width,x+maxTile+overlap),y1=Math.min(base.height,y+maxTile+overlap),w=x1-x0,h=y1-y0;
+    const out=await session.run({input:tileTensor(base,x0,y0,w,h)}), key=session.outputNames[0]||Object.keys(out)[0], tile=tensorCanvas(out[key],w,h);
+    const cl=(x-x0)*4,ct=(y-y0)*4,cr=(x1-Math.min(base.width,x+maxTile))*4,cb=(y1-Math.min(base.height,y+maxTile))*4,sw=tile.width-cl-cr,sh=tile.height-ct-cb;
+    fx.drawImage(tile,cl,ct,sw,sh,x*4,y*4,Math.min(sw,final.width-x*4),Math.min(sh,final.height-y*4));done++;setProgress(4+30*done/total,`AI super-resolution · tile ${done}/${total}`);
+  }
+  if(Number(els.upscaleFactor.value)===2){const two=document.createElement('canvas');two.width=Math.round(base.width*2);two.height=Math.round(base.height*2);const x=two.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(final,0,0,two.width,two.height);return two}return final;
+}
+els.loadUpscaler.onclick=async()=>{try{await loadSuperResolution()}catch(e){els.upscaleStatus.textContent='Unavailable';els.upscaleStatus.className='badge bad';showNotice(`AI upscaler unavailable: ${e.message}. OCR can still run without it.`,'bad')}};
+async function ocrCanvas(worker,c,label){const out=await worker.recognize(c.toDataURL('image/png'));return {text:out.data.text||'',confidence:Number(out.data.confidence||0),label}}
+function corroborate(a,b){if(!b)return a;const x=a.text.toUpperCase().replace(/\s+/g,' ').trim().split(' '),y=b.text.toUpperCase().replace(/\s+/g,' ').trim().split(' ');let same=0;for(let i=0;i<Math.min(x.length,y.length);i++)if(x[i]===y[i])same++;const agreement=Math.max(x.length,y.length)?same/Math.max(x.length,y.length):0;return {...a,secondaryText:b.text,secondaryConfidence:b.confidence,agreement,conflict:agreement<.65,confidence:Math.round(a.confidence*.55+b.confidence*.25+agreement*20)}}
+
 /* ----------------------------- OCR ----------------------------- */
 async function getWorker(){
   const lang=els.lang.value;
@@ -563,11 +612,13 @@ async function runOCR(){
         continue;
       }
       const c=enhanceCanvas(p.canvas);
-      // Do not use character substitution or whitelist; preserve OCR evidence.
-      const out=await worker.recognize(c.toDataURL('image/png'));
-      const text=out.data.text||'';
-      state.results.push({page:i+1,text,confidence:out.data.confidence||0,source:'ocr',canvas:c});
+      const primary=await ocrCanvas(worker,c,`${p.label} · primary`);
+      let secondary=null,aiCanvas=null;
+      if(els.aiUpscale.checked){try{aiCanvas=await aiUpscaleCanvas(c);secondary=await ocrCanvas(worker,enhanceCanvas(aiCanvas),`${p.label} · AI-upscaled`)}catch(e){console.warn(e);}}
+      const out=corroborate(primary,secondary), text=out.text||'';
+      state.results.push({page:i+1,text,confidence:out.confidence||0,source:'ocr',canvas:c,aiCanvas,secondaryText:out.secondaryText||'',secondaryConfidence:out.secondaryConfidence||0,agreement:out.agreement,conflict:out.conflict});
       allText.push(`\n--- ${p.label} ---\n${text}`);
+      if(out.conflict)allText.push('\n[AI OCR CORROBORATION WARNING: primary and AI-upscaled OCR disagree. Verify against source image.]');
       setProgress(15+80*(i+1)/state.pages.length,`OCR page ${i+1}/${state.pages.length}`);
     }
     const combined=allText.join('\n');
@@ -575,7 +626,7 @@ async function runOCR(){
     const fields=extractFields(combined);
     renderFields(fields);
     renderTableHints(combined);
-    const avg=state.results.filter(x=>x.source==='ocr').reduce((a,x)=>a+x.confidence,0)/(state.results.filter(x=>x.source==='ocr').length||1);
+    const pages=state.results.filter(x=>x.source==='ocr'); const avg=pages.reduce((a,x)=>a+(x.conflict?Math.min(x.confidence,60):x.confidence),0)/(pages.length||1);
     els.ocrBadge.textContent=`OCR evidence · ${Number.isFinite(avg)?avg.toFixed(1):'—'}%`;
     els.ocrBadge.className='badge '+(avg>=85?'ok':avg>=60?'warn':'bad');
     const review=fields.filter(f=>f.status!=='VERIFIED').length;
@@ -640,7 +691,7 @@ function numericRisk(v){
 }
 function extractFields(text){
   const lines=linesOf(text), joined=lines.join(' ');
-  const avg=state.results.filter(x=>x.source==='ocr').reduce((a,x)=>a+x.confidence,0)/(state.results.filter(x=>x.source==='ocr').length||1);
+  const pages=state.results.filter(x=>x.source==='ocr'); const avg=pages.reduce((a,x)=>a+(x.conflict?Math.min(x.confidence,60):x.confidence),0)/(pages.length||1);
   const out=[];
   const name=candidateAfterLabel(lines,['name','full name','nama','nama penuh','holder','cardholder']);
   if(name){
