@@ -673,172 +673,157 @@ async function runOCR(){
 }
 els.run.onclick=runOCR;
 
-/* ----------------------------- extraction ----------------------------- */
-/*
-  Extraction is deliberately conservative:
-  - labels are used as evidence
-  - patterns are surfaced, not blindly assigned
-  - ambiguous candidates remain UNKNOWN/UNCERTAIN
-  - numeric-looking text is treated as high risk
-*/
-function cleanEvidence(s){return s.replace(/[ \t]+/g,' ').trim()}
-function linesOf(text){return text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)}
-function candidateAfterLabel(lines,labels){
-  const escaped=labels.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
-  const re=new RegExp('^\\s*(?:'+escaped.join('|')+')\\s*[:\\-]?\\s*(.*)$','i');
-  const stop=/^(name|full name|nama|nama penuh|holder|cardholder|dob|date of birth|birth date|tarikh lahir|born|gender|sex|jantina|nationality|citizenship|kewarganegaraan|address|alamat|id no|id number|identification no|identification number|mykad|nric|ic no|no[.]? kad pengenalan)\\b/i;
+/* ----------------------------- evidence-first extraction ----------------------------- */
+function cleanEvidence(s){return String(s||'').replace(/[ \t]+/g,' ').trim()}
+function linesOf(text){return String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean)}
+function escReg(s){return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
+function candidateAfterLabel(lines,labels,maxLines=5){
+  const re=new RegExp('^\s*(?:'+labels.map(escReg).join('|')+')\s*[:\-]?\s*(.*)$','i');
+  const stop=/^(full?\s*name|name|nama(?:\s*penuh)?|dob|date\s*of\s*birth|birth\s*date|tarikh\s*lahir|gender|sex|jantina|nationality|citizenship|kewarganegaraan|address|alamat|id\s*(?:no|number)?|identification\s*(?:no|number)?|nric|ic\s*no|no\.?\s*kad\s*pengenalan|occupation|pekerjaan|phone|telephone|tel|mobile|email|e-?mail|date\s*issued|issue\s*date|expiry|valid\s*until|tarikh\s*luput)\s*[:\-]?/i;
   for(let i=0;i<lines.length;i++){
     const m=lines[i].match(re); if(!m)continue;
     const parts=[]; if(m[1]&&m[1].trim())parts.push(m[1].trim());
-    for(let j=i+1;j<Math.min(lines.length,i+5);j++){
+    for(let j=i+1;j<Math.min(lines.length,i+1+maxLines);j++){
       if(stop.test(lines[j]))break;
-      if(parts.length && /^(page|www[.]|http|tel|fax|email)\\b/i.test(lines[j]))break;
+      if(/^(page\s+\d+|www\.|https?:\/\/)/i.test(lines[j]))break;
       parts.push(lines[j]);
     }
-    if(parts.length)return {value:parts.join('\n'),evidence:lines[i]+'\n'+parts.join('\n')};
+    if(parts.length)return {value:parts.join('\n'),evidence:[lines[i],...parts].join('\n'),line:i};
   }
   return null;
 }
 function confidenceFromCandidate(value,ocrConf){
-  let c=Math.min(ocrConf||0,95);
+  let c=Math.min(Number(ocrConf)||0,95);
   if(!value)c=0;
-  if(/[�]/.test(value))c=Math.min(c,35);
-  if(/\s{3,}/.test(value))c=Math.min(c,65);
+  if(/[�]/.test(value))c=Math.min(c,30);
+  if(/\b(?:unknown|unreadable)\b/i.test(value))c=Math.min(c,20);
   return Math.round(c);
 }
 function makeField(name,value,conf,status,evidence,validation,reason,kind='text'){
-  return {name,value:value||'UNKNOWN',confidence:conf,status,evidence:evidence||'No reliable evidence found.',validation:validation||'Not validated',reason:reason||'',kind};
+  return {name,value:value||'UNKNOWN',confidence:Math.max(0,Math.min(100,Math.round(conf||0))),status,evidence:evidence||'No reliable evidence found.',validation:validation||'Not validated.',reason:reason||'',kind};
 }
 function validateDate(v){
-  if(!v)return {ok:false,msg:'No value'};
-  const m=v.match(/\b(19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}[-/.](?:19|20)?\d{2}\b/);
-  if(!m)return {ok:false,msg:'Date pattern is not sufficiently clear'};
-  const nums=m[0].split(/[-/.]/).map(Number);
-  let d,mo,y;
-  if(nums[0]>31){y=nums[0];mo=nums[1];d=nums[2]}else{d=nums[0];mo=nums[1];y=nums[2];if(y<100)y+=2000}
-  const dt=new Date(y,mo-1,d);
-  const ok=dt.getFullYear()===y&&dt.getMonth()===mo-1&&dt.getDate()===d;
-  return ok?{ok:true,msg:'Calendar date is structurally valid'}:{ok:false,msg:'Calendar date is invalid'};
+  const m=String(v||'').match(/\b(?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2}\b|\b\d{1,2}[-/.]\d{1,2}[-/.](?:19|20)?\d{2}\b/);
+  if(!m)return {ok:false,msg:'Date format is not sufficiently clear.'};
+  const a=m[0].split(/[-/.]/).map(Number);let d,mo,y;
+  if(a[0]>31){y=a[0];mo=a[1];d=a[2]}else{d=a[0];mo=a[1];y=a[2]<100?2000+a[2]:a[2]}
+  const dt=new Date(y,mo-1,d),ok=dt.getFullYear()===y&&dt.getMonth()===mo-1&&dt.getDate()===d;
+  return ok?{ok:true,msg:'Calendar date is structurally valid.'}:{ok:false,msg:'Calendar date is invalid.'};
 }
-function numericRisk(v){
-  return /[0-9]/.test(v) && /[A-Za-z]/.test(v);
+function explicitGender(v){
+  const x=String(v||'').trim().toUpperCase();
+  if(x==='M'||/^MALE(?:\s*[/|]\s*M)?$/.test(x)||/^LELAKI(?:\s*[/|]\s*(?:MALE\s*[/|]\s*)?M)?$/.test(x))return {original:v,normalized:'Male / M'};
+  if(x==='F'||/^FEMALE(?:\s*[/|]\s*F)?$/.test(x)||/^PEREMPUAN(?:\s*[/|]\s*(?:FEMALE\s*[/|]\s*)?F)?$/.test(x))return {original:v,normalized:'Female / F'};
+  if(/\b(?:MALE|LELAKI)\b/.test(x))return {original:v,normalized:'Male / M'};
+  if(/\b(?:FEMALE|PEREMPUAN)\b/.test(x))return {original:v,normalized:'Female / F'};
+  return null;
+}
+function numericAmbiguity(v){
+  return /[0-9]/.test(v)&&/[A-Za-z]/.test(v);
+}
+function extractAddress(lines){
+  const labels=['address','alamat','alamat tetap','alamat rumah','permanent address','residential address','home address','mailing address','postal address','correspondence address'];
+  const start=new RegExp('^\s*(?:'+labels.map(escReg).join('|')+')\s*[:\-]?\s*(.*)$','i');
+  const stop=/^(name|full\s*name|nama(?:\s*penuh)?|dob|date\s*of\s*birth|birth\s*date|tarikh\s*lahir|gender|sex|jantina|nationality|citizenship|kewarganegaraan|id\s*(?:no|number)?|identification\s*(?:no|number)?|nric|ic\s*no|no\.?\s*kad\s*pengenalan|occupation|pekerjaan|phone|telephone|tel|mobile|email|e-?mail|date\s*issued|issue\s*date|expiry|valid\s*until|tarikh\s*luput|signature|sign)\s*[:\-]?/i;
+  const addressWord=/(jalan|jln\.?|lorong|lrg\.?|persiaran|taman|kampung|kg\.?|road|street|st\.?\b|avenue|ave\.?\b|drive|dr\.?\b|lane|block|blok|lot|unit|floor|tingkat|residensi|residence|apartment|apartmen|condominium|condo|flat|suite|building|bangunan|postcode|poskod|bandar|city|daerah|district|selangor|perak|penang|pulau pinang|johor|melaka|malacca|negeri sembilan|pahang|terengganu|kelantan|kedah|perlis|sabah|sarawak|putrajaya|labuan|malaysia)/i;
+  const postcode=/\b\d{5}\b/;
+  for(let i=0;i<lines.length;i++){
+    const m=lines[i].match(start); if(!m)continue;
+    const parts=[];if(m[1].trim())parts.push(cleanEvidence(m[1]));
+    let sawAddressSignal=!!m[1].trim();
+    for(let j=i+1;j<Math.min(lines.length,i+13);j++){
+      const line=cleanEvidence(lines[j]);if(!line)continue;
+      if(stop.test(line))break;
+      if(/^(page\s+\d+|www\.|https?:\/\/)/i.test(line))break;
+      if(addressWord.test(line)||postcode.test(line)||parts.length<2){parts.push(line);sawAddressSignal=true;continue;}
+      if(parts.length>=2)break;
+    }
+    if(parts.length && sawAddressSignal)return {value:parts.join('\n'),evidence:[lines[i],...parts].join('\n')};
+  }
+  return null;
+}
+function extractAllReadable(lines){
+  /* Preserve every OCR line that is not already represented as a structured field.
+     This is the completeness layer: it prevents the extractor from throwing away
+     document text simply because no predefined field exists for it. */
+  const obviousMeta=/^(---|\[AI OCR|\[AI enhancement|\[FAST OCR|\[AI HD OCR)/i;
+  return lines.filter(x=>!obviousMeta.test(x)).slice(0,500);
 }
 function extractFields(text){
-  const ls=linesOf(text), joined=ls.join(' ');
+  const ls=linesOf(text),joined=ls.join(' ');
   const pages=state.results.filter(x=>x.source==='ocr');
-  const avg=pages.length?pages.reduce((a,x)=>a+(x.conflict?Math.min(x.confidence,60):x.confidence),0)/pages.length:0;
+  const avg=pages.length?pages.reduce((a,x)=>a+(x.conflict?Math.min(x.confidence||0,60):(x.confidence||0)),0)/pages.length:0;
   const out=[];
+  const push=(name,c,kind='text')=>{if(c)out.push(c);};
 
-  const name=candidateAfterLabel(ls,['name','full name','nama','nama penuh','holder','cardholder']);
-  if(name){
-    const c=confidenceFromCandidate(name.value,avg);
-    out.push(makeField('Full name',name.value,c,c>=85?'VERIFIED':'UNCERTAIN',name.evidence,'Label-associated candidate; manual visual verification required for legal identity use.',c<85?'OCR confidence or visual ambiguity is too high.':''));
-  }else out.push(makeField('Full name','UNKNOWN',0,'UNKNOWN','No reliable name label/candidate found.','Not validated','A name cannot be safely assigned from arbitrary document text.'));
+  const name=candidateAfterLabel(ls,['full name','name','nama penuh','nama','holder','cardholder'],4);
+  if(name){const c=confidenceFromCandidate(name.value,avg);push('Full name',makeField('Full Name',name.value,c,c>=85?'VERIFIED':'UNCERTAIN',name.evidence,'Explicit name-label association. No name is inferred from unrelated text.',c<85?'OCR evidence is not strong enough for unassisted verification.':''));}
+  else push('Full name',makeField('Full Name','UNKNOWN',0,'UNKNOWN','No reliable explicit name evidence found.','Not validated.','The system does not infer a person name from arbitrary text.'));
 
-  const id=candidateAfterLabel(ls,['id no','id number','identification no','identification number','mykad','nric','ic no','no. kad pengenalan','no kad pengenalan']);
-  if(id){
-    const c=confidenceFromCandidate(id.value,avg),risk=numericRisk(id.value);
-    out.push(makeField('Identity / document number',id.value,Math.min(c,risk?65:c),c>=85&&!risk?'VERIFIED':'UNCERTAIN',id.evidence,'No universal checksum is applied because document type is not known with certainty.',risk?'Contains mixed numeric/alphabetic characters; look-alike substitution is not allowed.':c<85?'OCR evidence is not strong enough.':'','numeric'));
-  }else out.push(makeField('Identity / document number','UNKNOWN',0,'UNKNOWN','No reliable identity-number label/candidate found.','Not validated','No number is inferred.','numeric'));
+  const id=candidateAfterLabel(ls,['nric number','nric no','nric','mykad number','mykad no','identification number','identification no','id number','id no','ic number','ic no','no. kad pengenalan','no kad pengenalan'],2);
+  if(id){const c=confidenceFromCandidate(id.value,avg),risk=numericAmbiguity(id.value);push('NRIC',makeField('NRIC / ID Number',id.value,Math.min(c,risk?65:c),c>=85&&!risk?'VERIFIED':'UNCERTAIN',id.evidence,'Exact OCR evidence preserved. No look-alike substitutions or silent corrections are performed.',risk?'Mixed alphanumeric content is high risk; visually verify every character.':c<85?'Confidence is below the safe threshold.':'Visually verify critical identity numbers.','numeric'));}
+  else push('NRIC',makeField('NRIC / ID Number','UNKNOWN',0,'UNKNOWN','No reliable explicit identification-number evidence found.','Not validated.','No identification number is inferred.','numeric'));
 
-  const dob=candidateAfterLabel(ls,['dob','date of birth','birth date','tarikh lahir','born']);
-  if(dob){
-    const v=validateDate(dob.value),c=confidenceFromCandidate(dob.value,avg);
-    out.push(makeField('Date of birth',dob.value,Math.min(c,v.ok?95:60),c>=85&&v.ok?'VERIFIED':'UNCERTAIN',dob.evidence,v.msg,v.ok?'':'Date syntax or OCR evidence is insufficient.','date'));
-  }else out.push(makeField('Date of birth','UNKNOWN',0,'UNKNOWN','No reliable DOB label/candidate found.','Not validated','No date is inferred.','date'));
+  const dob=candidateAfterLabel(ls,['date of birth','dob','birth date','tarikh lahir','born'],2);
+  if(dob){const v=validateDate(dob.value),c=confidenceFromCandidate(dob.value,avg);push('DOB',makeField('Date of Birth',dob.value,Math.min(c,v.ok?95:60),c>=85&&v.ok?'VERIFIED':'UNCERTAIN',dob.evidence,v.msg,v.ok?'':'Date evidence requires visual verification.','date'));}
+  else push('DOB',makeField('Date of Birth','UNKNOWN',0,'UNKNOWN','No reliable explicit date-of-birth evidence found.','Not validated.','No date is inferred.','date'));
 
-  const gender=candidateAfterLabel(ls,['gender','sex','jantina']);
-  if(gender){
-    const v=gender.value.trim().toUpperCase(),mapped=(v==='M'||/^MALE\b/.test(v))?'M — Male':(v==='F'||/^FEMALE\b/.test(v))?'F — Female':null;
-    const c=confidenceFromCandidate(gender.value,avg);
-    out.push(makeField('Sex / gender',mapped||gender.value,c,mapped&&c>=85?'VERIFIED':'UNCERTAIN',gender.evidence,'Only explicit M/F or Male/Female evidence is mapped.',mapped?'':'Value is not an unambiguous supported sex marker.'));
+  const gender=candidateAfterLabel(ls,['gender','sex','jantina'],2);
+  if(gender){const g=explicitGender(gender.value),c=confidenceFromCandidate(gender.value,avg);push('Gender',makeField('Gender / Sex',g?`${gender.value} → ${g.normalized}`:gender.value,c,g&&c>=85?'VERIFIED':'UNCERTAIN',gender.evidence,'Only explicit gender/sex wording is normalized; gender is never inferred from a name.',g?'':'The detected value is not an unambiguous supported marker.'));}
+  else push('Gender',makeField('Gender / Sex','UNKNOWN',0,'UNKNOWN','No reliable explicit gender/sex evidence found.','Not validated.','Gender is never inferred from a name.'));
+
+  let nat;
+  if(/\bwarganegara\s*[/|\-]?\s*malaysia\b/i.test(joined)||/\bmalaysia\s*[/|\-]?\s*warganegara\b/i.test(joined))nat={value:'Warganegara / Malaysia',evidence:ls.find(x=>/warganegara/i.test(x))||'Warganegara / Malaysia'};
+  else nat=candidateAfterLabel(ls,['nationality','citizenship','kewarganegaraan'],2);
+  if(nat){const c=confidenceFromCandidate(nat.value,avg);push('Nationality',makeField('Nationality',nat.value,c,c>=85?'VERIFIED':'UNCERTAIN',nat.evidence,'Explicit nationality wording or explicit nationality label. No nationality is inferred from a state/city alone.',c<85?'Verify against the original source.':''));}
+  else push('Nationality',makeField('Nationality','UNKNOWN',0,'UNKNOWN','No reliable explicit nationality evidence found.','Not validated.','A country/state appearing elsewhere is not automatically treated as nationality.'));
+
+  const address=extractAddress(ls);
+  if(address){const val=address.value,hasPost=/\b\d{5}\b/.test(val),hasStreet=/(jalan|jln\.?|lorong|persiaran|taman|kampung|road|street|avenue|drive|lane|block|blok|lot|unit|apartment|apartmen|condominium|residence|residensi)/i.test(val),n=val.split('\n').length,c=Math.min(95,confidenceFromCandidate(val,avg)+(hasPost?2:0)+(n>=3?2:0)),ok=(hasPost?1:0)+(hasStreet?1:0)+(n>=2?1:0)>=2;push('Address',makeField('Address',val,c,ok&&c>=85?'VERIFIED':'UNCERTAIN',address.evidence,`Captured ${n} contiguous address line(s) and preserved their order. ${hasPost?'A 5-digit postcode is present.':'No 5-digit postcode was reliably detected.'}`,ok&&c>=85?'':'One or more address components may be missing, blurred, merged, or misread; verify the complete block.'));}
+  else push('Address',makeField('Address','UNKNOWN',0,'UNKNOWN','No reliable explicit address block found.','Not validated.','An isolated postcode/city/state is never converted into an address.'));
+
+  /* Common additional explicit fields. These are intentionally broad so the
+     application captures more document information without guessing. */
+  const additional=[
+    ['Document Type',['document type','type of document','jenis dokumen','dokumen']],
+    ['Document Number',['document number','document no','no dokumen']],
+    ['Registration Number',['registration number','registration no','no pendaftaran']],
+    ['License Number',['license number','licence number','license no','licence no','no lesen']],
+    ['Issue Date',['issue date','date issued','tarikh dikeluarkan']],
+    ['Expiry Date',['expiry date','expiration date','valid until','tarikh luput']],
+    ['Place of Birth',['place of birth','birth place','tempat lahir']],
+    ['Phone / Telephone',['phone','telephone','tel','mobile','telefon']],
+    ['Email',['email','e-mail']],
+    ['Occupation',['occupation','job','pekerjaan']],
+    ['Employer',['employer','majikan']],
+    ['Postcode',['postcode','post code','poskod']],
+    ['State',['state','negeri']],
+    ['City / Town',['city','town','bandar']],
+    ['Country',['country','negara']]
+  ];
+  const seen=new Set(out.map(x=>x.name.toLowerCase()));
+  for(const [label,labels] of additional){
+    const cnd=candidateAfterLabel(ls,labels,3);if(!cnd)continue;
+    if(seen.has(label.toLowerCase()))continue;
+    const conf=confidenceFromCandidate(cnd.value,avg),risk=/number|postcode|phone|date/i.test(label)&&numericAmbiguity(cnd.value);
+    let validation='Explicit label-associated evidence captured.';
+    if(/date/i.test(label))validation=validateDate(cnd.value).msg;
+    out.push(makeField(label,cnd.value,Math.min(conf,risk?65:conf),conf>=85&&!risk?'VERIFIED':'UNCERTAIN',cnd.evidence,validation,risk?'Numeric ambiguity detected; visually verify.':''));
+    seen.add(label.toLowerCase());
   }
 
-  const nationality = /\bWarganegara\s+Malaysia\b/i.test(joined) ? 'Malaysia' : null;
-  if(nationality){
-    const line=ls.find(x=>/Warganegara/i.test(x));
-    out.push(makeField('Nationality',nationality,Math.min(avg,92),'VERIFIED',line||'Warganegara Malaysia','Explicit nationality wording detected.',''));
-  }else if(/\bWarganegara\b/i.test(joined)){
-    const line=ls.find(x=>/Warganegara/i.test(x));
-    out.push(makeField('Nationality','UNKNOWN',0,'UNCERTAIN',line||'Warganegara','Nationality wording detected, but country is not explicit.','The application does not infer Malaysia from the word Warganegara alone.'));
-  }else{
-    const nat=candidateAfterLabel(ls,['nationality','citizenship','kewarganegaraan']);
-    if(nat){const c=confidenceFromCandidate(nat.value,avg);out.push(makeField('Nationality',nat.value,c,c>=85?'VERIFIED':'UNCERTAIN',nat.evidence,'Label-associated candidate; not inferred from a state/country name alone.',c<85?'Evidence is not strong enough.':''));}
-    else out.push(makeField('Nationality','UNKNOWN',0,'UNKNOWN','No reliable nationality evidence found.','Not validated','A state/country name is not treated as nationality without explicit evidence.'));
-  }
+  const suspicious=ls.filter(x=>numericAmbiguity(x));
+  if(suspicious.length)out.push(makeField('Numeric Ambiguity Audit','REVIEW REQUIRED',Math.min(avg,70),'UNCERTAIN',suspicious.slice(0,12).join('\n'),'No character substitutions are performed.','Possible OCR confusions such as 0/O, 1/I/l, 5/S, 8/B/6, 2/Z, 4/A, etc. require visual verification.','numeric'));
 
-  /*
-     ADDRESS EXTRACTION — deliberately conservative but much more complete.
-     We preserve the contiguous address block instead of returning only a
-     postcode/city.  OCR line breaks are evidence, so each usable line is kept.
-     We stop only at a strong next-field label or obvious document metadata.
-  */
-  const addressLabels=['address','alamat','alamat tetap','alamat rumah','permanent address','residential address','home address','mailing address','postal address','correspondence address'];
-  const stopLabels=/^(name|full\s*name|nama(?:\s*penuh)?|dob|date\s*of\s*birth|birth\s*date|tarikh\s*lahir|gender|sex|jantina|nationality|citizenship|kewarganegaraan|id\s*(?:no|number)?|identification\s*(?:no|number)?|nric|ic\s*no|no\.?\s*kad\s*pengenalan|occupation|pekerjaan|phone|telephone|tel|mobile|email|e-?mail|date\s*issued|issue\s*date|expiry|valid\s*until|tarikh\s*luput)\s*[:\-]?\s*/i;
-  const addressStartRe=new RegExp('^\\s*(?:'+addressLabels.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')\\s*[:\\-]?\\s*(.*)$','i');
+  /* Completeness layer: every readable OCR line remains visible in Verified
+     Extraction, even when it has no predefined schema field. */
+  const represented=new Set();
+  for(const f of out){for(const line of String(f.evidence||'').split('\n')){const q=cleanEvidence(line).toLowerCase();if(q)represented.add(q)}}
+  const all=extractAllReadable(ls).filter(x=>!represented.has(cleanEvidence(x).toLowerCase()));
+  if(all.length){out.push(makeField('Other Reliably Read Information',all.join('\n'),Math.min(avg,95),avg>=85?'VERIFIED':'UNCERTAIN',all.join('\n'),'Preserved from OCR evidence because no safe predefined field assignment was available.',avg>=85?'':'Review OCR lines against the original source.'))}
 
-  function cleanAddressLine(x){
-    return String(x||'').replace(/[|]+/g,' ').replace(/[ \t]{2,}/g,' ').trim();
-  }
-  function looksLikeAddressLine(x){
-    const v=cleanAddressLine(x); if(v.length<2)return false;
-    if(stopLabels.test(v))return false;
-    if(/^(page|www\.|https?:\/\/|email\s*[:\-]|tel\s*[:\-])/i.test(v))return false;
-    const postcode=/\b\d{5}\b/.test(v);
-    const street=/(jalan|jln\.?|lorong|lrg\.?|persiaran|taman|kampung|kg\.?|no\.?\s*\d+|road|street|st\.?\b|avenue|ave\.?\b|drive|dr\.?\b|lane|block|blok|lot|unit|floor|tingkat|residensi|residence|apartment|apartmen|condominium|condo|flat|suite|building|bangunan)/i.test(v);
-    const place=/(kuala|selangor|perak|penang|pulau pinang|johor|melaka|malacca|negeri sembilan|pahang|terengganu|kelantan|kedah|perlis|sabah|sarawak|putrajaya|labuan|malaysia|singapore|singapura|indonesia|city|bandar|town|district|daerah|wilayah)/i.test(v);
-    return postcode||street||place||/[A-Za-z]{3,}.*\d/.test(v);
-  }
-  function findAddressBlock(){
-    for(let i=0;i<ls.length;i++){
-      const m=ls[i].match(addressStartRe); if(!m)continue;
-      const collected=[]; const first=cleanAddressLine(m[1]);
-      if(first)collected.push(first);
-      for(let j=i+1;j<Math.min(ls.length,i+12);j++){
-        const line=cleanAddressLine(ls[j]);
-        if(!line)continue;
-        if(stopLabels.test(line))break;
-        if(/^(signature|sign|photo|date|place of birth|religion|race|ethnicity)\b/i.test(line))break;
-        if(/^(page\s+\d+|www\.|https?:\/\/)/i.test(line))break;
-        /* Keep address-looking lines. Once an address is strongly established,
-           allow ordinary short locality lines too, but stop on a new field. */
-        if(collected.length===0 || looksLikeAddressLine(line) || collected.some(x=>/\b\d{5}\b/.test(x))){
-          collected.push(line);
-        }else if(collected.length>=2){
-          break;
-        }
-      }
-      if(collected.length)return {start:i,value:collected.join('\n'),evidence:[ls[i],...collected].join('\n')};
-    }
-    return null;
-  }
-
-  const address=findAddressBlock();
-  const postcodeCandidates=[...joined.matchAll(/\b\d{5}\b/g)].map(m=>m[0]);
-  const uniquePostcodes=[...new Set(postcodeCandidates)];
-  const postcodeText=uniquePostcodes.length?uniquePostcodes.join(', '):'';
-  if(address){
-    const lineCount=address.value.split('\n').length;
-    const hasPostcode=/\b\d{5}\b/.test(address.value);
-    const hasStreet=/(jalan|jln\.?|lorong|lrg\.?|persiaran|taman|kampung|kg\.?|road|street|avenue|drive|lane|block|blok|lot|unit|floor|tingkat|residen|apartment|apartmen|condominium|condo|flat|suite|building|bangunan)/i.test(address.value);
-    const c0=confidenceFromCandidate(address.value,avg);
-    const c=Math.min(95,c0+(hasPostcode?2:0)+(lineCount>=3?2:0));
-    const completeScore=(hasPostcode?1:0)+(hasStreet?1:0)+(lineCount>=2?1:0);
-    const st=c>=85&&completeScore>=2?'VERIFIED':'UNCERTAIN';
-    const reason=st==='VERIFIED'?'':'Address block was detected, but one or more components may be missing, merged, blurred, or misread. Verify every line against the original.';
-    out.push(makeField('Postal / residential address',address.value,c,st,address.evidence,`Captured ${lineCount} contiguous address line(s)${hasPostcode?' including postcode':''}. No address text was invented or reconstructed from a city/postcode alone.`,reason));
-  }else{
-    /* If there is no explicit label, do not manufacture an address. However,
-       expose the presence of postcode evidence so a reviewer knows why it was
-       not silently promoted into an address. */
-    const postcodeEvidence=uniquePostcodes.length?ls.filter(x=>/\b\d{5}\b/.test(x)).join('\n'):'';
-    out.push(makeField('Postal / residential address','UNKNOWN',0,'UNKNOWN',postcodeEvidence||'No reliable address label/candidate found.','Not validated','An isolated postcode, city, state, or country is never converted into a complete address.'));
-  }
-
-  const suspicious=ls.filter(x=>/[0-9]/.test(x)&&/[A-Za-z]/.test(x)&&/[0-9][A-Za-z]|[A-Za-z][0-9]/.test(x));
-  if(suspicious.length){
-    out.push(makeField('Numeric ambiguity audit','REVIEW REQUIRED',Math.min(avg,70),'UNCERTAIN',suspicious.slice(0,8).join('\n'),'Look-alike character substitutions were not performed.','Mixed alphanumeric evidence may contain OCR confusions such as 0/O, 1/I/l, 5/S, 8/B/6, etc. Verify against the source image.','numeric'));
-  }
+  const conflicts=pages.filter(x=>x.conflict).length;
+  if(conflicts)out.push(makeField('AI / Primary OCR Conflict','REVIEW REQUIRED',Math.min(avg,60),'UNCERTAIN',`${conflicts} page(s) contain disagreement between primary OCR and AI-upscaled OCR.`,'Conflicting OCR passes are retained rather than merged silently.','Verify affected information against the original image.'));
   return out;
 }
 function renderFields(fields){
@@ -846,29 +831,18 @@ function renderFields(fields){
   for(const f of fields){
     const d=document.createElement('div');d.className='field';
     const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';
-    d.innerHTML=`
-      <div class="field-top"><div class="field-name">${escapeHTML(f.name)}</div><span class="badge ${cls}">${escapeHTML(f.status)} · ${f.confidence}%</span></div>
-      <div class="field-value">${escapeHTML(f.value)}</div>
-      <div class="field-meta"><b>Validation:</b> ${escapeHTML(f.validation)}</div>
-      <div class="evidence"><b>Evidence:</b>\n${escapeHTML(f.evidence)}${f.reason?`\\n\\n<b>Reason:</b> ${escapeHTML(f.reason)}`:''}</div>`;
+    d.innerHTML=`<div class="field-top"><div class="field-name">${escapeHTML(f.name)}</div><span class="badge ${cls}">${escapeHTML(f.status)} · ${f.confidence}%</span></div><div class="field-value">${escapeHTML(f.value)}</div><div class="field-meta"><b>Validation:</b> ${escapeHTML(f.validation)}</div><div class="evidence"><b>Evidence:</b>\n${escapeHTML(f.evidence)}${f.reason?`\n\nReason: ${escapeHTML(f.reason)}`:''}</div>`;
     els.fields.appendChild(d);
   }
 }
 function renderTableHints(text){
-  const rows=linesOf(text).filter(x=>(x.split(/\s{2,}|\t|\|/).length>=3));
-  if(rows.length<2)return;
-  const box=document.createElement('div');box.className='field';
-  box.innerHTML='<div class="field-top"><div class="field-name">Possible table structure</div><span class="badge warn">REVIEW</span></div>';
-  const table=document.createElement('table');
-  const parsed=rows.slice(0,100).map(r=>r.split(/\s{2,}|\t|\|/).map(x=>x.trim()));
-  const max=Math.max(...parsed.map(r=>r.length));
-  const first=parsed[0];const trh=document.createElement('tr');
-  for(let i=0;i<max;i++){const th=document.createElement('th');th.textContent=first[i]||'';trh.appendChild(th)}
-  table.appendChild(trh);
+  const rows=linesOf(text).filter(x=>x.split(/\s{2,}|\t|\|/).length>=3);if(rows.length<2)return;
+  const box=document.createElement('div');box.className='field';box.innerHTML='<div class="field-top"><div class="field-name">Possible Table Structure</div><span class="badge warn">REVIEW</span></div>';
+  const parsed=rows.slice(0,100).map(r=>r.split(/\s{2,}|\t|\|/).map(x=>x.trim())),max=Math.max(...parsed.map(r=>r.length));
+  const table=document.createElement('table'),trh=document.createElement('tr');for(let i=0;i<max;i++){const th=document.createElement('th');th.textContent=parsed[0][i]||'';trh.appendChild(th)}table.appendChild(trh);
   parsed.slice(1).forEach(r=>{const tr=document.createElement('tr');for(let i=0;i<max;i++){const td=document.createElement('td');td.textContent=r[i]||'';tr.appendChild(td)}table.appendChild(tr)});
   const wrap=document.createElement('div');wrap.className='table-wrap';wrap.style.marginTop='8px';wrap.appendChild(table);box.appendChild(wrap);
-  const note=document.createElement('div');note.className='field-meta';note.textContent='Table-like rows detected from OCR line structure. Cell boundaries and merged cells must be visually verified; this heuristic does not claim perfect table reconstruction.';box.appendChild(note);
-  els.fields.appendChild(box);
+  const note=document.createElement('div');note.className='field-meta';note.textContent='OCR suggests table-like rows. Verify column boundaries, merged cells and every cell against the source.';box.appendChild(note);els.fields.appendChild(box);
 }
 
 /* ----------------------------- initial state ----------------------------- */
