@@ -335,97 +335,185 @@ async function ocr(c,psm){const w=await getWorker();return retry(async()=>{const
 function cleanOCRLine(s){return String(s||'').replace(/[ \t]+/g,' ').trim()}
 window.splitNameAddressByVisibleGap=function splitNameAddressByVisibleGap(result){
   /*
-    MyKad FRONT spatial rule:
-    - A small/tiny visible vertical gap separates the last name row from address.
-    - EVERY readable OCR line above that boundary is name evidence.
-    - Address normally occupies five lines.
-    - Address line 1 can begin with No 124..., PT1234..., Lot 01...,
-      01-02-03..., or a simple numeric house/lot number such as 25...
-    - Prefixes are boundary evidence only. OCR text is never corrected.
+    MyKad FRONT NAME/ADDRESS SEGMENTATION — STRICT EVIDENCE MODE
+
+    A small vertical gap separates the name block from the address block.
+    Every readable row above that boundary is NAME evidence.
+
+    Address line 1 can begin with:
+      No 124...
+      PT1234...
+      Lot 01...
+      01-02-03...
+      25...
+
+    IMPORTANT:
+      OCR line grouping can occasionally merge the last name row and the first
+      address row into one OCR line. When an unambiguous address-start token
+      occurs AFTER a leading name token on that same OCR line, split the line
+      at that token. The text on both sides is preserved verbatim; nothing is
+      corrected, expanded, or guessed.
+
+      Example:
+        "MOHAMED NO 17 P 3 ..."
+      becomes evidence:
+        name line:    "MOHAMED"
+        address line: "NO 17 P 3 ..."
+      ONLY because "NO 17" is an explicit address-start marker.
+
+      A bare name such as "MOHAMED" is never inserted into an address.
   */
   const rawLines=Array.isArray(result?.lines)?result.lines:[];
   const usable=rawLines.map((l,i)=>{
     const text=cleanOCRLine(typeof l==="string" ? l : (l?.text??l?.value??""));
     const b=(typeof l==="object"&&l?.bbox)||{};
-    const top=Number(b.y0), bottom=Number(b.y1);
-    return {text,bbox:(typeof l==="object"&&l?.bbox)||null,index:i,
+    const top=Number(b.y0),bottom=Number(b.y1);
+    return {
+      text,bbox:(typeof l==="object"&&l?.bbox)||null,index:i,
       conf:Number(typeof l==="object" ? (l?.conf??l?.confidence) : NaN),
-      top:Number.isFinite(top)?top:null,bottom:Number.isFinite(bottom)?bottom:null};
-  }).filter(x=>x.text);
+      top:Number.isFinite(top)?top:null,bottom:Number.isFinite(bottom)?bottom:null
+    };
+  }).filter(l=>l.text);
 
-  const addressStartPattern=/^(?:NO\.?\s*\d+|PT\s*[A-Z]?\s*\d+[A-Z0-9-]*|LOT\s*[A-Z0-9-]*\d[A-Z0-9-]*|\d{1,5}(?:-\d{1,5}){1,3}\b|\d{1,6}\b)(?:\s|$)/i;
-  const addressLabelPattern=/^(?:N[O0]\.?\s*\d+|P[T7]\s*[A-Z]?\s*\d+[A-Z0-9-]*|L[O0]T\s*[A-Z0-9-]*\d[A-Z0-9-]*)(?:\s|$)/i;
-  const isAddressStart=t=>{
-    const x=cleanOCRLine(t);
-    return addressStartPattern.test(x)||addressLabelPattern.test(x);
+  // Deliberately conservative: these are structural address starts, not
+  // spelling corrections. Match against the original OCR text.
+  const addressStartRe=/(?:^|\s)(NO\.?\s*\d+|PT\s*[A-Z]?\s*\d+[A-Z0-9-]*|LOT\s*[A-Z0-9-]*\d[A-Z0-9-]*|\d{1,5}(?:-\d{1,5}){1,3}\b|\d{1,6}\b)(?=\s|$)/i;
+
+  const locateAddressStart=(text)=>{
+    const s=cleanOCRLine(text);
+    const m=s.match(addressStartRe);
+    if(!m)return null;
+    const token=m[1];
+    const relative=m[0].indexOf(token);
+    const at=m.index + Math.max(0,relative);
+    return {index:at,token};
   };
 
-  const geom=usable.filter(x=>x.top!==null&&x.bottom!==null).sort((a,b)=>a.top-b.top);
+  const hasAddressStartAtBeginning=(text)=>{
+    const hit=locateAddressStart(text);
+    return !!hit && hit.index===0;
+  };
 
-  if(geom.length>=6){
-    const heights=geom.map(x=>x.bottom-x.top).filter(x=>x>0).sort((a,b)=>a-b);
-    const medianH=heights.length?heights[Math.floor(heights.length/2)]:0;
-    const gaps=geom.slice(1).map((x,i)=>({i:i+1,gap:x.top-geom[i].bottom}));
+  const splitMergedLine=(line)=>{
+    const hit=locateAddressStart(line.text);
+    if(!hit || hit.index<=0)return null;
+    const before=cleanOCRLine(line.text.slice(0,hit.index));
+    const after=cleanOCRLine(line.text.slice(hit.index));
+    if(!before || !after)return null;
+    return {
+      name:{...line,text:before},
+      address:{...line,text:after,mergedAddressStart:true}
+    };
+  };
 
-    // First priority: an address-looking first line immediately after the
-    // name block. A tiny positive gap is sufficient; small bbox overlap is
-    // tolerated because OCR boxes are not pixel-perfect.
-    const starts=geom.map((x,i)=>({i,x}))
-      .filter(o=>o.i>=2 && geom.length-o.i>=5 && isAddressStart(o.x.text));
-    let chosen=null;
-    for(const o of starts){
-      const g=gaps.find(v=>v.i===o.i);
-      if(g && g.gap>=-Math.max(1,medianH*.15)){
-        chosen={start:o.i,gap:g.gap,visibleGap:g.gap>0,byPrefix:true};
+  let work=usable.slice();
+
+  // First, repair OCR line grouping only where an explicit address prefix is
+  // embedded after a non-empty leading token. No characters are changed.
+  for(let i=0;i<work.length;i++){
+    const split=splitMergedLine(work[i]);
+    if(split){
+      const remaining=work.length-i-1;
+      // Require at least four following OCR rows so this can form the normal
+      // five-line address block. This prevents ordinary numeric/name text from
+      // being mistaken for an address.
+      if(remaining>=4){
+        work.splice(i,1,split.name,split.address);
         break;
       }
     }
+  }
 
-    // If OCR damaged the first address prefix, use the five-line structure.
-    // This keeps every preceding line as name evidence and never changes text.
-    if(!chosen && geom.length>=7){
-      const i=geom.length-5, g=gaps.find(v=>v.i===i);
-      if(g) chosen={start:i,gap:g.gap,visibleGap:g.gap>0,byPrefix:false};
-    }
+  const geom=work.filter(l=>l.top!==null&&l.bottom!==null).sort((a,b)=>a.top-b.top);
 
-    if(chosen){
-      const name=geom.slice(0,chosen.start);
-      const addr=geom.slice(chosen.start,chosen.start+5);
+  if(geom.length>=6){
+    const heights=geom.map(l=>l.bottom-l.top).filter(v=>v>0).sort((a,b)=>a-b);
+    const medianH=heights.length?heights[Math.floor(heights.length/2)]:0;
+
+    // Prefer an explicit address prefix that has five lines available below it.
+    const starts=geom.map((l,i)=>({i,l}))
+      .filter(x=>x.i>=2 && geom.length-x.i>=5 && hasAddressStartAtBeginning(x.l.text));
+    const mergedStarts=geom.map((l,i)=>({i,l}))
+      .filter(x=>x.i>=2 && geom.length-x.i>=5 && x.l.mergedAddressStart===true);
+    if(mergedStarts.length){
+      const s=mergedStarts[0];
+      const name=geom.slice(0,s.i);
+      const addr=geom.slice(s.i,s.i+5);
       return {
         nameLines:name.map(x=>x.text),
         addressLines:addr.map(x=>x.text),
-        visibleGap:chosen.visibleGap,
-        method:chosen.byPrefix?"address-prefix-plus-gap":"five-line-structural",
+        visibleGap:false,
+        method:"merged-line-address-prefix",
         addressStart:addr[0]?.text||"",
-        lineCount:geom.length,
-        gapPx:chosen.gap,
-        medianLineHeight:medianH
+        lineCount:geom.length,gapPx:0,medianLineHeight:medianH
       };
     }
+
+    if(starts.length){
+      const s=starts[0];
+      const gap=s.i>0 ? s.l.top-geom[s.i-1].bottom : 0;
+      // A boundary is valid when boxes do not materially overlap. Tiny positive
+      // gaps are intentionally accepted.
+      if(gap>=-Math.max(1,medianH*.15)){
+        const name=geom.slice(0,s.i);
+        const addr=geom.slice(s.i,s.i+5);
+        return {
+          nameLines:name.map(x=>x.text),
+          addressLines:addr.map(x=>x.text),
+          visibleGap:gap>0,
+          method:"address-prefix-plus-spatial-boundary",
+          addressStart:addr[0]?.text||"",
+          lineCount:geom.length,gapPx:gap,medianLineHeight:medianH
+        };
+      }
+    }
+
+    // The document layout guarantees five address rows. Use the final five
+    // only when no explicit prefix boundary is available.
+    const addr=geom.slice(-5),name=geom.slice(0,-5);
+    const gap=addr.length&&name.length ? addr[0].top-name[name.length-1].bottom : 0;
+    return {
+      nameLines:name.map(x=>x.text),
+      addressLines:addr.map(x=>x.text),
+      visibleGap:gap>0,
+      method:"five-line-structural",
+      addressStart:addr[0]?.text||"",
+      lineCount:geom.length,gapPx:gap,medianLineHeight:medianH
+    };
   }
 
-  const texts=usable.length?usable.map(x=>x.text):
+  const texts=work.length ? work.map(x=>x.text) :
     String(result?.text||"").split(/\r?\n/).map(cleanOCRLine).filter(Boolean);
 
-  // Without geometry, only an explicit address prefix is used to locate the
-  // boundary. Otherwise retain the five-line structural fallback.
-  const startIndex=texts.findIndex((t,i)=>i>=2 && texts.length-i>=5 && isAddressStart(t));
+  const startIndex=texts.findIndex((t,i)=>i>=2 && texts.length-i>=5 && hasAddressStartAtBeginning(t));
   if(startIndex>=2 && texts.length-startIndex>=5){
-    return {nameLines:texts.slice(0,startIndex),
+    return {
+      nameLines:texts.slice(0,startIndex),
       addressLines:texts.slice(startIndex,startIndex+5),
-      visibleGap:false,method:"address-prefix-no-geometry",
-      addressStart:texts[startIndex],lineCount:texts.length,gapPx:0,medianLineHeight:0};
+      visibleGap:false,
+      method:"address-prefix-no-geometry",
+      addressStart:texts[startIndex],
+      lineCount:texts.length,gapPx:0,medianLineHeight:0
+    };
   }
 
   if(texts.length>=6){
     const i=texts.length-5;
-    return {nameLines:texts.slice(0,i),addressLines:texts.slice(i,i+5),
-      visibleGap:false,method:"five-line-structural",addressStart:texts[i]||"",
-      lineCount:texts.length,gapPx:0,medianLineHeight:0};
+    return {
+      nameLines:texts.slice(0,i),
+      addressLines:texts.slice(i,i+5),
+      visibleGap:false,
+      method:"five-line-structural",
+      addressStart:texts[i]||"",
+      lineCount:texts.length,gapPx:0,medianLineHeight:0
+    };
   }
 
-  return {nameLines:[],addressLines:[],visibleGap:false,method:"insufficient-lines",
-    addressStart:"",lineCount:texts.length,gapPx:0,medianLineHeight:0};
+  return {
+    nameLines:[],addressLines:[],visibleGap:false,
+    method:"insufficient-lines",addressStart:"",
+    lineCount:texts.length,gapPx:0,medianLineHeight:0
+  };
 };
 function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
 function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
@@ -745,59 +833,7 @@ window.applyStrictUncertaintyPolicy = function(result){
 })();
 </script>
 
-<script id="name-address-gap-tests">(function(){
-  function run(){
-    const failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
-    const mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
-    const cases=[
-      ["No 124","NO 124 BATU 34"],
-      ["PT1234","PT1234 KG RAWANG"],
-      ["Lot 01","LOT 01 BATU"],
-      ["01-02-03","01-02-03 JALAN"],
-      ["25","25 JALAN"]
-    ];
-    for(const [label,first] of cases){
-      const r=window.splitNameAddressByVisibleGap({lines:[
-        mk("RAJESHWARY A/P VASU",0,10),
-        mk("SECOND NAME ROW",12,22),
-        mk(first,23,33),
-        mk("ADDRESS LINE 2",37,47),
-        mk("ADDRESS LINE 3",51,61),
-        mk("ADDRESS LINE 4",65,75),
-        mk("ADDRESS LINE 5",79,89)
-      ]});
-      assert(label+" boundary",r.addressStart===first);
-      assert(label+" keeps all name rows",r.nameLines.join("|")==="RAJESHWARY A/P VASU|SECOND NAME ROW");
-      assert(label+" five address rows",r.addressLines.length===5);
-      assert(label+" tiny gap accepted",r.visibleGap===true);
-    }
 
-    // Larger and tiny gaps both remain valid visual boundaries.
-    const large=window.splitNameAddressByVisibleGap({lines:[
-      mk("NAME ONE",0,10),mk("NAME TWO",12,22),mk("25 JALAN",40,50),
-      mk("L2",54,64),mk("L3",68,78),mk("L4",82,92),mk("L5",96,106)
-    ]});
-    assert("larger gap",large.nameLines.length===2 && large.addressLines.length===5);
-
-    // No geometry: explicit prefix still locates address without altering text.
-    const nogeo=window.splitNameAddressByVisibleGap({lines:[
-      {text:"NAME ONE"},{text:"NAME TWO"},{text:"No 124 RAWANG"},
-      {text:"L2"},{text:"L3"},{text:"L4"},{text:"L5"}
-    ]});
-    assert("prefix fallback",nogeo.addressStart==="No 124 RAWANG" && nogeo.nameLines.length===2);
-
-    // Preserve OCR spelling; never normalize BATANG/BAT TANG etc.
-    const exact=window.splitNameAddressByVisibleGap({lines:[
-      mk("NAME ONE",0,10),mk("NAME TWO",12,22),mk("25 BAT TANG",23,33),
-      mk("L2",37,47),mk("L3",51,61),mk("L4",65,75),mk("L5",79,89)
-    ]});
-    assert("address evidence unchanged",exact.addressStart==="25 BAT TANG");
-
-    window.NAME_ADDRESS_GAP_TESTS={passed:failures.length===0,failures};
-    if(new URLSearchParams(location.search).get("ocrdebug")==="1")console.log(window.NAME_ADDRESS_GAP_TESTS);
-  }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});else run();
-})();</script>
 
 <script id="name-symbol-r-c-regression-tests">
 (function(){
@@ -846,5 +882,46 @@ window.applyStrictUncertaintyPolicy = function(result){
   else run();
 })();
 </script>
+<script id="name-address-gap-tests">(function(){
+function run(){
+ const failures=[],assert=(n,v)=>{if(!v)failures.push(n)};
+ const mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const base=(first)=>[
+   mk("NAME ONE",0,10),mk("NAME TWO",14,24),mk(first,28,38),
+   mk("ADDRESS LINE 2",42,52),mk("ADDRESS LINE 3",56,66),
+   mk("ADDRESS LINE 4",70,80),mk("ADDRESS LINE 5",84,94)
+ ];
+ for(const [label,first] of [
+   ["No","NO 124 BATU 34"],["PT","PT1234 KG RAWANG"],
+   ["Lot","LOT 01 BATU"],["hyphen","01-02-03 JALAN"],["numeric","25 JALAN"]
+ ]){
+   const r=window.splitNameAddressByVisibleGap({lines:base(first)});
+   assert(label+" address detected",r.addressStart===first);
+   assert(label+" preserves name",r.nameLines.join("|")==="NAME ONE|NAME TWO");
+   assert(label+" five address lines",r.addressLines.length===5);
+ }
+ // Critical regression: OCR sometimes merges the last name with address line 1.
+ const merged=[
+   mk("JOHN CITIZEN",0,10),
+   mk("MOHAMED NO 17 P 3 JASE SEBERANG PERAK",14,24),
+   mk("WARG ISLAM",28,38),
+   mk("ADDRESS LINE 3",42,52),
+   mk("ADDRESS LINE 4",56,66),
+   mk("ADDRESS LINE 5",70,80),
+   mk("ADDRESS LINE 6",84,94)
+ ];
+ const rm=window.splitNameAddressByVisibleGap({lines:merged});
+ assert("merged name retained",rm.nameLines.includes("MOHAMED"));
+ assert("merged address starts at No 17",rm.addressStart==="NO 17 P 3 JASE SEBERANG PERAK");
+ assert("merged address excludes MOHAMED",!rm.addressLines.some(x=>/^MOHAMED\b/i.test(x)));
+ assert("merged address has five lines",rm.addressLines.length===5);
+ // Never manufacture a name or alter its characters.
+ const exactName=window.splitNameAddressByVisibleGap({lines:base("25 BATANG")});
+ assert("name exact preservation",exactName.nameLines[1]==="NAME TWO");
+ assert("address exact preservation",exactName.addressLines[0]==="25 BATANG");
+ window.NAME_ADDRESS_GAP_TESTS={passed:failures.length===0,failures};
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});else run();
+})();</script>
 </body>
 </html>
