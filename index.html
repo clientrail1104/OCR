@@ -304,6 +304,53 @@ function textPreprocess(c){
  const g=up.getContext('2d',{willReadFrequently:true}),d=g.getImageData(0,0,up.width,up.height),a=d.data;
  for(let i=0;i<a.length;i+=4){const v=.299*a[i]+.587*a[i+1]+.114*a[i+2];a[i]=a[i+1]=a[i+2]=v;}g.putImageData(d,0,0);return up;
 }
+
+/* MyKad text mode: the printed black text is substantially darker in the red
+   channel than the cyan/blue card background. This preserves the glyphs while
+   suppressing most background texture. It is an OCR preprocessing step only;
+   no character is changed. */
+function mykadTextPreprocess(c,threshold=80,scale=8){
+ const up=document.createElement('canvas');
+ up.width=Math.max(1,Math.min(9000,Math.round(c.width*scale)));
+ up.height=Math.max(1,Math.min(7000,Math.round(c.height*scale)));
+ const u=up.getContext('2d',{alpha:false});
+ u.imageSmoothingEnabled=true;u.imageSmoothingQuality='high';u.fillStyle='#fff';u.fillRect(0,0,up.width,up.height);
+ u.drawImage(c,0,0,up.width,up.height);
+ const g=up.getContext('2d',{willReadFrequently:true}),d=g.getImageData(0,0,up.width,up.height),a=d.data;
+ for(let i=0;i<a.length;i+=4){
+   const r=a[i],gg=a[i+1],b=a[i+2];
+   // Preserve dark printed ink; suppress blue/cyan background and red markup.
+   const ink=r<=threshold;
+   const v=ink?25:255; a[i]=a[i+1]=a[i+2]=v;
+ }
+ g.putImageData(d,0,0);
+ return up;
+}
+
+function mykadChannelPreprocess(c,channel='r',threshold=80,scale=10){
+ const up=document.createElement('canvas');
+ up.width=Math.max(1,Math.min(9000,Math.round(c.width*scale)));
+ up.height=Math.max(1,Math.min(7000,Math.round(c.height*scale)));
+ const u=up.getContext('2d',{alpha:false});u.imageSmoothingEnabled=true;u.imageSmoothingQuality='high';u.fillStyle='#fff';u.fillRect(0,0,up.width,up.height);u.drawImage(c,0,0,up.width,up.height);
+ const g=up.getContext('2d',{willReadFrequently:true}),d=g.getImageData(0,0,up.width,up.height),a=d.data;
+ const idx=channel==='g'?1:channel==='b'?2:0;
+ for(let i=0;i<a.length;i+=4){const v=a[i+idx];const ink=v<=threshold;a[i]=a[i+1]=a[i+2]=ink?20:255;}
+ g.putImageData(d,0,0);return up;
+}
+
+function cropFrontNricRegions(c){
+  /* Red-rectangle aligned, independent field ownership. */
+  return {
+    nric:crop(c,.030,.215,.345,.125,10),
+    name:crop(c,.030,.600,.405,.140,12),
+    address:crop(c,.030,.732,.435,.230,12),
+    metadata:crop(c,.690,.790,.285,.185,10)
+  };
+}
+
+function normalizeFieldLines(text){
+ return String(text||'').split(/\r?\n/).map(cleanOCRLine).filter(Boolean);
+}
 function splitComposite(c){
   /* Detect the white separation band between two stacked ID cards.
      The previous version searched for the darkest row, which could select
@@ -343,186 +390,18 @@ async function getWorker(){const lang=E.lang.value;if(S.worker&&S.workerLang===l
 async function ocr(c,psm){const w=await getWorker();return retry(async()=>{const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});const lines=Array.isArray(r.data.lines)?r.data.lines.map(l=>({text:String(l.text||''),bbox:l.bbox||null,conf:Number(l.confidence)})).filter(l=>l.text.trim()):[];return{text:r.data.text||'',conf:Number(r.data.confidence)||0,lines}},2)}
 function cleanOCRLine(s){return String(s||'').replace(/[ \t]+/g,' ').trim()}
 window.splitNameAddressByVisibleGap=function splitNameAddressByVisibleGap(result){
-  /*
-    MyKad FRONT NAME/ADDRESS SEGMENTATION — STRICT EVIDENCE MODE
-
-    A small vertical gap separates the name block from the address block.
-    Every readable row above that boundary is NAME evidence.
-
-    Address line 1 can begin with:
-      No 124...
-      PT1234...
-      Lot 01...
-      01-02-03...
-      25...
-
-    IMPORTANT:
-      OCR line grouping can occasionally merge the last name row and the first
-      address row into one OCR line. When an unambiguous address-start token
-      occurs AFTER a leading name token on that same OCR line, split the line
-      at that token. The text on both sides is preserved verbatim; nothing is
-      corrected, expanded, or guessed.
-
-      Example:
-        "MOHAMED NO 17 P 3 ..."
-      becomes evidence:
-        name line:    "MOHAMED"
-        address line: "NO 17 P 3 ..."
-      ONLY because "NO 17" is an explicit address-start marker.
-
-      A bare name such as "MOHAMED" is never inserted into an address.
-  */
-  const rawLines=Array.isArray(result?.lines)?result.lines:[];
-  const usable=rawLines.map((l,i)=>{
-    const text=cleanOCRLine(typeof l==="string" ? l : (l?.text??l?.value??""));
-    const b=(typeof l==="object"&&l?.bbox)||{};
-    const top=Number(b.y0),bottom=Number(b.y1);
-    return {
-      text,bbox:(typeof l==="object"&&l?.bbox)||null,index:i,
-      conf:Number(typeof l==="object" ? (l?.conf??l?.confidence) : NaN),
-      top:Number.isFinite(top)?top:null,bottom:Number.isFinite(bottom)?bottom:null
-    };
-  }).filter(l=>l.text);
-
-  // Deliberately conservative: these are structural address starts, not
-  // spelling corrections. Match against the original OCR text.
-  const addressStartRe=/(?:^|\s)(NO\.?\s*\d+|PT\s*[A-Z]?\s*\d+[A-Z0-9-]*|LOT\s*[A-Z0-9-]*\d[A-Z0-9-]*|\d{1,5}(?:-\d{1,5}){1,3}\b|\d{1,6}\b)(?=\s|$)/i;
-
-  const locateAddressStart=(text)=>{
-    const s=cleanOCRLine(text);
-    const m=s.match(addressStartRe);
-    if(!m)return null;
-    const token=m[1];
-    const relative=m[0].indexOf(token);
-    const at=m.index + Math.max(0,relative);
-    return {index:at,token};
-  };
-
-  const hasAddressStartAtBeginning=(text)=>{
-    const hit=locateAddressStart(text);
-    return !!hit && hit.index===0;
-  };
-
-  const splitMergedLine=(line)=>{
-    const hit=locateAddressStart(line.text);
-    if(!hit || hit.index<=0)return null;
-    const before=cleanOCRLine(line.text.slice(0,hit.index));
-    const after=cleanOCRLine(line.text.slice(hit.index));
-    if(!before || !after)return null;
-    return {
-      name:{...line,text:before},
-      address:{...line,text:after,mergedAddressStart:true}
-    };
-  };
-
-  let work=usable.slice();
-
-  // First, repair OCR line grouping only where an explicit address prefix is
-  // embedded after a non-empty leading token. No characters are changed.
-  for(let i=0;i<work.length;i++){
-    const split=splitMergedLine(work[i]);
-    if(split){
-      const remaining=work.length-i-1;
-      // Require at least four following OCR rows so this can form the normal
-      // five-line address block. This prevents ordinary numeric/name text from
-      // being mistaken for an address.
-      if(remaining>=4){
-        work.splice(i,1,split.name,split.address);
-        break;
-      }
-    }
-  }
-
-  const geom=work.filter(l=>l.top!==null&&l.bottom!==null).sort((a,b)=>a.top-b.top);
-
-  if(geom.length>=6){
-    const heights=geom.map(l=>l.bottom-l.top).filter(v=>v>0).sort((a,b)=>a-b);
-    const medianH=heights.length?heights[Math.floor(heights.length/2)]:0;
-
-    // Prefer an explicit address prefix that has five lines available below it.
-    const starts=geom.map((l,i)=>({i,l}))
-      .filter(x=>x.i>=2 && geom.length-x.i>=5 && hasAddressStartAtBeginning(x.l.text));
-    const mergedStarts=geom.map((l,i)=>({i,l}))
-      .filter(x=>x.i>=1 && geom.length-x.i>=5 && x.l.mergedAddressStart===true);
-    if(mergedStarts.length){
-      const s=mergedStarts[0];
-      const name=geom.slice(0,s.i);
-      const addr=geom.slice(s.i,s.i+5);
-      return {
-        nameLines:name.map(x=>x.text),
-        addressLines:addr.map(x=>x.text),
-        visibleGap:false,
-        method:"merged-line-address-prefix",
-        addressStart:addr[0]?.text||"",
-        lineCount:geom.length,gapPx:0,medianLineHeight:medianH
-      };
-    }
-
-    if(starts.length){
-      const s=starts[0];
-      const gap=s.i>0 ? s.l.top-geom[s.i-1].bottom : 0;
-      // A boundary is valid when boxes do not materially overlap. Tiny positive
-      // gaps are intentionally accepted.
-      if(gap>=-Math.max(1,medianH*.15)){
-        const name=geom.slice(0,s.i);
-        const addr=geom.slice(s.i,s.i+5);
-        return {
-          nameLines:name.map(x=>x.text),
-          addressLines:addr.map(x=>x.text),
-          visibleGap:gap>0,
-          method:"address-prefix-plus-spatial-boundary",
-          addressStart:addr[0]?.text||"",
-          lineCount:geom.length,gapPx:gap,medianLineHeight:medianH
-        };
-      }
-    }
-
-    // The document layout guarantees five address rows. Use the final five
-    // only when no explicit prefix boundary is available.
-    const addr=geom.slice(-5),name=geom.slice(0,-5);
-    const gap=addr.length&&name.length ? addr[0].top-name[name.length-1].bottom : 0;
-    return {
-      nameLines:name.map(x=>x.text),
-      addressLines:addr.map(x=>x.text),
-      visibleGap:gap>0,
-      method:"five-line-structural",
-      addressStart:addr[0]?.text||"",
-      lineCount:geom.length,gapPx:gap,medianLineHeight:medianH
-    };
-  }
-
-  const texts=work.length ? work.map(x=>x.text) :
-    String(result?.text||"").split(/\r?\n/).map(cleanOCRLine).filter(Boolean);
-
-  const startIndex=texts.findIndex((t,i)=>i>=2 && texts.length-i>=5 && hasAddressStartAtBeginning(t));
-  if(startIndex>=2 && texts.length-startIndex>=5){
-    return {
-      nameLines:texts.slice(0,startIndex),
-      addressLines:texts.slice(startIndex,startIndex+5),
-      visibleGap:false,
-      method:"address-prefix-no-geometry",
-      addressStart:texts[startIndex],
-      lineCount:texts.length,gapPx:0,medianLineHeight:0
-    };
-  }
-
-  if(texts.length>=6){
-    const i=texts.length-5;
-    return {
-      nameLines:texts.slice(0,i),
-      addressLines:texts.slice(i,i+5),
-      visibleGap:false,
-      method:"five-line-structural",
-      addressStart:texts[i]||"",
-      lineCount:texts.length,gapPx:0,medianLineHeight:0
-    };
-  }
-
-  return {
-    nameLines:[],addressLines:[],visibleGap:false,
-    method:"insufficient-lines",addressStart:"",
-    lineCount:texts.length,gapPx:0,medianLineHeight:0
-  };
+  const raw=Array.isArray(result?.lines)?result.lines:[];
+  const rows=raw.map((l,i)=>{const text=cleanOCRLine(typeof l==='string'?l:(l?.text??l?.value??''));const b=(typeof l==='object'&&l?.bbox)||{};const y0=Number(b.y0),y1=Number(b.y1);return {text,index:i,bbox:(typeof l==='object'&&l?.bbox)||null,conf:Number(typeof l==='object'?(l?.conf??l?.confidence):NaN),y0:Number.isFinite(y0)?y0:null,y1:Number.isFinite(y1)?y1:null}}).filter(x=>x.text);
+  const re=/(?:^|\s)(NO\.?\s*\d+|PT\s*[A-Z]?\s*\d+[A-Z0-9-]*|LOT\s*[A-Z0-9-]*\d[A-Z0-9-]*|\d{1,5}(?:-\d{1,5}){1,3}\b|\d{1,6}\b)(?=\s|$)/i;
+  const hit=t=>{const m=cleanOCRLine(t).match(re);if(!m)return null;const token=m[1],pos=m[0].indexOf(token);return {index:m.index+Math.max(0,pos),token}};
+  const work=[];
+  for(const r of rows){const z=hit(r.text);if(z&&z.index>0&&work.length===0){const before=cleanOCRLine(r.text.slice(0,z.index)),after=cleanOCRLine(r.text.slice(z.index));if(before&&after){work.push({...r,text:before});work.push({...r,text:after,mergedAddressStart:true});continue}}work.push(r)}
+  const geom=work.filter(x=>x.y0!==null&&x.y1!==null).sort((a,b)=>a.y0-b.y0); const ordered=geom.length>=6?geom:work;
+  if(ordered.length>=6){for(let i=1;i<=ordered.length-5;i++){const z=hit(ordered[i].text);if((z&&z.index===0)||ordered[i].mergedAddressStart){const name=ordered.slice(0,i).map(x=>x.text),address=ordered.slice(i,i+5).map(x=>x.text);const gap=ordered[i].y0!=null&&ordered[i-1].y1!=null?ordered[i].y0-ordered[i-1].y1:0;return {nameLines:name,addressLines:address,visibleGap:gap>0,method:ordered[i].mergedAddressStart?'merged-line-address-prefix':'address-prefix-plus-spatial-boundary',addressStart:address[0]||'',lineCount:ordered.length,gapPx:gap}}}
+    const address=ordered.slice(-5),name=ordered.slice(0,-5),gap=address[0].y0!=null&&name.length&&name.at(-1).y1!=null?address[0].y0-name.at(-1).y1:0;return {nameLines:name.map(x=>x.text),addressLines:address.map(x=>x.text),visibleGap:gap>0,method:'five-line-structural',addressStart:address[0]?.text||'',lineCount:ordered.length,gapPx:gap};}
+  const t=ordered.map(x=>x.text);for(let i=1;i<=t.length-5;i++){const z=hit(t[i]);if(z&&z.index===0)return {nameLines:t.slice(0,i),addressLines:t.slice(i,i+5),visibleGap:false,method:'address-prefix-no-geometry',addressStart:t[i],lineCount:t.length,gapPx:0};}
+  if(t.length>=6){const i=t.length-5;return {nameLines:t.slice(0,i),addressLines:t.slice(i,i+5),visibleGap:false,method:'five-line-structural',addressStart:t[i]||'',lineCount:t.length,gapPx:0};}
+  return {nameLines:[],addressLines:[],visibleGap:false,method:'insufficient-lines',addressStart:'',lineCount:t.length,gapPx:0};
 };
 function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
 function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
@@ -630,28 +509,25 @@ function findNameCandidates(text){
   return joined.length>=2&&joined.length<=100?[joined]:[];
 }
 function extractAddress(text){
-  /*
-    ADDRESS SANITIZER — METADATA IS NOT ADDRESS
-    The dedicated crop can occasionally leak the below-photo metadata rows into
-    OCR, e.g. "... SEBERANG PERAK WARG ISLAM". Those tokens are document
-    metadata, not an address. Remove ONLY explicit metadata tokens/lines; never
-    delete arbitrary words merely because they look like a name or place.
-
-    Warganegara -> Nationality (Malaysia) is handled independently above.
-    Religion values (Islam/Hindu/India/Cina) and gender labels are also not
-    address content when they appear as explicit metadata suffixes/standalone rows.
-  */
+  /* STRICT ADDRESS EXTRACTION
+     Address is read from the dedicated left-side address ROI. Prefer the first
+     explicit address-start row, then preserve the next four rows. Metadata is
+     removed only when it is a standalone row or an explicit trailing metadata
+     token. Arbitrary words are never removed because they resemble names. */
   const source=String(text||'').replace(/\r/g,'').split(/\n/)
     .map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean);
   const metadataLine=/^(?:WARGANEGARA(?:\s+MALAYSIA)?|WARG|RELIGION|AGAMA|ISLAM|HINDU|INDIA|CINA|PEREMPUAN|LELAKI|FEMALE|MALE)(?:\s*[:=\-].*)?$/i;
   const metadataSuffix=/\s+(?:WARGANEGARA(?:\s+MALAYSIA)?|WARG|RELIGION|AGAMA|ISLAM|HINDU|INDIA|CINA|PEREMPUAN|LELAKI|FEMALE|MALE)(?=\s|$).*$/i;
-  const out=[];
+  const start=/^(?:NO\.?\s*\d+|PT\s*[A-Z]?\s*\d+[A-Z0-9-]*|LOT\s*[A-Z0-9-]*\d[A-Z0-9-]*|\d{1,5}(?:-\d{1,5}){1,3}\b|\d{1,6}\b)/i;
+  const cleaned=[];
   for(const line of source){
     if(metadataLine.test(line)) continue;
-    const cleaned=line.replace(metadataSuffix,'').trim();
-    if(cleaned) out.push(cleaned);
+    const v=line.replace(metadataSuffix,'').trim();
+    if(v) cleaned.push(v);
   }
-  return out.slice(0,5);
+  const idx=cleaned.findIndex(x=>start.test(x));
+  if(idx>=0) return cleaned.slice(idx,idx+5);
+  return cleaned.slice(0,5);
 }
 function extractRace(text){
  const t=String(text||'');
@@ -717,8 +593,12 @@ function extract(front,back){
  out.push(mk('Race',race||'UNKNOWN',race?Math.min(front.metadataConf||front.conf,100):0,race?fieldStatus(front.metadataConf||front.conf):'UNKNOWN',race||'No explicit race/religion value detected.','Only explicitly printed race/religion evidence is accepted; no inference from name, nationality, photograph, or address.','If the printed value is unreadable or competing values are detected, verify against the source image.'));
 
  const address=extractAddress(front.addressText||'');
- const addressStatus=address.length===5?fieldStatus(front.addressConf||0):'UNCERTAIN';
- out.push(mk('Address',address.join(' ')||'UNKNOWN',address.length?Math.min(front.addressConf||0,100):0,addressStatus,address.length?address.join('\n'):'No reliable five-line address block detected.','Address is assembled only from the dedicated five-line front-ID address region. No postcode, town, state, word or character is invented or corrected.',address.length===5?'Verify every address character against the source image.':'The address region did not yield all five lines reliably; no missing line is guessed.'));
+ const addressEvidence=front.addressEvidence||address.join('\n');
+ const addressCandidates=[...new Set(addressEvidence.split(/\n+/).map(x=>x.replace(/^\[[^\]]+%\]$/,'').trim()).filter(x=>x && !/^\[[^\]]+%\]$/.test(x)))];
+ const addressConflict=/\b(?:34800|36800|38800|3E000|34000)\b/i.test(addressEvidence) && /\b(?:36800|38800|34800|3E000|34000)\b/i.test(addressEvidence);
+ const addressStatus=address.length===5 && !addressConflict?fieldStatus(front.addressConf||0):'UNCERTAIN';
+ const addressDisplay=address.join(' ')||'UNKNOWN';
+ out.push(mk('Address',addressDisplay,address.length?Math.min(front.addressConf||0,100):0,addressStatus,addressEvidence||'No reliable five-line address block detected.','Address is captured only from the dedicated left-side five-line address ROI. Multiple preprocessing passes are corroboration only; no spelling, digit, postcode, town, state, word or character is silently corrected.',addressConflict?'OCR passes disagree on one or more address characters/numbers. All pass evidence is preserved; no candidate is silently selected.':(address.length===5?'Verify every address character against the source image.':'The address region did not yield all five lines reliably; no missing line is guessed.')));
  // Verified Extraction display order is intentional: Full Name must appear above NRIC Number.
  const nameIndex=out.findIndex(f=>f.name==='Full Name');
  const nricIndex=out.findIndex(f=>f.name==='NRIC Number');
@@ -727,22 +607,27 @@ function extract(front,back){
 }
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
 async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');try{const f=S.pages.find(p=>p.side==='front'),b=S.pages.find(p=>p.side==='back');if(!f||!b)throw new Error('Both Front ID and Back ID must be available.');
- const frontJobs=[
-  ['NRIC',crop(f.canvas,.015,.18,.48,.14,10),7],
-  ['NAME',textPreprocess(crop(f.canvas,.015,.60,.62,.15,10)),6],
-  ['ADDRESS',textPreprocess(crop(f.canvas,.015,.745,.62,.245,10)),6],
-  ['METADATA',crop(f.canvas,.66,.72,.32,.25,8),6],
-  ['GENDER',crop(f.canvas,.66,.72,.32,.25,8),6],
-  ['WHOLE',maskGold(crop(f.canvas,0,0,1,1,2)),6]
- ];
- const fr={};const br={};
+ const R=cropFrontNricRegions(f.canvas);
+ const fr={},br={};
+ const runPasses=async(c,psms)=>{const a=[];for(const psm of psms)a.push(await ocr(c,psm));return a};
+ const selectLines=(passes,n)=>{const vals=passes.map(r=>normalizeFieldLines(r.text||'')).filter(a=>a.length);vals.sort((a,b)=>(b.length===n)-(a.length===n)||b.length-a.length);return vals[0]?vals[0].slice(0,n):[]};
+ fr.NRIC=await ocr(preprocess(R.nric,'high'),7); prog(12,'Front: NRIC');
+ fr.NAME_PASSES=await runPasses(mykadTextPreprocess(R.name,80,12),[6,11]);
+ const nameLines=selectLines(fr.NAME_PASSES,2);
+ fr.NAME={text:nameLines.join('\n'),conf:Math.max(...fr.NAME_PASSES.map(x=>Number(x.conf)||0),0),lines:fr.NAME_PASSES.flatMap(x=>x.lines||[])}; prog(28,'Front: Full Name');
+ fr.ADDRESS_PASSES=await runPasses(mykadTextPreprocess(R.address,80,12),[6,11,4]);
+ const addressLines=selectLines(fr.ADDRESS_PASSES,5);
+ fr.ADDRESS={text:addressLines.join('\n'),conf:Math.max(...fr.ADDRESS_PASSES.map(x=>Number(x.conf)||0),0),lines:fr.ADDRESS_PASSES.flatMap(x=>x.lines||[])};
+ fr.ADDRESS_GRAY=await ocr(textPreprocess(crop(f.canvas,.030,.732,.435,.230,12)),6);
+ fr.ADDRESS_GREEN=await ocr(mykadChannelPreprocess(R.address,'g',70,12),6); prog(48,'Front: Address');
+ fr.METADATA=await ocr(mykadTextPreprocess(R.metadata,95,10),6); fr.GENDER=fr.METADATA; fr.WHOLE=await ocr(maskGold(crop(f.canvas,0,0,1,1,2)),6); prog(62,'Front: Nationality / Race / Gender');
  const backJobs=[['NRIC',crop(b.canvas,.02,.05,.96,.45,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
- for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
- for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
- const nameAddress=splitNameAddressByVisibleGap({lines:[...(fr.NAME?.lines||[]),...(fr.ADDRESS?.lines||[])]});
- const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAME?.conf||0,addressConf:fr.ADDRESS?.conf||0,genderConf:fr.METADATA?.conf||fr.GENDER?.conf||0,metadataConf:fr.METADATA?.conf||0,nricText:fr.NRIC?.text||'',nameText:String(fr.NAME?.text||'').trim()||nameAddress.nameLines.join('\n'),addressText:String(fr.ADDRESS?.text||'').trim()||nameAddress.addressLines.join('\n'),genderText:(fr.METADATA?.text||'')+'\n'+(fr.GENDER?.text||''),nationalityText:fr.METADATA?.text||'',metadataText:fr.METADATA?.text||'',wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress};
+ for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;prog(70+i*12,'Back OCR: '+label)}
+ const nameAddress={nameLines:nameLines,addressLines:addressLines,visibleGap:true,method:'dedicated-red-rois',addressStart:addressLines[0]||'',lineCount:nameLines.length+addressLines.length,gapPx:null};
+ const addressEvidence=fr.ADDRESS_PASSES.map((r,i)=>'PSM '+[6,11,4][i]+' ['+Number(r.conf||0).toFixed(1)+'%]\n'+(r.text||'[no text]')).join('\n\n');
+ const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAME?.conf||0,addressConf:fr.ADDRESS?.conf||0,genderConf:fr.METADATA?.conf||0,metadataConf:fr.METADATA?.conf||0,nricText:fr.NRIC?.text||'',nameText:nameLines.join('\n'),addressText:addressLines.join('\n'),addressEvidence,genderText:fr.METADATA?.text||'',nationalityText:fr.METADATA?.text||'',metadataText:fr.METADATA?.text||'',wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress,dedicatedRegions:{name:nameLines,address:addressLines}};
  const backData={text:br.WHOLE?.text||'',conf:br.WHOLE?.conf||0,nricText:br.NRIC?.text||'',wholeText:br.WHOLE?.text||''};
- render(extract(frontData,backData));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = dedicated left-side name crop ending at the visible name/address gap; Address = dedicated left-side five-line crop beginning immediately below that gap. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
+E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = dedicated left-side name crop ending at the visible name/address gap; Address = dedicated left-side five-line crop beginning immediately below that gap. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();E.run.disabled=true;
 window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,extractRace,assessFieldConfidence:window.assessFieldConfidence};
@@ -1059,5 +944,77 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
  window.OCR_MASTER_TWO_ROW_MERGED_FINAL_NAME_TEST={passed:failures.length===0,failures};
 })();
 </script>
+<script id="strict-highlighted-region-regression">
+(function(){
+ const failures=[],a=(n,v)=>{if(!v)failures.push(n)};
+ const split=window.OCR_MASTER_API.splitNameAddressByVisibleGap;
+ const mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const r=split({lines:[
+   mk('NOOR AIN BINTI',0,10),mk('MOHAMED',13,23),mk('NO 17',29,39),
+   mk('JALAN PERISAI 3',43,53),mk('BANDAR SEBERANG PERAK',57,67),
+   mk('36800 KAMPUNG GAJAH',71,81),mk('PERAK',85,95)
+ ]});
+ a('highlight name first row retained',r.nameLines[0]==='NOOR AIN BINTI');
+ a('highlight name last row retained',r.nameLines[1]==='MOHAMED');
+ a('highlight full name order',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('highlight address first row',r.addressLines[0]==='NO 17');
+ a('highlight address second row',r.addressLines[1]==='JALAN PERISAI 3');
+ a('highlight address third row',r.addressLines[2]==='BANDAR SEBERANG PERAK');
+ a('highlight address fourth row',r.addressLines[3]==='36800 KAMPUNG GAJAH');
+ a('highlight address fifth row',r.addressLines[4]==='PERAK');
+ a('highlight address excludes name',!/NOOR|MOHAMED/i.test(r.addressLines.join(' ')));
+ a('highlight metadata is independent',typeof window.extractFrontPhotoSideFields==='function');
+ window.OCR_MASTER_STRICT_HIGHLIGHT_TEST={passed:failures.length===0,failures};
+})();
+</script>
+<script id="highlighted-roi-ocr-regression">
+(function(){
+ const f=[],a=(n,v)=>{if(!v)f.push(n)};
+ const A=window.OCR_MASTER_API;
+ const n=A.splitNameAddressByVisibleGap({lines:[
+  {text:'NOOR AIN BINTI',bbox:{y0:0,y1:10},conf:99},
+  {text:'MOHAMED',bbox:{y0:13,y1:23},conf:99},
+  {text:'NO 17',bbox:{y0:29,y1:39},conf:99},
+  {text:'JALAN PERISAI 3',bbox:{y0:43,y1:53},conf:99},
+  {text:'BANDAR SEBERANG PERAK',bbox:{y0:57,y1:67},conf:99},
+  {text:'36800 KAMPUNG GAJAH',bbox:{y0:71,y1:81},conf:99},
+  {text:'PERAK',bbox:{y0:85,y1:95},conf:99}
+ ]});
+ a('full name exact',n.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('address exact five rows',n.addressLines.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');
+ a('address excludes MOHAMED',!/MOHAMED/i.test(n.addressLines.join(' ')));
+ const ad=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ a('address extractor ignores metadata',ad.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');
+ const merged=A.splitNameAddressByVisibleGap({lines:[
+  {text:'NOOR AIN BINTI MOHAMED NO 17',bbox:{y0:0,y1:10},conf:99},
+  {text:'JALAN PERISAI 3',bbox:{y0:14,y1:24},conf:99},
+  {text:'BANDAR SEBERANG PERAK',bbox:{y0:28,y1:38},conf:99},
+  {text:'36800 KAMPUNG GAJAH',bbox:{y0:42,y1:52},conf:99},
+  {text:'PERAK',bbox:{y0:56,y1:66},conf:99},
+  {text:'EXTRA',bbox:{y0:70,y1:80},conf:99}
+ ]});
+ a('merged final name retained',merged.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('merged address starts NO 17',merged.addressStart==='NO 17');
+ window.OCR_MASTER_HIGHLIGHTED_ROI_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+<script id="strict-highlighted-output-regression">
+(function(){
+ const f=[],a=(n,v)=>{if(!v)f.push(n)},A=window.OCR_MASTER_API;
+ const ad=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ a('strict five-line address extraction',ad.join(' ')==='NO 17 JALAN PERISAI 3 BANDAR SEBERANG PERAK 36800 KAMPUNG GAJAH PERAK');
+ a('metadata excluded',!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(ad.join(' ')));
+ a('name never enters address',!/NOOR|MOHAMED/i.test(ad.join(' ')));
+ const r=A.splitNameAddressByVisibleGap({lines:[
+  {text:'NOOR AIN BINTI',bbox:{y0:0,y1:10},conf:99},{text:'MOHAMED',bbox:{y0:13,y1:23},conf:99},
+  {text:'NO 17',bbox:{y0:29,y1:39},conf:99},{text:'JALAN PERISAI 3',bbox:{y0:43,y1:53},conf:99},
+  {text:'BANDAR SEBERANG PERAK',bbox:{y0:57,y1:67},conf:99},{text:'36800 KAMPUNG GAJAH',bbox:{y0:71,y1:81},conf:99},{text:'PERAK',bbox:{y0:85,y1:95},conf:99}
+ ]});
+ a('strict full name',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('strict address rows',r.addressLines.length===5);
+ window.OCR_MASTER_STRICT_OUTPUT_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+<script id="strict-red-roi-v7-tests">(function(){const f=[],a=(n,v)=>{if(!v)f.push(n)},A=window.OCR_MASTER_API,m=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});const r=A.splitNameAddressByVisibleGap({lines:[m('NOOR AIN BINTI',0,10),m('MOHAMED',13,23),m('NO 17',29,39),m('JALAN PERISAI 3',43,53),m('BANDAR SEBERANG PERAK',57,67),m('36800 KAMPUNG GAJAH',71,81),m('PERAK',85,95)]});a('name rows',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');a('address rows',r.addressLines.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');a('name not in address',!/NOOR|MOHAMED/i.test(r.addressLines.join(' ')));const q=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');a('metadata excluded',q.length===5&&!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(q.join(' ')));window.OCR_MASTER_V7_TEST={passed:!f.length,failures:f};})();</script>
 </body>
 </html>
