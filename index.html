@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#edf3f7">
-<title>OCR MASTER — MyKad Verified Extraction</title>
+<title>OCR MASTER — Verified Extraction</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#edf3f7;--ink:#26343d;--muted:#70808a;--cyan:#10c9c1;--violet:#7967f5;--ok:#13875f;--warn:#a76e00;--bad:#c43f56;--out:10px 10px 22px #cbd5dc,-10px -10px 22px #fff;--in:inset 5px 5px 12px #cbd5dc,inset -5px -5px 12px #fff}
@@ -44,6 +44,17 @@ window.normalizeOCRConfidence = function(v){
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
   return n > 1 ? n / 100 : n;
+};
+
+window.protectedOCRConflict = function(a,b){
+  const x=String(a??'').toUpperCase().trim();
+  const y=String(b??'').toUpperCase().trim();
+  if(!x || !y || x===y) return false;
+  const rules=window.OCR_MASTER_UNCERTAINTY.protectedPairs;
+  return rules.some(group=>{
+    const g=group.map(v=>String(v).toUpperCase());
+    return g.includes(x) && g.includes(y);
+  });
 };
 
 window.hasProtectedAmbiguity = function(value, candidates=[]){
@@ -133,6 +144,10 @@ window.assessFieldConfidence = function(field, confidence, candidates=[], opts={
 .status-uncertain{font-weight:900}
 </style>
 
+<style id="final-layout-fix">
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr) 360px;gap:10px;min-height:0}
+.right{min-width:0;overflow:auto}.fields{display:grid;gap:7px}.field{padding:8px;border-radius:11px;background:rgba(255,255,255,.42);box-shadow:var(--in)}.ftop{display:flex;align-items:center;justify-content:space-between;gap:6px}.fname{font-size:10px;font-weight:900}.fval{margin-top:4px;font-size:11px;font-weight:800;white-space:pre-wrap;overflow-wrap:anywhere}.meta,.ev{font-size:8px;line-height:1.35;margin-top:4px;white-space:pre-wrap}.badge{white-space:nowrap}@media(max-width:1100px){.grid{grid-template-columns:260px minmax(0,1fr)}.right{grid-column:1/-1}}@media(max-width:760px){.grid{grid-template-columns:1fr}.right{grid-column:auto}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -152,6 +167,7 @@ window.assessFieldConfidence = function(field, confidence, candidates=[], opts={
 <div class="card"><h2>Front ID / Back ID</h2><div class="workspace"><div class="slot" id="front"><span>FRONT ID</span></div><div class="slot" id="back"><span>BACK ID</span></div></div></div>
 <div class="card evidence"><div class="head"><h2>OCR evidence</h2><span class="badge" id="ocrBadge">WAITING</span></div><div class="raw" id="raw">OCR evidence will appear here.</div></div>
 </section>
+<aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div id="fields" class="fields"><div class="mini">Upload Front + Back ID, then click Run OCR.</div></div><div id="notice" class="mini confidence-policy-note">No OCR is performed until Run OCR is clicked.</div></aside>
 </main></div>
 <script>
 'use strict';
@@ -174,7 +190,20 @@ E.drop.addEventListener('dragover',e=>{e.preventDefault();E.drop.style.transform
 E.drop.addEventListener('dragleave',()=>E.drop.style.transform='');
 E.drop.addEventListener('drop',e=>{e.preventDefault();E.drop.style.transform='';addFiles([...e.dataTransfer.files])});
 E.drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();E.files.click()}});
-async function addFiles(fs){const ok=[],bad=[];for(const f of fs){if(!ALLOWED.test(f.name)||!f.type.startsWith('image/')){bad.push(f.name+' — unsupported');continue}if(!f.size){bad.push(f.name+' — empty');continue}if(f.size>500*1024*1024){bad.push(f.name+' — over 500 MB');continue}if(!S.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))ok.push(f)}if(bad.length)E.notice.textContent=bad.join('\n');S.files.push(...ok);renderFiles();if(!ok.length)return;try{status('PREPARING');E.run.disabled=true;await makePages();renderSlots();E.run.disabled=false;prog(0,'Upload ready. Click Run OCR to begin.');E.badge.textContent='READY';E.badge.className='badge warn';E.raw.textContent='OCR has not started. Click Run OCR to process the uploaded document.';E.fields.innerHTML='';E.review.textContent='WAITING';E.review.className='badge warn';status('READY');E.notice.textContent='Files loaded. OCR is manual: click Run OCR. No OCR is performed automatically after upload.'}catch(e){console.error(e);E.run.disabled=true;status('ERROR',true);E.notice.textContent='Document preparation failed safely: '+e.message+' No value was guessed.'}}
+function clearAll(){
+  S.files=[]; S.pages=[]; S.running=false;
+  E.files.value='';
+  E.list.innerHTML='<div class="mini">No files selected.</div>';
+  E.front.innerHTML='<span>FRONT ID</span>';
+  E.back.innerHTML='<span>BACK ID</span>';
+  E.raw.textContent='OCR evidence will appear here.';
+  E.fields.innerHTML='<div class="mini">Upload Front + Back ID, then click Run OCR.</div>';
+  E.review.textContent='WAITING'; E.review.className='badge warn';
+  E.badge.textContent='WAITING'; E.badge.className='badge';
+  E.notice.textContent='No OCR is performed until Run OCR is clicked.';
+  E.run.disabled=true; prog(0,'Upload ready. Click Run OCR to begin.'); status('READY');
+}
+async function addFiles(fs){const ok=[],bad=[];for(const f of fs){if(!ALLOWED.test(f.name)){bad.push(f.name+' — unsupported');continue}if(!f.size){bad.push(f.name+' — empty');continue}if(f.size>500*1024*1024){bad.push(f.name+' — over 500 MB');continue}if(!S.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))ok.push(f)}if(bad.length)E.notice.textContent=bad.join('\n');S.files.push(...ok);renderFiles();if(!ok.length)return;try{status('PREPARING');E.run.disabled=true;await makePages();renderSlots();E.run.disabled=false;prog(0,'Upload ready. Click Run OCR to begin.');E.badge.textContent='READY';E.badge.className='badge warn';E.raw.textContent='OCR has not started. Click Run OCR to process the uploaded document.';E.fields.innerHTML='';E.review.textContent='WAITING';E.review.className='badge warn';status('READY');E.notice.textContent='Files loaded. OCR is manual: click Run OCR. No OCR is performed automatically after upload.'}catch(e){console.error(e);E.run.disabled=true;status('ERROR',true);E.notice.textContent='Document preparation failed safely: '+e.message+' No value was guessed.'}}
 function renderFiles(){E.list.innerHTML=S.files.length?S.files.map(f=>'<div class="file"><b>'+esc(f.name)+'</b><span>'+esc(f.type||'image')+' · '+bytes(f.size)+'</span></div>').join(''):'<div class="mini">No files selected.</div>'}
 async function loadImage(f){const u=URL.createObjectURL(f);const im=new Image();im.src=u;await im.decode();return im}
 function canvasFrom(im){const max=5200,r=Math.min(1,max/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round((im.naturalWidth||im.width)*r));c.height=Math.max(1,Math.round((im.naturalHeight||im.height)*r));const x=c.getContext('2d',{alpha:false});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);return c}
@@ -205,7 +234,7 @@ function consensus(candidates){
  if(all.length>1)return {value:null,votes:sorted[0][1],all};
  return {value:all[0],votes:sorted[0][1],all};
 }
-function fieldStatus(conf,ambiguous=false){return ambiguous?'UNCERTAIN':conf>=75?'VERIFIED':'UNCERTAIN'}
+function fieldStatus(conf,ambiguous=false){return ambiguous?'UNCERTAIN':Number(conf)>=95?'VERIFIED':'UNCERTAIN'}
 function candidateDisplay(c){return c&&c.all&&c.all.length>1?'UNCERTAIN — competing OCR candidates:\n'+c.all.join('\n'):c?.value||null}
 function numericConfusionEvidence(text){
  const t=String(text||'');
@@ -277,13 +306,13 @@ function extract(front,back){
  const bNumEvidence=bnum?(bnum.value||bnum.all.join('\n')):'No exact 6-2-4-2-2 numeric candidate was read.';
  const fNumericFlags=numericConfusionEvidence(front.nricText+'\n'+front.wholeText);
  const bNumericFlags=numericConfusionEvidence(back.nricText+'\n'+back.wholeText);
- out.push(mk('NRIC Number',fnum?(fnum.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN',fnum?Math.min(front.conf,98):0,fnum?fieldStatus(front.conf,fAmb):'UNKNOWN',fNumEvidence,'Exact 6-2-4 numeric pattern only. Never transform: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fAmb?'Competing NRIC candidates detected; candidates are preserved and no winner is selected.':fNumericFlags.length?'Potentially confusable OCR evidence detected: '+fNumericFlags.join(', ')+'. No substitution was made.':'An unreadable digit is never repaired.'));
+ out.push(mk('NRIC Number',fnum?(fnum.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN',fnum?Math.min(front.conf,100):0,fnum?fieldStatus(front.conf,fAmb):'UNKNOWN',fNumEvidence,'Exact 6-2-4 numeric pattern only. Never transform: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fAmb?'Competing NRIC candidates detected; candidates are preserved and no winner is selected.':fNumericFlags.length?'Potentially confusable OCR evidence detected: '+fNumericFlags.join(', ')+'. No substitution was made.':'An unreadable digit is never repaired.'));
 
  const nameCropCandidates=findNameCandidates(front.nameText||'');
  const fallbackNameCandidates=findNameCandidates((front.wholeText||'')+'\n'+ft);
  const name=consensus(nameCropCandidates.length?nameCropCandidates:fallbackNameCandidates);
  const nameValue=name?(name.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN';
- out.push(mk('Full Name',nameValue,name?Math.min(front.conf,96):0,name?fieldStatus(front.conf,name.all.length>1):'UNKNOWN',name?(name.value?name.value:name.all.join('\n')):'No reliable name line detected.','Exact OCR candidate preserved. No alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted. Never transform R↔L, J↔I, V↔W, J↔S, VS↔W or any other protected pair.','If OCR passes disagree, all candidates are preserved and the field is UNCERTAIN; no plausible spelling is selected.'));
+ out.push(mk('Full Name',nameValue,name?Math.min(front.conf,100):0,name?fieldStatus(front.conf,name.all.length>1):'UNKNOWN',name?(name.value?name.value:name.all.join('\n')):'No reliable name line detected.','Exact OCR candidate preserved. No alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted. Never transform R↔L, J↔I, V↔W, J↔S, VS↔W or any other protected pair.','If OCR passes disagree, all candidates are preserved and the field is UNCERTAIN; no plausible spelling is selected.'));
 
  const explicitGender=findExplicitGender(front.genderText||ft);
  const derived=genderFromNric(fnum?.value);
@@ -300,21 +329,25 @@ function extract(front,back){
  }else if(derived){
   genderValue=derived.gender;genderStatus=fieldStatus(front.conf);genderEvidence='NRIC Number '+fnum.value+'; final digit '+derived.digit+' is '+(derived.digit%2?'odd':'even')+'.';genderReason='Derived only from the explicit NRIC number using the Malaysian NRIC parity rule: odd = Lelaki/Male; even = Perempuan/Female.';
  }
- out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,96),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
+ out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,100),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
 
  const natText=(front.nationalityText||ft)+'\n'+(front.wholeText||'');
  const natMatch=natText.match(/\bWARGANEGARA\b/i);
  const malaysiaMatch=natText.match(/\bMALAYSIA\b/i);
  if(natMatch){
-  out.push(mk('Nationality','Malaysia',Math.min(front.conf,96),fieldStatus(front.conf),natMatch[0],'Explicit "WARGANEGARA" evidence on the MyKad indicates Malaysian nationality. The displayed value is Malaysia; no state/address is used to infer nationality.','"Warganegara" is evidence, not a character-replacement rule.'));
+  out.push(mk('Nationality','Malaysia',Math.min(front.conf,100),fieldStatus(front.conf),natMatch[0],'Explicit "WARGANEGARA" evidence on the MyKad indicates Malaysian nationality. The displayed value is Malaysia; no state/address is used to infer nationality.','"Warganegara" is evidence, not a character-replacement rule.'));
  }else if(malaysiaMatch){
-  out.push(mk('Nationality','Malaysia',Math.min(front.conf,96),fieldStatus(front.conf),malaysiaMatch[0],'Explicit Malaysia evidence retained.',''));
+  out.push(mk('Nationality','Malaysia',Math.min(front.conf,100),fieldStatus(front.conf),malaysiaMatch[0],'Explicit Malaysia evidence retained.',''));
  }else{
   out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state or address is never converted into nationality.'));
  }
 
  const address=extractAddress(front.addressText||ft+'\n'+(front.wholeText||''));
- out.push(mk('Address',address.join(' ')||'UNKNOWN',address.length?Math.min(front.conf,94):0,address.length?fieldStatus(front.conf):'UNKNOWN',address.length?address.join('\n'):'No reliable address block detected.','Address is assembled only from text directly read from the front ID. No postcode, town or state is invented.',address.length?'Verify every address character against the source image.':''));
+ out.push(mk('Address',address.join(' ')||'UNKNOWN',address.length?Math.min(front.conf,100):0,address.length?fieldStatus(front.conf):'UNKNOWN',address.length?address.join('\n'):'No reliable address block detected.','Address is assembled only from text directly read from the front ID. No postcode, town or state is invented.',address.length?'Verify every address character against the source image.':''));
+ // Verified Extraction display order is intentional: Full Name must appear above NRIC Number.
+ const nameIndex=out.findIndex(f=>f.name==='Full Name');
+ const nricIndex=out.findIndex(f=>f.name==='NRIC Number');
+ if(nameIndex>nricIndex && nameIndex>=0 && nricIndex>=0){ const nameField=out.splice(nameIndex,1)[0]; out.splice(nricIndex,0,nameField); }
  return out;
 }
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
@@ -327,9 +360,12 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
   ['WHOLE',maskGold(crop(f.canvas,0,0,1,1,2)),6]
  ];
  const fr={};const br={};
+ const backJobs=[['NRIC',crop(b.canvas,.02,.05,.96,.45,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
  for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
  for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
- render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
+ const frontData={text:fr.WHOLE?.text||'',conf:Math.max(fr.WHOLE?.conf||0,fr.NRIC?.conf||0,fr.NAME?.conf||0,fr.ADDRESS?.conf||0,fr.GENDER?.conf||0),nricText:fr.NRIC?.text||'',nameText:fr.NAME?.text||'',addressText:fr.ADDRESS?.text||'',genderText:fr.GENDER?.text||'',nationalityText:fr.WHOLE?.text||'',wholeText:fr.WHOLE?.text||''};
+ const backData={text:br.WHOLE?.text||'',conf:br.WHOLE?.conf||0,nricText:br.NRIC?.text||'',wholeText:br.WHOLE?.text||''};
+ render(extract(frontData,backData));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();E.run.disabled=true;
 })();
@@ -427,26 +463,6 @@ window.applyStrictUncertaintyPolicy = function(result){
 })();
 </script>
 
-
-<script id="no-extended-nric-guard">
-(function(){
-  function removeExtended(){
-    const nodes = document.querySelectorAll('body *');
-    for(const el of nodes){
-      if(el.children.length === 0){
-        const t=(el.textContent||'').trim().toLowerCase();
-        if(t === 'extended nric number' || t === 'extended nric'){
-          const box=el.closest('.field,.card,.result,.extract,.row') || el;
-          if(box && box.parentNode) box.parentNode.removeChild(box);
-        }
-      }
-    }
-  }
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', removeExtended, {once:true});
-  } else removeExtended();
-})();
-</script>
 
 </body>
 </html>
