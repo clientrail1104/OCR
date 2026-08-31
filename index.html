@@ -2,648 +2,420 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#edf3f7">
-<title>OCR Master — Document Intelligence</title>
-
-<!--
-  OCR MASTER
-  GitHub Pages-ready single-file application.
-
-  Processing:
-
-
-    DOCX   -> Mammoth text extraction (not OCR)
-    XLSX   -> SheetJS text/table extraction (not OCR)
-
-  Privacy:
-    OCR is performed in the browser. Files are not uploaded by this page to a server.
-    Third-party CDN libraries are fetched by the browser. For strict offline deployment,
-    self-host the pinned library files and change the URLs below.
-
-  Important accuracy rule:
-    OCR output is evidence, not truth. This application never "fixes" ambiguous
-    characters by substitution. Confidence, validation and conflict state remain separate.
--->
-<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#eef4f7">
+<title>OCR MASTER — Instant Document Intelligence</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
 <style>
 :root{
-  --bg:#edf3f7; --surface:#edf3f7; --ink:#24313a; --muted:#71808b;
-  --accent:#20c9c1; --accent2:#8b6cff; --danger:#e05c70; --warn:#e0a62e;
-  --ok:#27a56d; --shadow1:12px 12px 26px rgba(163,177,190,.45);
-  --shadow2:-12px -12px 26px rgba(255,255,255,.92);
-  --inset:inset 5px 5px 12px rgba(163,177,190,.28),inset -5px -5px 12px rgba(255,255,255,.9);
+ --bg:#edf3f7;--ink:#26343d;--muted:#71808a;--cyan:#12c9c0;--violet:#806cff;
+ --ok:#168b61;--warn:#ad7800;--bad:#c83f59;
+ --out:10px 10px 24px rgba(159,174,187,.45),-10px -10px 24px rgba(255,255,255,.95);
+ --in:inset 5px 5px 12px rgba(159,174,187,.30),inset -5px -5px 12px rgba(255,255,255,.92)
 }
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-body{padding:18px}
+html,body{width:100%;height:100%;margin:0}
+body{overflow:hidden;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:10px}
 button,input,select{font:inherit}
-button{cursor:pointer;border:0;color:var(--ink)}
-button:disabled{opacity:.45;cursor:not-allowed}
-.app{max-width:1600px;margin:auto}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
-.brand{display:flex;align-items:center;gap:13px}
-.logo{width:48px;height:48px;border-radius:16px;background:var(--surface);box-shadow:var(--shadow1),var(--shadow2);display:grid;place-items:center;font-weight:900;color:var(--accent);font-size:20px}
-h1{font-size:22px;margin:0;letter-spacing:.2px}
-.sub{font-size:12px;color:var(--muted);margin-top:2px}
-.status-pill{padding:9px 14px;border-radius:999px;background:var(--surface);box-shadow:var(--shadow1),var(--shadow2);font-size:12px;font-weight:700}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:7px}
-.grid{display:grid;grid-template-columns:310px minmax(0,1fr) 420px;gap:16px;min-height:calc(100vh - 100px)}
-.card{border-radius:22px;background:var(--surface);box-shadow:var(--shadow1),var(--shadow2);padding:16px;min-width:0}
-.card h2{font-size:14px;margin:0 0 12px}
-.section{margin-bottom:15px}
-.section:last-child{margin-bottom:0}
-.label{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:800;margin-bottom:7px}
-.drop{border:1.5px dashed rgba(32,201,193,.55);border-radius:18px;padding:20px 14px;text-align:center;box-shadow:var(--inset);transition:.2s}
-.drop.drag{transform:scale(1.01);box-shadow:var(--inset),0 0 0 2px rgba(32,201,193,.18)}
-.drop strong{display:block;font-size:13px}
-.drop span{display:block;color:var(--muted);font-size:11px;margin-top:5px;line-height:1.5}
-.btn{border-radius:13px;padding:10px 12px;background:var(--surface);box-shadow:7px 7px 14px rgba(163,177,190,.35),-7px -7px 14px rgba(255,255,255,.9);font-weight:750;font-size:12px}
-.btn:active{box-shadow:var(--inset)}
-.btn.primary{background:linear-gradient(135deg,#20c9c1,#6c9cff);color:#fff;box-shadow:7px 7px 15px rgba(90,135,190,.3),-5px -5px 12px rgba(255,255,255,.8)}
-.btn.danger{color:var(--danger)}
-.row{display:flex;gap:8px;align-items:center}
-.row>*{flex:1}
+button{border:0;cursor:pointer;color:inherit}
+button:disabled{opacity:.5;cursor:not-allowed}
+.app{height:calc(100vh - 20px);max-width:1800px;margin:auto;display:flex;flex-direction:column}
+.top{flex:0 0 auto;height:48px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.brand{display:flex;align-items:center;gap:10px}.logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:12px;font-weight:950;color:var(--cyan);box-shadow:var(--out)}
+h1{font-size:18px;line-height:1;margin:0}.sub{font-size:9px;color:var(--muted);margin-top:4px}
+.status{padding:8px 11px;border-radius:99px;box-shadow:var(--out);font-size:9px;font-weight:900;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--ok)}
+.layout{flex:1;min-height:0;display:grid;grid-template-columns:260px minmax(0,1fr) 390px;gap:9px}
+.card{background:var(--bg);border-radius:17px;box-shadow:var(--out);padding:11px;min-width:0;min-height:0}
+.left,.right,.center{min-height:0}.left{overflow:auto}.center{display:grid;grid-template-rows:auto minmax(130px,1fr) minmax(130px,1fr);gap:9px}
+.right{display:flex;flex-direction:column}
+h2{font-size:11px;margin:0 0 7px}.label{text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-size:8px;font-weight:900;margin-bottom:5px}
+.drop{border:1.5px dashed rgba(18,201,192,.65);border-radius:15px;padding:13px;text-align:center;box-shadow:var(--in);outline:none}
+.drop.drag{box-shadow:var(--in),0 0 0 2px rgba(18,201,192,.2);transform:scale(1.01)}
+.scan{font-size:25px;color:var(--cyan);font-weight:900}.drop strong{display:block;font-size:10px}.drop small{display:block;color:var(--muted);font-size:8px;line-height:1.45;margin-top:3px}
+.row{display:flex;gap:6px;align-items:center}.row>*{flex:1}
+.btn{padding:8px 9px;border-radius:10px;background:var(--bg);box-shadow:6px 6px 12px rgba(159,174,187,.35),-6px -6px 12px white;font-size:9px;font-weight:900}.btn:active{box-shadow:var(--in)}
+.primary{background:linear-gradient(135deg,var(--cyan),var(--violet));color:white}
 input[type=file]{display:none}
-select,input[type=number]{width:100%;border:0;outline:0;border-radius:12px;background:var(--surface);box-shadow:var(--inset);padding:10px 11px;color:var(--ink);font-size:12px}
-.range{width:100%}
-.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;font-size:12px}
-.switch{position:relative;width:40px;height:22px;flex:0 0 auto}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;inset:0;border-radius:999px;background:#d2dbe1;box-shadow:var(--inset);transition:.2s}
-.slider:before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:2px 2px 5px #aab5bc;transition:.2s}
-.switch input:checked+.slider{background:rgba(32,201,193,.55)}
-.switch input:checked+.slider:before{transform:translateX(18px)}
-.mini{font-size:10px;color:var(--muted);line-height:1.45}
-.file-list{display:flex;flex-direction:column;gap:7px;max-height:235px;overflow:auto}
-.file-item{padding:9px;border-radius:13px;box-shadow:var(--inset);font-size:11px}
-.file-item b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.file-item span{color:var(--muted)}
-.center{display:flex;flex-direction:column;gap:14px}
-.hero{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:14px;min-height:190px}
-.drop.big{height:100%;display:grid;place-items:center}
-.scan-icon{font-size:42px;color:var(--accent)}
-.id-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.id-slot{min-height:140px;border-radius:18px;box-shadow:var(--inset);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px}
-.id-slot img{max-width:100%;max-height:100px;border-radius:10px;object-fit:contain}
-.id-slot .empty{color:var(--muted);font-size:11px}
-.progress-wrap{padding:12px;border-radius:15px;box-shadow:var(--inset)}
-.progress{height:8px;border-radius:99px;background:#dce4e9;overflow:hidden}
-.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#8b6cff);transition:width .15s}
-.progress-text{font-size:11px;color:var(--muted);margin-top:7px}
-.results{display:flex;flex-direction:column;gap:10px;min-height:0}
-.result-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
-.badge{font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;background:var(--surface);box-shadow:var(--inset)}
-.badge.ok{color:var(--ok)} .badge.warn{color:var(--warn)} .badge.bad{color:var(--danger)}
-.field{border-radius:15px;padding:11px;box-shadow:var(--inset)}
-.field-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
-.field-name{font-size:11px;font-weight:850}
-.field-value{font-size:13px;margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere}
-.field-meta{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5}
-.evidence{margin-top:7px;padding:8px;border-radius:10px;background:rgba(255,255,255,.25);font-size:10px;white-space:pre-wrap;overflow-wrap:anywhere}
-.notice{padding:10px;border-radius:14px;font-size:11px;line-height:1.5;box-shadow:var(--inset)}
-.notice.warn{color:#8a6200}.notice.bad{color:#9b3045}.notice.ok{color:#126846}
-.tabs{display:flex;gap:7px;overflow:auto}
-.tab{padding:8px 10px;border-radius:10px;white-space:nowrap;background:var(--surface);box-shadow:var(--inset);font-size:11px}
-.tab.active{box-shadow:var(--shadow1),var(--shadow2);font-weight:800;color:#5963c9}
-.preview{border-radius:18px;box-shadow:var(--inset);padding:10px;min-height:150px;max-height:430px;overflow:auto}
-.preview img{max-width:100%;display:block;margin:auto;border-radius:10px}
-.raw{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
-.table-wrap{overflow:auto;border-radius:12px;box-shadow:var(--inset)}
-table{border-collapse:collapse;width:100%;font-size:10px}
-th,td{padding:7px;border-bottom:1px solid rgba(110,130,145,.16);text-align:left;vertical-align:top}
-th{font-weight:850}
-.empty-state{text-align:center;color:var(--muted);padding:30px 10px;font-size:12px}
-footer{font-size:9px;color:var(--muted);text-align:center;padding:10px}
-@media(max-width:1200px){.grid{grid-template-columns:270px minmax(0,1fr)}.right{grid-column:1/-1}.results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){body{padding:10px}.topbar{align-items:flex-start}.grid{grid-template-columns:1fr}.right{grid-column:auto}.hero{grid-template-columns:1fr}.id-grid{grid-template-columns:1fr}.results{display:flex}.topbar .status-pill{display:none}}
+select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);box-shadow:var(--in);color:var(--ink);font-size:9px;outline:0}
+.section{margin-bottom:9px}.mini{font-size:8px;color:var(--muted);line-height:1.45}
+.file-list{max-height:135px;overflow:auto;display:flex;flex-direction:column;gap:5px}.file{padding:7px;border-radius:10px;box-shadow:var(--in);font-size:8px}.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file span{color:var(--muted)}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) 185px;gap:9px}.id-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.slot{height:74px;border-radius:13px;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center;padding:5px}.slot img{max-width:100%;max-height:66px;object-fit:contain;border-radius:7px}.empty{color:var(--muted);font-size:9px}
+.progress-box{border-radius:12px;box-shadow:var(--in);padding:9px}.progress{height:7px;border-radius:99px;background:#dce4e9;overflow:hidden}.progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .15s}.progress-text{font-size:8px;color:var(--muted);min-height:23px;margin-top:5px}
+.live{font-size:8px;padding:7px;margin-top:6px;border-radius:9px;box-shadow:var(--in);line-height:1.4}
+.result-head{display:flex;align-items:center;justify-content:space-between;gap:6px}.tabs{display:flex;gap:4px;max-width:70%;overflow:auto}.tab{padding:5px 7px;border-radius:8px;background:var(--bg);box-shadow:var(--in);font-size:8px;white-space:nowrap}.tab.active{box-shadow:var(--out);font-weight:900;color:#5d59b9}
+.preview{height:100%;min-height:0;border-radius:12px;box-shadow:var(--in);padding:7px;overflow:auto;margin-top:7px}.preview img{max-width:100%;display:block;margin:auto;border-radius:7px}.raw{height:100%;min-height:0;overflow:auto;border-radius:12px;box-shadow:var(--in);padding:8px;margin-top:7px;white-space:pre-wrap;overflow-wrap:anywhere;font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+.badge{padding:4px 6px;border-radius:99px;box-shadow:var(--in);font-size:7px;font-weight:950;white-space:nowrap}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.notice{font-size:8px;line-height:1.45;padding:7px;border-radius:10px;box-shadow:var(--in);margin:7px 0}.results{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:5px}.field{padding:8px;border-radius:11px;box-shadow:var(--in)}.field-top{display:flex;align-items:center;justify-content:space-between;gap:6px}.field-name{font-size:8px;font-weight:950}.field-value{font-size:9px;line-height:1.4;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.field-meta{font-size:7.5px;color:var(--muted);line-height:1.4;margin-top:4px}.evidence{margin-top:4px;padding:5px;border-radius:7px;background:rgba(255,255,255,.22);font-size:7px;white-space:pre-wrap;overflow-wrap:anywhere}
+.table-wrap{overflow:auto;margin-top:5px;border-radius:7px;box-shadow:var(--in)}table{border-collapse:collapse;width:100%;font-size:7px}th,td{padding:4px;border-bottom:1px solid rgba(100,120,140,.15);text-align:left}
+.hidden-internal{display:none!important}
+@media(max-width:1150px){html,body{overflow:auto}.app{height:auto;min-height:100vh}.layout{grid-template-columns:240px 1fr}.right{grid-column:1/-1;min-height:350px}.center{min-height:700px}}
+@media(max-width:700px){.layout{grid-template-columns:1fr}.right{grid-column:auto}.hero{grid-template-columns:1fr}.id-grid{grid-template-columns:1fr}.top{height:auto}.status{display:none}}
 </style>
-
-<style id="ocr-master-one-page-fix">
-html,body{height:100%;overflow:hidden}
-body{padding:10px}
-.app{height:calc(100vh - 20px);max-width:1800px;display:flex;flex-direction:column}
-.top{flex:0 0 auto;margin-bottom:9px}
-.grid{flex:1 1 auto;min-height:0;grid-template-columns:270px minmax(0,1fr) 390px;gap:10px}
-.card{padding:11px;border-radius:17px}
-.grid>.card,.grid>aside,.grid>section{min-height:0}
-.center{min-height:0;display:grid;grid-template-rows:auto minmax(105px,1fr) minmax(120px,1fr);gap:9px}
-.center>.card{min-height:0}
-.hero{min-height:0;grid-template-columns:minmax(0,1fr) 170px}
-.id-grid{gap:7px}
-.slot{height:86px}
-.slot img{max-height:78px}
-.preview{height:100%;min-height:0;max-height:none}
-.raw{max-height:none;height:100%;overflow:auto}
-.right{min-height:0;display:flex;flex-direction:column}
-.right .results{min-height:0;flex:1;max-height:none;overflow:auto}
-.results{gap:6px}
-.field{padding:8px}
-.fvalue{font-size:11px}
-.evidence{padding:5px;margin-top:4px}
-.notice{padding:7px}
-.file-list{max-height:115px}
-.section{margin-bottom:9px}
-h2{margin-bottom:7px}
-.drop{padding:12px}
-.drop-icon{font-size:27px}
-.mini{font-size:8.5px}
-footer{display:none}
-@media(max-width:1150px){
- .grid{grid-template-columns:245px minmax(0,1fr)}
- .right{grid-column:1/-1}
- .app{height:auto;min-height:100vh}
- html,body{overflow:auto}
- .right{min-height:350px}
-}
-@media(max-width:760px){
- .grid{grid-template-columns:1fr}
- .right{grid-column:auto}
-}
-</style>
-
 </head>
-
 <body>
 <div class="app">
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo" aria-hidden="true">OCR</div>
-      <div>
-        <h1>OCR MASTER</h1>
-        <div class="sub">Evidence-first document intelligence · browser-side processing</div>
-      </div>
-    </div>
-    <div class="status-pill"><span class="dot"></span><span id="engineStatus">Ready</span></div>
-  </header>
+<header class="top">
+ <div class="brand"><div class="logo">OCR</div><div><h1>OCR MASTER</h1><div class="sub">Instant OCR · evidence-first extraction · automatic HD corroboration</div></div></div>
+ <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Ready</span></div>
+</header>
 
-  <main class="grid">
-    <aside class="card">
-      <div class="section">
-        <h2>Input & controls</h2>
-        <div class="drop" id="dropZone" tabindex="0" role="button" aria-label="Upload documents">
-          <div class="scan-icon" aria-hidden="true">＋</div>
-          <strong>Drop files here</strong>
-          <span>Images, PDF, DOCX, XLSX<br>Front + back ID cards are supported.</span>
-          <div class="row" style="margin-top:12px">
-            <button class="btn primary" id="chooseBtn" type="button">Choose files</button>
-            <button class="btn" id="clearBtn" type="button">Clear</button>
-          </div>
-        </div>
-        <input id="fileInput" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.pdf,.docx,.xlsx,image/*">
-      </div>
+<main class="layout">
+<aside class="card left">
+ <div class="section">
+  <h2>Upload documents</h2>
+  <div class="drop" id="dropZone" tabindex="0" role="button" aria-label="Upload files">
+   <div class="scan">＋</div><strong>Drop files here</strong>
+   <small>PNG · JPG · WEBP · TIFF · PDF · DOCX · XLSX<br>Front + back ID images supported</small>
+   <div class="row" style="margin-top:9px"><button class="btn primary" id="chooseBtn" type="button">Choose files</button><button class="btn" id="clearBtn" type="button">Clear</button></div>
+  </div>
+  <input id="fileInput" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.pdf,.docx,.xlsx,image/*">
+ </div>
 
-      <div class="section">
-        <div class="label">OCR language</div>
-        <select id="lang">
-          <option value="eng">English</option>
-          <option value="msa">Malay</option>
-          <option value="ind">Indonesian</option>
-          <option value="eng+msa">English + Malay</option>
-          <option value="eng+ind">English + Indonesian</option>
-          <option value="eng+msa+ind">English + Malay + Indonesian</option>
-        </select>
-        <div class="mini" style="margin-top:6px">Tesseract language models are downloaded only when selected. Add more traineddata files for additional languages.</div>
-      </div>
+ <div class="section">
+  <div class="label">OCR language</div>
+  <select id="lang">
+   <option value="eng">English</option><option value="msa">Malay</option><option value="ind">Indonesian</option>
+   <option value="eng+msa">English + Malay</option><option value="eng+ind">English + Indonesian</option>
+   <option value="eng+msa+ind">English + Malay + Indonesian</option>
+  </select>
+ </div>
 
-      
-        
-        </div>
-        
-        
-        
-        <div class="label" style="margin-top:7px">Render scale</div>
-        <input class="range" id="scale" type="range" min="1" max="3" step=".25" value="2" aria-label="Render scale">
-        <div class="mini"><span id="scaleValue">2.00×</span> · capped to prevent unsafe browser memory use</div>
-      </div>
+ <div class="section">
+  <div class="label">Automatic document processing</div>
+  <div class="mini">Instant OCR starts automatically. Image orientation, deskew, contrast, sharpening, HD upscaling, multilingual recognition, field extraction and validation run without user-facing processing switches.</div>
+ </div>
 
-      <div class="section">
-        <div class="label">AI super-resolution</div>
-        
-        <select id="upscaleFactor" aria-label="AI upscale factor">
-          <option value="2">2× AI upscale</option>
-          <option value="4" selected>4× AI upscale</option>
-        </select>
-        <div class="mini" style="margin-top:6px">Uses browser-side Real-ESRGAN general x4 through ONNX Runtime Web. AI reconstruction is corroboration only, never source truth.</div>
-        <div class="row" style="margin-top:8px"><button class="btn" id="loadUpscaler" type="button">Prepare AI model</button><span class="badge" id="upscaleStatus">Not loaded</span></div>
-      </div>
+ <div class="section">
+  <div class="label">Files</div>
+  <div class="file-list" id="fileList"><div class="empty">No files selected.</div></div>
+ </div>
 
-      
-        <div class="notice warn">Low-confidence, conflicting, numeric and date fields remain visibly flagged. The app never replaces ambiguous characters with look-alikes.</div>
-      </div>
+ <!-- Internal defaults. They are intentionally not exposed in the UI. -->
+ <div class="hidden-internal" aria-hidden="true">
+  <input id="autoInstant" type="checkbox" checked>
+  <input id="enhance" type="checkbox" checked>
+  <input id="deskew" type="checkbox" checked>
+  <input id="threshold" type="checkbox">
+  <input id="sharpen" type="checkbox" checked>
+  <input id="scale" type="range" min="1" max="2.5" step=".25" value="2">
+  <input id="aiUpscale" type="checkbox" checked>
+  <select id="upscaleFactor"><option value="4" selected>4</option></select>
+  <button id="loadUpscaler" type="button"></button><span id="upscaleStatus"></span><span id="scaleValue"></span>
+ </div>
+</aside>
 
-      <div class="section">
-        <div class="label">Files</div>
-        <div class="file-list" id="fileList"><div class="empty-state">No files selected.</div></div>
-      </div>
-    </aside>
+<section class="center">
+ <div class="card hero">
+  <div>
+   <h2>Front / back ID workspace</h2>
+   <div class="mini" style="margin-bottom:7px">First two image uploads are displayed as front/back evidence. Every supported page is still processed.</div>
+   <div class="id-grid"><div class="slot" id="frontSlot"><div class="empty">ID FRONT</div></div><div class="slot" id="backSlot"><div class="empty">ID BACK</div></div></div>
+  </div>
+  <div>
+   <h2>Instant processing</h2>
+   <div class="progress-box"><div class="progress"><i id="bar"></i></div><div class="progress-text" id="progressText">Waiting for upload.</div></div>
+   <div class="live"><b id="liveState">READY</b><br><span id="liveDetail">Upload a document to begin.</span></div>
+   <button class="btn primary" id="runBtn" type="button" style="width:100%;margin-top:6px">Run / Re-run OCR</button>
+  </div>
+ </div>
 
-    <section class="center">
-      <div class="card hero">
-        <div>
-          <h2>Document workspace</h2>
-          <div class="mini" style="margin-bottom:10px">Use separate front/back slots for identity cards. Additional documents can be processed together.</div>
-          <div class="id-grid">
-            <div class="id-slot" id="frontSlot">
-              <div class="empty">ID FRONT<br><small>drop or choose an image</small></div>
-            </div>
-            <div class="id-slot" id="backSlot">
-              <div class="empty">ID BACK<br><small>drop or choose an image</small></div>
-            </div>
-          </div>
-        </div>
-        <div class="card" style="padding:12px;box-shadow:var(--inset)">
-          <div class="label">Processing</div>
-          <div class="progress-wrap">
-            <div class="progress"><i id="bar"></i></div>
-            <div class="progress-text" id="progressText">Waiting for input.</div>
-          </div>
-          <button class="btn primary" id="runBtn" type="button" style="width:100%;margin-top:4px">Run OCR</button>
-        </div>
-      </div>
+ <div class="card">
+  <div class="result-head"><h2>Source preview</h2><div class="tabs" id="pageTabs"></div></div>
+  <div class="preview" id="preview"><div class="empty">Upload a document to preview it.</div></div>
+ </div>
 
-      <div class="card">
-        <div class="result-head">
-          <h2 style="margin:0">Source preview</h2>
-          <div class="tabs" id="pageTabs"></div>
-        </div>
-        <div class="preview" id="preview"><div class="empty-state">Upload a document to preview it.</div></div>
-      </div>
+ <div class="card">
+  <div class="result-head"><h2>OCR evidence</h2><span class="badge" id="ocrBadge">WAITING</span></div>
+  <div class="raw" id="rawText"><div class="empty">OCR evidence will appear progressively.</div></div>
+ </div>
+</section>
 
-      <div class="card">
-        <div class="result-head">
-          <h2 style="margin:0">OCR evidence</h2>
-          <span class="badge" id="ocrBadge">No result</span>
-        </div>
-        <div class="raw" id="rawText" style="margin-top:10px"><div class="empty-state">OCR text will appear here. It is preserved as evidence and is not silently corrected.</div></div>
-      </div>
-
-      <footer>Client-side processing. Do not use this page as the sole verification mechanism for legally or operationally critical identity data.</footer>
-    </section>
-
-    <aside class="card right">
-      <div class="result-head">
-        <h2>Verified extraction</h2>
-        <span class="badge warn" id="reviewBadge">Awaiting OCR</span>
-      </div>
-      <div class="notice" id="summary" style="margin:10px 0">No extracted fields yet.</div>
-      <div class="results" id="fields">
-        <div class="empty-state">Structured fields will appear after OCR.</div>
-      </div>
-    </aside>
-  </main>
+<aside class="card right">
+ <div class="result-head"><h2>Verified extraction</h2><span class="badge warn" id="reviewBadge">AWAITING OCR</span></div>
+ <div class="notice warn" id="summary">Capture includes explicit fields plus other reliably readable information. No ambiguous character is silently corrected.</div>
+ <div class="results" id="fields"><div class="empty">Structured extraction will appear here.</div></div>
+</aside>
+</main>
 </div>
 
-<script type="module">
-/* ----------------------------- setup ----------------------------- */
-const $ = s => document.querySelector(s);
-const state = {
-  files: [], pages: [], selectedPage: 0, results: [], worker: null,
-  running: false, front: null, back: null, tables: [], srSession: null, workerLang: null
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const state={files:[],pages:[],selected:0,results:[],worker:null,workerLang:null,running:false,front:null,back:null,sr:null};
+const els={
+ fileInput:$('#fileInput'),drop:$('#dropZone'),choose:$('#chooseBtn'),clear:$('#clearBtn'),run:$('#runBtn'),lang:$('#lang'),
+ autoInstant:$('#autoInstant'),enhance:$('#enhance'),deskew:$('#deskew'),threshold:$('#threshold'),sharpen:$('#sharpen'),
+ scale:$('#scale'),aiUpscale:$('#aiUpscale'),upscaleFactor:$('#upscaleFactor'),loadUpscaler:$('#loadUpscaler'),upscaleStatus:$('#upscaleStatus'),scaleValue:$('#scaleValue'),
+ fileList:$('#fileList'),front:$('#frontSlot'),back:$('#backSlot'),tabs:$('#pageTabs'),preview:$('#preview'),raw:$('#rawText'),
+ fields:$('#fields'),bar:$('#bar'),progress:$('#progressText'),status:$('#statusText'),dot:$('#statusDot'),liveState:$('#liveState'),liveDetail:$('#liveDetail'),
+ ocrBadge:$('#ocrBadge'),review:$('#reviewBadge'),summary:$('#summary')
 };
-const els = {
-  fileInput: $('#fileInput'), drop: $('#dropZone'), fileList: $('#fileList'),
-  choose: $('#chooseBtn'), clear: $('#clearBtn'), run: $('#runBtn'),
-  lang: $('#lang'), enhance: $('#enhance'), deskew: $('#deskew'),
-  threshold: $('#threshold'), sharpen: $('#sharpen'), scale: $('#scale'),
-  aiUpscale: $('#aiUpscale'), upscaleFactor: $('#upscaleFactor'), loadUpscaler: $('#loadUpscaler'), upscaleStatus: $('#upscaleStatus'),
-  scaleValue: $('#scaleValue'), autoInstant: $('#autoInstant'), bar: $('#bar'), progress: $('#progressText'),
-  engine: $('#engineStatus'), front: $('#frontSlot'), back: $('#backSlot'),
-  tabs: $('#pageTabs'), preview: $('#preview'), raw: $('#rawText'),
-  ocrBadge: $('#ocrBadge'), reviewBadge: $('#reviewBadge'),
-  summary: $('#summary'), fields: $('#fields')
-};
-els.scale.addEventListener('input',()=>els.scaleValue.textContent = Number(els.scale.value).toFixed(2)+'×');
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function setStatus(t,good=true){els.status.textContent=t;els.dot.style.background=good?'var(--ok)':'var(--bad)'}
+function progress(p,t){els.bar.style.width=Math.max(0,Math.min(100,p))+'%';els.progress.textContent=t}
+function bytes(n){return n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB'}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function retry(fn,n=3){return (async()=>{let e;for(let i=0;i<n;i++){try{return await fn()}catch(x){e=x;if(i<n-1)await sleep(250*(i+1))}}throw e})()}
 
-function setProgress(p,msg){
-  els.bar.style.width = Math.max(0,Math.min(100,p))+'%';
-  els.progress.textContent = msg || '';
-}
-function escapeHTML(s){
-  return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-function fmtBytes(n){
-  if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB';
-  return (n/1048576).toFixed(1)+' MB';
-}
-function setEngine(text,good=true){
-  els.engine.textContent=text;
-  document.querySelector('.status-pill .dot').style.background = good ? 'var(--ok)' : 'var(--danger)';
-}
-
-/* ----------------------------- file intake ----------------------------- */
-els.choose.onclick=()=>els.fileInput.click();
-els.drop.onclick=e=>{ if(e.target.tagName!=='BUTTON') els.fileInput.click(); };
-els.drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();els.fileInput.click()}};
-els.fileInput.onchange=e=>addFiles([...e.target.files]);
-els.clear.onclick=async()=>{
-  if(state.running) return;
-  if(state.worker){try{await state.worker.terminate()}catch{} state.worker=null;}
-  state.files=[];state.pages=[];state.results=[];state.front=null;state.back=null;state.tables=[];state.selectedPage=0;state.workerLang=null;
-  if(state.srSession){try{await state.srSession.release?.()}catch{} state.srSession=null;}
-  if(state.front?.url)URL.revokeObjectURL(state.front.url); if(state.back?.url)URL.revokeObjectURL(state.back.url);
-  els.fileInput.value=''; renderFiles();renderSlots();renderPages();renderEmpty();
-  setProgress(0,'Waiting for input.');setEngine('Ready');els.run.disabled=false;
-};
-['dragenter','dragover'].forEach(ev=>els.drop.addEventListener(ev,e=>{e.preventDefault();els.drop.classList.add('drag')}));
-['dragleave','drop'].forEach(ev=>els.drop.addEventListener(ev,e=>{e.preventDefault();els.drop.classList.remove('drag')}));
+/* Upload: do not depend on any removed UI control. */
+els.choose.addEventListener('click',e=>{e.stopPropagation();els.fileInput.click()});
+els.drop.addEventListener('click',e=>{if(!e.target.closest('button'))els.fileInput.click()});
+els.drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();els.fileInput.click()}});
+els.fileInput.addEventListener('change',e=>{const f=[...e.target.files];e.target.value='';addFiles(f)});
+['dragenter','dragover'].forEach(x=>els.drop.addEventListener(x,e=>{e.preventDefault();e.stopPropagation();els.drop.classList.add('drag')}));
+['dragleave','drop'].forEach(x=>els.drop.addEventListener(x,e=>{e.preventDefault();e.stopPropagation();els.drop.classList.remove('drag')}));
 els.drop.addEventListener('drop',e=>addFiles([...e.dataTransfer.files]));
+els.clear.addEventListener('click',clearAll);
+els.run.addEventListener('click',()=>runOCR(true));
 
-async function addFiles(files){
-  const allowed = /\.(png|jpe?g|webp|tiff?|pdf|docx|xlsx)$/i;
-  const valid=[], rejected=[];
-  for(const f of files){
-    if(!allowed.test(f.name)){rejected.push(`${f.name}: unsupported format`);continue}
-    if(f.size>500*1024*1024){rejected.push(`${f.name}: exceeds 500 MB limit`);continue}
-    if(f.size===0){rejected.push(`${f.name}: empty file`);continue}
-    valid.push(f);
-  }
-  state.files.push(...valid);
-  renderFiles();
-  if(rejected.length) showNotice(rejected.join('\n'),'bad');
-  if(valid.length){
-    await buildPages();
-    renderSlots();
-    if(els.autoInstant.checked) await runOCR();
-  }
+async function clearAll(){
+ if(state.running)return;
+ if(state.worker)try{await state.worker.terminate()}catch{}
+ state.worker=null;state.workerLang=null;
+ state.files.forEach(f=>f.__url&&URL.revokeObjectURL(f.__url));
+ state.files=[];state.pages=[];state.results=[];state.selected=0;state.front=null;state.back=null;
+ els.fileInput.value='';renderFiles();renderSlots();renderPages();resetOutput();progress(0,'Waiting for upload.');setStatus('Ready');els.run.disabled=false
+}
+function resetOutput(){
+ els.raw.innerHTML='<div class="empty">OCR evidence will appear progressively.</div>';
+ els.fields.innerHTML='<div class="empty">Structured extraction will appear here.</div>';
+ els.summary.textContent='Capture includes explicit fields plus other reliably readable information. No ambiguous character is silently corrected.';
+ els.ocrBadge.textContent='WAITING';els.ocrBadge.className='badge';els.review.textContent='AWAITING OCR';els.review.className='badge warn';
+ els.liveState.textContent='READY';els.liveDetail.textContent='Upload a document to begin.'
 }
 function renderFiles(){
-  els.fileList.innerHTML='';
-  if(!state.files.length){els.fileList.innerHTML='<div class="empty-state">No files selected.</div>';return}
-  state.files.forEach((f,i)=>{
-    const d=document.createElement('div');d.className='file-item';
-    d.innerHTML=`<b title="${escapeHTML(f.name)}">${escapeHTML(f.name)}</b><span>${escapeHTML(f.type||'unknown')} · ${fmtBytes(f.size)}</span>`;
-    els.fileList.appendChild(d);
-  });
+ els.fileList.innerHTML=state.files.length?'':'<div class="empty">No files selected.</div>';
+ state.files.forEach(f=>{const d=document.createElement('div');d.className='file';d.innerHTML='<b title="'+esc(f.name)+'">'+esc(f.name)+'</b><span>'+esc(f.type||'unknown')+' · '+bytes(f.size)+'</span>';els.fileList.appendChild(d)})
 }
 function renderSlots(){
-  for(const [el,obj,label] of [[els.front,state.front,'ID FRONT'],[els.back,state.back,'ID BACK']]){
-    el.innerHTML='';
-    if(obj){
-      const img=document.createElement('img');img.src=obj.url;img.alt=label+' preview';el.appendChild(img);
-      const t=document.createElement('div');t.className='mini';t.textContent=obj.file.name;el.appendChild(t);
-    }else{
-      const x=document.createElement('div');x.className='empty';x.innerHTML=label+'<br><small>Use the image assignment below</small>';el.appendChild(x);
-    }
-  }
+ [[els.front,state.front,'ID FRONT'],[els.back,state.back,'ID BACK']].forEach(([el,o,label])=>{
+  el.innerHTML='';
+  if(o){const im=document.createElement('img');im.src=o.url;im.alt=label;el.appendChild(im)}
+  else el.innerHTML='<div class="empty">'+label+'</div>'
+ })
 }
-
-/* ----------------------------- source conversion ----------------------------- */
-async function fileToDataURL(file){
-  return await new Promise((resolve,reject)=>{
-    const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);
-  });
+async function addFiles(files){
+ if(!files.length)return;
+ const allow=/\.(png|jpe?g|webp|tif|tiff|pdf|docx|xlsx)$/i,valid=[],bad=[];
+ for(const f of files){
+  if(!allow.test(f.name)){bad.push(f.name+' — unsupported format');continue}
+  if(f.size===0){bad.push(f.name+' — empty file');continue}
+  if(f.size>500*1024*1024){bad.push(f.name+' — larger than 500 MB');continue}
+  const duplicate=state.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified);
+  if(duplicate)continue;
+  valid.push(f)
+ }
+ if(bad.length){els.summary.textContent=bad.join('\\n');els.summary.className='notice bad'}
+ if(!valid.length)return;
+ state.files.push(...valid);renderFiles();setStatus('Preparing');els.liveState.textContent='PREPARING';els.liveDetail.textContent='Converting pages…';
+ try{await buildPages();renderSlots();renderPages();if(state.pages.length)await runOCR(false)}catch(e){console.error(e);els.summary.textContent='Unable to prepare the document: '+e.message;els.summary.className='notice bad';setStatus('Preparation failed',false);els.liveState.textContent='STOPPED';els.liveDetail.textContent='No information was guessed.'}
 }
-async function imageBitmapFromFile(file){
-  if('createImageBitmap' in window) return await createImageBitmap(file);
-  const url=URL.createObjectURL(file);
-  try{
-    const img=new Image();img.src=url;await img.decode();return img;
-  }finally{URL.revokeObjectURL(url)}
+async function imageBitmap(file){
+ if(window.createImageBitmap)return await retry(()=>createImageBitmap(file),2);
+ const url=URL.createObjectURL(file);
+ try{const im=new Image();im.src=url;await im.decode();return im}finally{URL.revokeObjectURL(url)}
 }
-function canvasFromBitmap(bmp,scale=2){
-  const max=6000;
-  let w=Math.round(bmp.width*scale),h=Math.round(bmp.height*scale);
-  const ratio=Math.min(1,max/Math.max(w,h));w=Math.max(1,Math.round(w*ratio));h=Math.max(1,Math.round(h*ratio));
-  const c=document.createElement('canvas');c.width=w;c.height=h;
-  const x=c.getContext('2d',{willReadFrequently:true});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';
-  x.drawImage(bmp,0,0,w,h);return c;
+function bitmapCanvas(bmp,scale){
+ const max=5500;let w=Math.max(1,Math.round(bmp.width*scale)),h=Math.max(1,Math.round(bmp.height*scale));
+ const r=Math.min(1,max/Math.max(w,h));w=Math.round(w*r);h=Math.round(h*r);
+ const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{alpha:false});
+ x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(bmp,0,0,w,h);return c
 }
-async function renderPDF(file){
-  if(!window.pdfjsLib) {
-    // pdfjs module may expose the library asynchronously through global in some browsers;
-    // fallback import is handled below.
-  }
-  let pdfjs; try { pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs'); } catch(e) { throw new Error('PDF engine could not be loaded. Check internet access/CSP or self-host PDF.js for GitHub Pages.'); }
-  pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-  const buf=await file.arrayBuffer();
-  const pdf=await pdfjs.getDocument({data:buf}).promise;
-  const out=[];
-  for(let i=1;i<=pdf.numPages;i++){
-    const page=await pdf.getPage(i);
-    const vp=page.getViewport({scale:Number(els.scale.value)});
-    const c=document.createElement('canvas');c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);
-    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-    out.push({file,page:i,canvas:c,label:`${file.name} · page ${i}/${pdf.numPages}`});
-    if(i===1) setProgress(3,`PDF loaded · ${pdf.numPages} page(s)`);
-  }
-  return out;
+async function pdfPages(file){
+ const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
+ pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+ const pdf=await retry(()=>pdfjs.getDocument({data:await file.arrayBuffer()}).promise,2),out=[];
+ for(let i=1;i<=pdf.numPages;i++){
+  const p=await pdf.getPage(i),v=p.getViewport({scale:2});
+  const c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);
+  await p.render({canvasContext:c.getContext('2d',{alpha:false}),viewport:v}).promise;
+  out.push({file,page:i,canvas:c,label:file.name+' · page '+i+'/'+pdf.numPages})
+ }
+ return out
 }
 async function buildPages(){
-  state.pages=[]; state.results=[]; state.tables=[];
-  if(state.front?.url)URL.revokeObjectURL(state.front.url); if(state.back?.url)URL.revokeObjectURL(state.back.url);
-  state.front=null; state.back=null;
-  let imageCount=0;
-  for(const f of state.files){
-    const ext=f.name.split('.').pop().toLowerCase();
-    try{
-      if(ext==='pdf'){
-        state.pages.push(...await renderPDF(f));
-      }else if(ext==='docx'){
-        const ab=await f.arrayBuffer();
-        const res=await mammoth.extractRawText({arrayBuffer:ab});
-        state.pages.push({file:f,page:1,textOnly:res.value,label:f.name});
-      }else if(ext==='xlsx'){
-        const ab=await f.arrayBuffer();
-        const wb=XLSX.read(ab,{type:'array'});
-        for(const name of wb.SheetNames){
-          const ws=wb.Sheets[name];
-          const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-          state.pages.push({file:f,page:1,textOnly:rows.map(r=>r.join(' | ')).join('\n'),sheet:name,rows,label:`${f.name} · ${name}`});
-        }
-      }else{
-        const bmp=await imageBitmapFromFile(f);
-        state.pages.push({file:f,page:1,canvas:canvasFromBitmap(bmp,Number(els.scale.value)),label:f.name});
-        imageCount++; if(imageCount===1) state.front={file:f,url:URL.createObjectURL(f)};
-        else if(imageCount===2) state.back={file:f,url:URL.createObjectURL(f)};
-      }
-    }catch(err){
-      state.pages.push({file:f,page:1,error:err.message,label:f.name});
+ state.pages=[];state.front=null;state.back=null;state.selected=0;progress(1,'Reading file list…');
+ for(const f of state.files){
+  const ext=f.name.split('.').pop().toLowerCase();
+  try{
+   if(ext==='pdf'){
+    const ps=await pdfPages(f);state.pages.push(...ps)
+   }else if(ext==='docx'){
+    const ab=await f.arrayBuffer();
+    const r=await retry(async()=>{if(!window.mammoth)throw new Error('DOCX reader unavailable');return await window.mammoth.extractRawText({arrayBuffer:ab})},2);
+    state.pages.push({file:f,page:1,text:r.value||'',native:true,label:f.name})
+   }else if(ext==='xlsx'){
+    /* Use SheetJS only if already available; otherwise give a safe explicit error. */
+    if(!window.XLSX)throw new Error('XLSX reader is not loaded. Upload PDF/image for immediate OCR.');
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});for(const name of wb.SheetNames){
+     const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:''});
+     state.pages.push({file:f,page:1,text:rows.map(r=>r.join(' | ')).join('\\n'),rows,native:true,label:f.name+' · '+name})
     }
-  }
-  renderPages();
+   }else{
+    const b=await imageBitmap(f),c=bitmapCanvas(b,Number(els.scale.value));
+    const obj={file:f,page:1,canvas:c,label:f.name};state.pages.push(obj);
+    f.__url=URL.createObjectURL(f);if(!state.front)state.front={file:f,url:f.__url};else if(!state.back)state.back={file:f,url:f.__url}
+   }
+  }catch(e){state.pages.push({file:f,page:1,error:e.message,label:f.name})}
+ }
+ progress(4,state.pages.length+' page(s) ready')
 }
 function renderPages(){
-  els.tabs.innerHTML='';
-  state.pages.forEach((p,i)=>{
-    const b=document.createElement('button');b.className='tab'+(i===state.selectedPage?' active':'');b.type='button';
-    b.textContent=(i+1);b.title=p.label;b.onclick=()=>{state.selectedPage=i;renderPages()};
-    els.tabs.appendChild(b);
-  });
-  const p=state.pages[state.selectedPage];
-  els.preview.innerHTML='';
-  if(!p){els.preview.innerHTML='<div class="empty-state">Upload a document to preview it.</div>';return}
-  if(p.error){els.preview.innerHTML=`<div class="notice bad">${escapeHTML(p.error)}</div>`;return}
-  if(p.canvas){
-    const img=document.createElement('img');img.src=p.canvas.toDataURL('image/jpeg',.9);img.alt='Source page preview';els.preview.appendChild(img);
-  }else{
-    els.preview.innerHTML=`<div class="raw">${escapeHTML(p.textOnly||'')}</div>`;
-  }
-}
-function renderEmpty(){
-  els.raw.innerHTML='<div class="empty-state">OCR text will appear here.</div>';
-  els.fields.innerHTML='<div class="empty-state">Structured fields will appear after OCR.</div>';
-  els.summary.textContent='No extracted fields yet.';
-  els.ocrBadge.textContent='No result';els.reviewBadge.textContent='Awaiting OCR';
-}
-function showNotice(text,type='warn'){
-  els.summary.className='notice '+type;els.summary.textContent=text;
+ els.tabs.innerHTML='';
+ state.pages.forEach((p,i)=>{const b=document.createElement('button');b.type='button';b.className='tab'+(i===state.selected?' active':'');b.textContent=String(i+1);b.title=p.label;b.onclick=()=>{state.selected=i;renderPages()};els.tabs.appendChild(b)});
+ const p=state.pages[state.selected];els.preview.innerHTML='';
+ if(!p){els.preview.innerHTML='<div class="empty">Upload a document to preview it.</div>';return}
+ if(p.error){els.preview.innerHTML='<div class="notice bad">'+esc(p.error)+'</div>';return}
+ if(p.canvas){const im=document.createElement('img');im.src=p.canvas.toDataURL('image/jpeg',.9);im.alt='Source page';els.preview.appendChild(im)}
+ else els.preview.innerHTML='<div class="raw" style="height:auto;box-shadow:none;margin:0">'+esc(p.text||'')+'</div>'
 }
 
-
-function clamp(v){return Math.max(0,Math.min(255,v))}
+/* Conservative preprocessing. It never changes characters in OCR output. */
 function grayscaleContrast(c){
-  const x=c.getContext('2d',{willReadFrequently:true}), d=x.getImageData(0,0,c.width,c.height), a=d.data;
-  for(let i=0;i<a.length;i+=4){
-    const g=0.299*a[i]+0.587*a[i+1]+0.114*a[i+2];
-    const v=clamp((g-128)*1.18+128);
-    a[i]=a[i+1]=a[i+2]=v;
-  }
-  x.putImageData(d,0,0);
+ const x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),a=d.data;
+ for(let i=0;i<a.length;i+=4){const g=.299*a[i]+.587*a[i+1]+.114*a[i+2];const v=Math.max(0,Math.min(255,(g-128)*1.15+128));a[i]=a[i+1]=a[i+2]=v}
+ x.putImageData(d,0,0)
 }
 function unsharp(c){
-  const x=c.getContext('2d'),w=c.width,h=c.height;
-  const src=x.getImageData(0,0,w,h), dst=x.createImageData(w,h), s=src.data,d=dst.data;
-  for(let y=1;y<h-1;y++)for(let xx=1;xx<w-1;xx++){
-    const idx=(y*w+xx)*4;
-    for(let k=0;k<3;k++){
-      const blur=(s[idx-4+k]+s[idx+4+k]+s[idx-w*4+k]+s[idx+w*4+k]+s[idx+k])/5;
-      d[idx+k]=clamp(s[idx+k]+(s[idx+k]-blur)*0.75);
-    }
-    d[idx+3]=255;
-  }
-  // keep border
-  for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++)if(y===0||xx===0||y===h-1||xx===w-1){
-    const i=(y*w+xx)*4;d[i]=d[i+1]=d[i+2]=s[i];d[i+3]=255;
-  }
-  x.putImageData(dst,0,0);
-}
-function adaptiveThreshold(c){
-  const x=c.getContext('2d',{willReadFrequently:true}),w=c.width,h=c.height,d=x.getImageData(0,0,w,h),a=d.data;
-  const gray=new Uint8Array(w*h), iw=w+1, integral=new Float64Array((w+1)*(h+1));
-  for(let i=0,j=0;i<a.length;i+=4,j++) gray[j]=Math.round(.299*a[i]+.587*a[i+1]+.114*a[i+2]);
-  for(let y=1;y<=h;y++){
-    let row=0;
-    for(let xx=1;xx<=w;xx++){
-      row+=gray[(y-1)*w+(xx-1)];
-      integral[y*iw+xx]=integral[(y-1)*iw+xx]+row;
-    }
-  }
-  const r=9;
-  for(let y=0;y<h;y++) for(let xx=0;xx<w;xx++){
-    const x0=Math.max(0,xx-r),x1=Math.min(w-1,xx+r),y0=Math.max(0,y-r),y1=Math.min(h-1,y+r);
-    const A=integral[y0*iw+x0],B=integral[y0*iw+(x1+1)],C=integral[(y1+1)*iw+x0],D=integral[(y1+1)*iw+(x1+1)];
-    const mean=(D-B-C+A)/((x1-x0+1)*(y1-y0+1));
-    const i=(y*w+xx)*4,v=gray[y*w+xx]<mean-7?0:255;a[i]=a[i+1]=a[i+2]=v;
-  }
-  x.putImageData(d,0,0);
+ const w=c.width,h=c.height;if(w*h>15000000)return;
+ const x=c.getContext('2d',{willReadFrequently:true}),src=x.getImageData(0,0,w,h),a=src.data,o=x.createImageData(w,h),b=o.data;
+ for(let y=1;y<h-1;y++)for(let q=1;q<w-1;q++){const i=(y*w+q)*4;for(let k=0;k<3;k++){const avg=(a[i-4+k]+a[i+4+k]+a[i-w*4+k]+a[i+w*4+k]+a[i+k])/5;b[i+k]=Math.max(0,Math.min(255,a[i+k]+.55*(a[i+k]-avg)))}b[i+3]=255}
+ x.putImageData(o,0,0)
 }
 function estimateSkew(c){
-  // Conservative projection estimate. Only correct small angles; otherwise retain source.
-  const w=c.width,h=c.height, maxDim=900, sc=Math.min(1,maxDim/Math.max(w,h));
-  const t=document.createElement('canvas');t.width=Math.max(1,Math.round(w*sc));t.height=Math.max(1,Math.round(h*sc));
-  const tx=t.getContext('2d');tx.drawImage(c,0,0,t.width,t.height);
-  const d=tx.getImageData(0,0,t.width,t.height).data;
-  const angles=[-4,-3,-2,-1,0,1,2,3,4];let best=0,bestScore=-Infinity;
-  for(const deg of angles){
-    const rad=deg*Math.PI/180, cs=Math.cos(rad),sn=Math.sin(rad);
-    // sample edge-energy by horizontal projection after a virtual rotation.
-    let score=0;
-    for(let y=5;y<t.height-5;y+=3){
-      let row=0;
-      for(let x=5;x<t.width-5;x+=3){
-        const sx=Math.round((x-t.width/2)*cs+(y-t.height/2)*sn+t.width/2);
-        const sy=Math.round(-(x-t.width/2)*sn+(y-t.height/2)*cs+t.height/2);
-        if(sx>0&&sx<t.width-1&&sy>0&&sy<t.height-1){
-          const i=(sy*t.width+sx)*4, j=i+t.width*4;
-          row+=Math.abs(d[i]-d[j]);
-        }
-      }
-      score+=row*row;
-    }
-    if(score>bestScore){bestScore=score;best=deg}
-  }
-  return best;
+ const max=700,r=Math.min(1,max/Math.max(c.width,c.height)),t=document.createElement('canvas');t.width=Math.max(1,Math.round(c.width*r));t.height=Math.max(1,Math.round(c.height*r));
+ const x=t.getContext('2d'),w=t.width,h=t.height;x.drawImage(c,0,0,w,h);const d=x.getImageData(0,0,w,h).data;let best=0,bs=-1;
+ for(const deg of [-3,-2,-1,0,1,2,3]){
+  const rad=deg*Math.PI/180,co=Math.cos(rad),si=Math.sin(rad);let score=0;
+  for(let y=4;y<h-4;y+=5)for(let q=4;q<w-4;q+=5){const sx=Math.round((q-w/2)*co+(y-h/2)*si+w/2),sy=Math.round(-(q-w/2)*si+(y-h/2)*co+h/2);if(sx>0&&sx<w-1&&sy>0&&sy<h-1){const i=(sy*w+sx)*4,j=i+w*4;score+=Math.abs(d[i]-d[j])}}
+  if(score>bs){bs=score;best=deg}
+ }
+ return best
 }
-function rotateCanvas(c,deg){
-  if(Math.abs(deg)<0.5)return c;
-  const rad=deg*Math.PI/180, cs=Math.abs(Math.cos(rad)),sn=Math.abs(Math.sin(rad));
-  const out=document.createElement('canvas');
-  out.width=Math.ceil(c.width*cs+c.height*sn);out.height=Math.ceil(c.width*sn+c.height*cs);
-  const x=out.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,out.width,out.height);
-  x.translate(out.width/2,out.height/2);x.rotate(rad);x.drawImage(c,-c.width/2,-c.height/2);return out;
+function rotate(c,deg){
+ if(Math.abs(deg)<.5)return c;const r=deg*Math.PI/180,co=Math.abs(Math.cos(r)),si=Math.abs(Math.sin(r)),o=document.createElement('canvas');o.width=Math.ceil(c.width*co+c.height*si);o.height=Math.ceil(c.width*si+c.height*co);
+ const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,o.width,o.height);x.translate(o.width/2,o.height/2);x.rotate(r);x.drawImage(c,-c.width/2,-c.height/2);return o
 }
-function enhanceCanvas(input){
-  let c=input;
-  if(els.deskew.checked){
-    const skew=estimateSkew(c);
-    if(Math.abs(skew)<=4)c=rotateCanvas(c,-skew);
-  }
-  if(els.enhance.checked)grayscaleContrast(c);
-  if(els.threshold.checked)adaptiveThreshold(c);
-  if(els.sharpen.checked && !els.threshold.checked)unsharp(c);
-  return c;
+function prepare(c){
+ let out=c;if(els.deskew.checked){const s=estimateSkew(out);if(Math.abs(s)<=3)out=rotate(out,-s)}
+ if(els.enhance.checked)grayscaleContrast(out);if(els.sharpen.checked&&!els.threshold.checked)unsharp(out);return out
 }
 
-/* ----------------------------- AI super-resolution ----------------------------- */
-const SR_MODEL_URL='https://huggingface.co/CoderViking/realesr-general-x4v3-onnx/resolve/main/realesr-general-x4v3.onnx';
-async function loadSuperResolution(){
-  if(state.srSession)return state.srSession;
-  if(!window.ort)throw new Error('ONNX Runtime Web failed to load.');
-  els.upscaleStatus.textContent='Loading…';setEngine('Loading AI upscaler…');
-  ort.env.wasm.numThreads=Math.max(1,Math.min(4,navigator.hardwareConcurrency||2));
-  const providers=(navigator.gpu?['webgpu','wasm']:['wasm']);
-  let last;
-  for(const provider of providers){
-    try{
-      state.srSession=await ort.InferenceSession.create(SR_MODEL_URL,{executionProviders:[provider],graphOptimizationLevel:'all'});
-      els.upscaleStatus.textContent=provider==='webgpu'?'Ready · WebGPU':'Ready · WASM';els.upscaleStatus.className='badge ok';
-      setEngine('AI upscaler ready');return state.srSession;
-    }catch(e){last=e;}
-  }
-  throw last||new Error('No supported ONNX execution provider.');
-}
-function tileTensor(c,x0,y0,w,h){
-  const a=c.getContext('2d',{willReadFrequently:true}).getImageData(x0,y0,w,h).data,plane=w*h,out=new Float32Array(plane*3);
-  for(let p=0;p<span class="badge ${cls}">${escapeHTML(f.status)} · ${f.confidence}%</span></div><div class="field-value">${escapeHTML(f.value)}</div><div class="field-meta"><b>Validation:</b> ${escapeHTML(f.validation)}</div><div class="evidence"><b>Evidence:</b>\n${escapeHTML(f.evidence)}${f.reason?`\n\nReason: ${escapeHTML(f.reason)}`:''}</div>`;
-    els.fields.appendChild(d);
-  }
-}
-function renderTableHints(text){
-  const rows=linesOf(text).filter(x=>x.split(/\s{2,}|\t|\|/).length>=3);if(rows.length<2)return;
-  const box=document.createElement('div');box.className='field';box.innerHTML='<div class="field-top"><div class="field-name">Possible Table Structure</div><span class="badge warn">REVIEW</span></div>';
-  const parsed=rows.slice(0,100).map(r=>r.split(/\s{2,}|\t|\|/).map(x=>x.trim())),max=Math.max(...parsed.map(r=>r.length));
-  const table=document.createElement('table'),trh=document.createElement('tr');for(let i=0;i<max;i++){const th=document.createElement('th');th.textContent=parsed[0][i]||'';trh.appendChild(th)}table.appendChild(trh);
-  parsed.slice(1).forEach(r=>{const tr=document.createElement('tr');for(let i=0;i<max;i++){const td=document.createElement('td');td.textContent=r[i]||'';tr.appendChild(td)}table.appendChild(tr)});
-  const wrap=document.createElement('div');wrap.className='table-wrap';wrap.style.marginTop='8px';wrap.appendChild(table);box.appendChild(wrap);
-  const note=document.createElement('div');note.className='field-meta';note.textContent='OCR suggests table-like rows. Verify column boundaries, merged cells and every cell against the source.';box.appendChild(note);els.fields.appendChild(box);
+/* Internal 4× HD fallback: browser-native high quality scaling.
+   It is deliberately hidden from the UI and is never treated as source truth. */
+function upscale4x(c){
+ const max=7000,r=Math.min(1,max/Math.max(c.width*4,c.height*4)),o=document.createElement('canvas');
+ o.width=Math.max(1,Math.round(c.width*4*r));o.height=Math.max(1,Math.round(c.height*4*r));
+ const x=o.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(c,0,0,o.width,o.height);return o
 }
 
-/* ----------------------------- initial state ----------------------------- */
-renderFiles();renderPages();renderEmpty();renderSlots();
-setEngine('Ready',true);
+/* OCR worker is reused between pages. */
+async function getWorker(){
+ const l=els.lang.value;if(state.worker&&state.workerLang===l)return state.worker;
+ if(state.worker)try{await state.worker.terminate()}catch{}
+ if(!window.Tesseract)throw new Error('OCR engine did not load. Check network access and reload.');
+ setStatus('Loading OCR');els.liveDetail.textContent='Loading OCR language model…';
+ state.worker=await retry(()=>Tesseract.createWorker(l,1,{logger:m=>{
+   if(m.status&&m.status.toLowerCase().includes('recogn')){const p=Math.round((m.progress||0)*100);els.liveDetail.textContent='Recognizing… '+p+'%'}
+ }}),2);
+ state.workerLang=l;return state.worker
+}
+async function recognize(c){
+ const w=await getWorker();const r=await retry(()=>w.recognize(c.toDataURL('image/png')),2);
+ return {text:r.data.text||'',confidence:Number.isFinite(Number(r.data.confidence))?Number(r.data.confidence):0}
+}
+
+/* Evidence-first extraction. */
+function lines(rs){return rs.flatMap(r=>String(r.text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean))}
+function labelBlock(ls,labels,maxNext=7){
+ const re=new RegExp('^\\s*(?:'+labels.join('|')+')\\s*[:\\-]?\\s*(.*)$','i');
+ for(let i=0;i<ls.length;i++){const m=ls[i].match(re);if(!m)continue;let v=m[1].trim(),ev=ls[i];if(!v&&ls[i+1]){v=ls[i+1];ev+='\\n'+ls[i+1];i++}
+  if(v){for(let j=i+1;j<Math.min(ls.length,i+1+maxNext);j++){if(/^(full\\s*name|name|nama|dob|date\\s*of\\s*birth|tarikh\\s*lahir|gender|sex|jantina|nationality|kewarganegaraan|citizenship|nric|ic\\s*no|id\\s*(?:no|number)|address|alamat|telephone|phone|email|expiry|issue|registration|license)\\b/i.test(ls[j]))break;if(/\\d{5}/.test(ls[j])||/\\b(jalan|jln|lorong|persiaran|taman|kampung|kg|blok|block|lot|unit|tingkat|no\\.?\\s*\\d)/i.test(ls[j])){v+='\\n'+ls[j];ev+='\\n'+ls[j]}}
+   return {value:v,evidence:ev}
+  }
+ }
+ return null
+}
+function avgConf(rs){const a=rs.filter(r=>!r.native);return a.length?a.reduce((s,r)=>s+(r.conflict?Math.min(r.confidence,60):r.confidence),0)/a.length:100}
+function mk(name,value,c,status,evidence,validation,reason=''){return{name,value:value||'UNKNOWN',confidence:Math.round(Math.max(0,Math.min(100,c))),status,evidence:evidence||'No reliable evidence.',validation,reason}}
+function findGeneric(ls,patterns){
+ const re=new RegExp(patterns.join('|'),'i');return ls.filter(x=>re.test(x))
+}
+function extract(rs){
+ const ls=lines(rs),c=avgConf(rs),out=[];
+ const name=labelBlock(ls,['full\\s*name','name','nama\\s*penuh','nama'],5);
+ out.push(name?mk('Full Name',name.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',name.evidence,'Explicit name-label association.',c<85?'OCR confidence is below the verification threshold.':''):mk('Full Name','UNKNOWN',0,'UNKNOWN','No reliable name field was detected.','Not validated.','The application does not infer a name from unrelated text.'));
+ const id=labelBlock(ls,['nric(?:\\s*(?:no|number))?','ic\\s*(?:no|number)?','identification\\s*(?:no|number)?','id\\s*(?:no|number)','no\\.?\\s*kad\\s*pengenalan'],2);
+ out.push(id?mk('NRIC / ID Number',id.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',id.evidence,'Preserved exactly as detected; no O/0, I/1 or similar substitutions.',/[A-Za-z0-9]/.test(id.value)?'Every character should be checked visually.':''):mk('NRIC / ID Number','UNKNOWN',0,'UNKNOWN','No reliable identification-number label was detected.','Not validated.','No number is inferred.'));
+ const nat=labelBlock(ls,['nationality','kewarganegaraan','citizenship'],2);
+ const explicitMY=ls.find(x=>/\\bwarganegara(?:\\s*\\/\\s*malaysia|\\s+malaysia)?\\b/i.test(x));
+ if(nat)out.push(mk('Nationality',nat.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',nat.evidence,'Explicit nationality field.',c<85?'Verify visually.':''));
+ else if(explicitMY)out.push(mk('Nationality','Warganegara / Malaysia',Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',explicitMY,'Explicit Warganegara/Malaysia evidence.',''));
+ else out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state/country appearing in an address is not used as nationality.'));
+ const sex=labelBlock(ls,['gender','sex','jantina'],2);
+ if(sex){const u=sex.value.toUpperCase();let norm=null;if(/\\b(PEREMPUAN|FEMALE|F)\\b/.test(u))norm='Perempuan / Female / F';else if(/\\b(LELAKI|MALE|M)\\b/.test(u))norm='Lelaki / Male / M';out.push(mk('Gender / Sex',norm?sex.value+' → '+norm:sex.value,Math.min(c,96),norm&&c>=85?'VERIFIED':'UNCERTAIN',sex.evidence,'Normalization only occurs for explicit gender evidence.',norm?'':'Value is not an unambiguous supported gender marker.'))}
+ else out.push(mk('Gender / Sex','UNKNOWN',0,'UNKNOWN','No explicit gender/sex field detected.','Not validated.','Gender is never inferred from a name.'));
+ const dob=labelBlock(ls,['date\\s*of\\s*birth','dob','tarikh\\s*lahir','birth\\s*date'],2);
+ if(dob){const ok=/\\b(?:\\d{1,4}[-/.]\\d{1,2}[-/.]\\d{1,4})\\b/.test(dob.value);out.push(mk('Date of Birth',dob.value,Math.min(c,96),ok&&c>=85?'VERIFIED':'UNCERTAIN',dob.evidence,ok?'Date has a recognizable numeric structure.':'Date format is not sufficiently clear.',ok?'':'Verify date visually.'))}
+ else out.push(mk('Date of Birth','UNKNOWN',0,'UNKNOWN','No explicit DOB field detected.','Not validated.','No date is inferred.'));
+ const addr=labelBlock(ls,['address','alamat','alamat\\s*tetap','residential\\s*address','mailing\\s*address','permanent\\s*address'],10);
+ if(addr){const ac=Math.min(c,96);out.push(mk('Address',addr.value,ac,ac>=85?'VERIFIED':'UNCERTAIN',addr.evidence,'Captured as a multi-line address block; postcode/city/state are preserved.',ac<85?'Some address characters may need visual verification.':''))}
+ else out.push(mk('Address','UNKNOWN',0,'UNKNOWN','No explicit address block detected.','Not validated.','The application does not construct an address from isolated postcode or city text.'));
+ const postcode=ls.find(x=>/\\b\\d{5}\\b/.test(x));if(postcode)out.push(mk('Postcode',(postcode.match(/\\b\\d{5}\\b/)||[''])[0],Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',postcode,'Five-digit postcode pattern detected.','Verify against the original.'));
+ const states=ls.filter(x=>/\\b(Johor|Kedah|Kelantan|Melaka|Malacca|Negeri Sembilan|Pahang|Perak|Perlis|Penang|Pulau Pinang|Sabah|Sarawak|Selangor|Terengganu|Kuala Lumpur|Putrajaya|Labuan)\\b/i.test(x));
+ if(states.length)out.push(mk('State / Location',states.join('\\n'),Math.min(c,92),c>=85?'VERIFIED':'UNCERTAIN',states.join('\\n'),'Explicit state/location text retained.','This is not converted into nationality.'));
+ const phone=ls.find(x=>/(?:tel|telephone|phone|mobile|telefon)\\b/i.test(x));if(phone)out.push(mk('Telephone / Mobile',phone,Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',phone,'Explicit telephone evidence.','Verify digits visually.'));
+ const email=ls.find(x=>/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i.test(x));if(email)out.push(mk('Email',email,Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',email,'Email pattern detected.','Verify characters visually.'));
+ const conflicts=rs.filter(r=>r.conflict).length;if(conflicts)out.push(mk('OCR / HD Conflict','REVIEW REQUIRED',Math.min(c,60),'UNCERTAIN',conflicts+' page(s) produced materially different OCR between primary and HD pass.','Conflict detected.','Verify affected fields against the original source.'));
+ const known=/^(full name|nric \\/ id number|nationality|gender \\/ sex|date of birth|address|postcode|state \\/ location|telephone \\/ mobile|email|ocr \\/ hd conflict)$/i;
+ const other=ls.filter(x=>x.length>1&&!known.test(x));if(other.length)out.push(mk('Other Reliably Read Information',other.join('\\n'),Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',other.slice(0,80).join('\\n'),'Retained directly from OCR evidence; no semantic invention.',c<85?'Some text may need verification.':''));
+ return out
+}
+function renderFields(fs){
+ els.fields.innerHTML='';let review=0;
+ fs.forEach(f=>{if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';
+ d.innerHTML='<div class="field-top"><div class="field-name">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.confidence+'%</span></div><div class="field-value">'+esc(f.value)+'</div><div class="field-meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="evidence"><b>Evidence:</b>\\n'+esc(f.evidence)+(f.reason?'\\n\\n<b>Reason:</b> '+esc(f.reason):'')+'</div>';els.fields.appendChild(d)});
+ els.review.textContent=review?review+' REVIEW ITEM(S)':'COMPLETE';els.review.className='badge '+(review?'warn':'ok')
+}
+
+/* Primary OCR first; HD pass follows without hiding the first result. */
+async function runOCR(manual){
+ if(state.running||!state.pages.length)return;
+ state.running=true;els.run.disabled=true;state.results=[];els.raw.textContent='';els.fields.innerHTML='<div class="empty">Reading document…</div>';els.liveState.textContent='INSTANT OCR ACTIVE';
+ try{
+  const w=await getWorker();void w;
+  for(let i=0;i<state.pages.length;i++){
+   const p=state.pages[i];state.selected=i;renderPages();progress(5+70*i/state.pages.length,'Processing page '+(i+1)+' of '+state.pages.length+'…');
+   if(p.error){state.results.push({page:i+1,text:'',confidence:0,error:p.error});continue}
+   if(p.native){state.results.push({page:i+1,text:p.text||'',confidence:100,native:true});els.raw.textContent+=(els.raw.textContent?'\\n\\n':'')+'--- '+p.label+' ---\\n'+(p.text||'[No readable text]');renderFields(extract(state.results));continue}
+   const base=prepare(p.canvas),fast=await recognize(base),rec={page:i+1,text:fast.text,confidence:fast.confidence,conflict:false,aiText:''};state.results.push(rec);
+   els.raw.textContent+=(els.raw.textContent?'\\n\\n':'')+'--- '+p.label+' · FAST OCR ---\\n'+(fast.text||'[No readable text]')+'\\n[OCR confidence: '+fast.confidence.toFixed(1)+'%]';
+   els.ocrBadge.textContent='LIVE · '+fast.confidence.toFixed(1)+'%';els.ocrBadge.className='badge '+(fast.confidence>=85?'ok':fast.confidence>=60?'warn':'bad');renderFields(extract(state.results));
+   els.liveDetail.textContent='Fast OCR displayed. HD corroboration follows…';
+   /* Internal 4× pass. If it fails, primary OCR remains available. */
+   try{
+    const hd=upscale4x(base),second=await recognize(prepare(hd));rec.aiText=second.text;rec.aiConfidence=second.confidence;
+    const a=fast.text.toUpperCase().replace(/\\s+/g,' ').trim().split(' ').filter(Boolean),b=second.text.toUpperCase().replace(/\\s+/g,' ').trim().split(' ').filter(Boolean);
+    const n=Math.max(a.length,b.length),same=a.reduce((s,x,j)=>s+(x===b[j]?1:0),0);rec.agreement=n?same/n:0;rec.conflict=rec.agreement<.62;
+    els.raw.textContent+='\\n\\n--- '+p.label+' · HD CORROBORATION ---\\n'+(second.text||'[No readable text]')+'\\n'+(rec.conflict?'[CONFLICT — verify against original source]':'[Corroboration token agreement: '+Math.round(rec.agreement*100)+'%]');
+    renderFields(extract(state.results))
+   }catch(e){els.raw.textContent+='\\n\\n[HD corroboration unavailable: '+e.message+']'}
+   await sleep(0)
+  }
+  const fs=extract(state.results),needs=fs.filter(x=>x.status!=='VERIFIED').length;renderFields(fs);
+  els.ocrBadge.textContent='COMPLETE';els.ocrBadge.className='badge ok';els.liveState.textContent='OCR COMPLETE';els.liveDetail.textContent=needs?'Review flagged fields against the original source.':'Processing complete. Critical data should still be visually checked.';
+  els.summary.textContent=needs?'Completed with '+needs+' field(s) requiring verification. No ambiguous value was guessed.':'Completed. Critical identity/numeric data should still be visually verified.';
+  els.summary.className='notice '+(needs?'warn':'ok');progress(100,'Complete · evidence preserved');setStatus('Complete')
+ }catch(e){console.error(e);els.summary.textContent='OCR stopped safely: '+e.message;els.summary.className='notice bad';els.liveState.textContent='STOPPED';els.liveDetail.textContent='No information was fabricated.';setStatus('OCR failed',false)}
+ finally{state.running=false;els.run.disabled=false}
+}
+renderFiles();renderPages();renderSlots();resetOutput();setStatus('Ready');
+})();
 </script>
-
-<script id="ocr-master-availability-fix">
-/* Availability guard:
-   transient OCR/model failures are retried with bounded backoff.
-   No retry ever fabricates a result. */
-window.OCR_MASTER_RETRY = async function(fn, attempts=3){
-  let last;
-  for(let i=0;i<attempts;i++){
-    try{return await fn()}catch(e){
-      last=e;
-      if(i<attempts-1) await new Promise(r=>setTimeout(r, 350*(i+1)));
-    }
-  }
-  throw last;
-};
-</script>
-
 </body>
 </html>
