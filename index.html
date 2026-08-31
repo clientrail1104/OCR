@@ -178,7 +178,7 @@ select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);b
 
 <aside class="card right">
  <div class="result-head"><h2>Verified extraction</h2><span class="badge warn" id="reviewBadge">AWAITING OCR</span></div>
- <div class="notice warn" id="summary">Capture includes explicit fields plus other reliably readable information. No ambiguous character is silently corrected.</div>
+ <div class="notice warn" id="summary">Capture includes explicit fields plus other reliably readable information. Gold microchip regions are excluded from OCR. No ambiguous character is silently corrected.</div>
  <div class="results" id="fields"><div class="empty">Structured extraction will appear here.</div></div>
 </aside>
 </main>
@@ -360,7 +360,7 @@ function rotate(c,deg){
  const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,o.width,o.height);x.translate(o.width/2,o.height/2);x.rotate(r);x.drawImage(c,-c.width/2,-c.height/2);return o
 }
 function prepare(c){
- let out=c;if(els.deskew.checked){const s=estimateSkew(out);if(Math.abs(s)<=3)out=rotate(out,-s)}
+ let out=maskGoldMicrochip(c);if(els.deskew.checked){const s=estimateSkew(out);if(Math.abs(s)<=3)out=rotate(out,-s)}
  if(els.enhance.checked)grayscaleContrast(out);if(els.sharpen.checked&&!els.threshold.checked)unsharp(out);return out
 }
 
@@ -388,59 +388,113 @@ async function recognize(c){
  return {text:r.data.text||'',confidence:Number.isFinite(Number(r.data.confidence))?Number(r.data.confidence):0}
 }
 
-/* Evidence-first extraction. */
+/* Evidence-first extraction.
+   IMPORTANT: field values are NEVER normalized by OCR-confusion substitutions.
+   R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP and A/L/AL
+   are preserved exactly as OCR evidence. Only explicit labels determine a field.
+*/
+const CONFUSION_PAIRS=[
+ ['R','F'],['P','F'],['R','C'],['K','H'],['D','O'],['D','0'],['O','0'],['U','Y'],
+ ['B','S'],['N','I'],['|','I'],['N','EA'],['A/P','AP'],['A/L','AL']
+];
+const FIELD_STOP_RE=/^(?:full\s*name|name|nama(?:\s*penuh)?|nric|ic\s*(?:no|number)?|identification|id\s*(?:no|number)?|no\.?\s*kad\s*pengenalan|nationality|kewarganegaraan|warganegara|citizenship|gender|sex|jantina|date\s*of\s*birth|dob|tarikh\s*lahir|birth\s*date|address|alamat|alamat\s*tetap|residential\s*address|mailing\s*address|permanent\s*address|telephone|phone|mobile|telefon|email|expiry|issue|registration|license)\b/i;
 function lines(rs){return rs.flatMap(r=>String(r.text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean))}
+function cleanLabelText(x){return String(x||'').replace(/[：]/g,':').replace(/[–—]/g,'-').trim()}
 function labelBlock(ls,labels,maxNext=7){
- const re=new RegExp('^\s*(?:'+labels.join('|')+')\s*[:\-]?\s*(.*)$','i');
- for(let i=0;i<ls.length;i++){const m=ls[i].match(re);if(!m)continue;let v=m[1].trim(),ev=ls[i];if(!v&&ls[i+1]){v=ls[i+1];ev+='\n'+ls[i+1];i++}
-  if(v){for(let j=i+1;j<Math.min(ls.length,i+1+maxNext);j++){if(/^(full\s*name|name|nama|dob|date\s*of\s*birth|tarikh\s*lahir|gender|sex|jantina|nationality|kewarganegaraan|citizenship|nric|ic\s*no|id\s*(?:no|number)|address|alamat|telephone|phone|email|expiry|issue|registration|license)\b/i.test(ls[j]))break;if(/\d{5}/.test(ls[j])||/\b(jalan|jln|lorong|persiaran|taman|kampung|kg|blok|block|lot|unit|tingkat|no\.?\s*\d)/i.test(ls[j])){v+='\n'+ls[j];ev+='\n'+ls[j]}}
-   return {value:v,evidence:ev}
+ const source=labels.map(x=>'(?:'+x+')').join('|');
+ const re=new RegExp('^\\s*(?:'+source+')\\s*(?:[:\\-]|\\|)?\\s*(.*)$','i');
+ for(let i=0;i<ls.length;i++){
+  const line=cleanLabelText(ls[i]),m=line.match(re); if(!m) continue;
+  let value=m[1].trim(), evidence=ls[i];
+  if(!value && ls[i+1] && !FIELD_STOP_RE.test(ls[i+1])){value=ls[i+1].trim();evidence+='\n'+ls[i+1];i++}
+  if(!value) continue;
+  const parts=[value];
+  for(let j=i+1;j<Math.min(ls.length,i+1+maxNext);j++){
+   if(FIELD_STOP_RE.test(ls[j])) break;
+   if(parts.length>=maxNext) break;
+   const candidate=ls[j];
+   if(/^(?:name|nama|nationality|kewarganegaraan|gender|sex|jantina|dob|date\s*of\s*birth|tarikh\s*lahir|nric|ic|id|address|alamat)\b/i.test(candidate)) break;
+   if(/\b(?:jalan|jln|lorong|persiaran|taman|kampung|kg|blok|block|lot|unit|tingkat|no\.?\s*\d)\b/i.test(candidate) || /\b\d{5}\b/.test(candidate) || /^(?:[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' .\/-]{2,})$/.test(candidate)){
+    parts.push(candidate); evidence+='\n'+candidate;
+   }
   }
+  return {value:parts.join('\n'),evidence:evidence};
  }
- return null
+ return null;
 }
+function findLine(ls,re){for(const x of ls){if(re.test(x))return x}return null}
+function findFieldValueSameLine(ls,labels){return labelBlock(ls,labels,4)}
 function avgConf(rs){const a=rs.filter(r=>!r.native);return a.length?a.reduce((s,r)=>s+(r.conflict?Math.min(r.confidence,60):r.confidence),0)/a.length:100}
 function mk(name,value,c,status,evidence,validation,reason=''){return{name,value:value||'UNKNOWN',confidence:Math.round(Math.max(0,Math.min(100,c))),status,evidence:evidence||'No reliable evidence.',validation,reason}}
-function findGeneric(ls,patterns){
- const re=new RegExp(patterns.join('|'),'i');return ls.filter(x=>re.test(x))
-}
+function statusFor(c,explicit=true){return explicit&&c>=85?'VERIFIED':explicit?'UNCERTAIN':'UNKNOWN'}
+function hasSuspiciousNumericChars(v){const t=String(v||'').replace(/[\s-]/g,''); return !/^\d+$/.test(t)}
 function extract(rs){
- const ls=lines(rs),c=avgConf(rs),out=[];
- const name=labelBlock(ls,['full\s*name','name','nama\s*penuh','nama'],5);
- out.push(name?mk('Full Name',name.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',name.evidence,'Explicit name-label association.',c<85?'OCR confidence is below the verification threshold.':''):mk('Full Name','UNKNOWN',0,'UNKNOWN','No reliable name field was detected.','Not validated.','The application does not infer a name from unrelated text.'));
- const id=labelBlock(ls,['nric(?:\s*(?:no|number))?','ic\s*(?:no|number)?','identification\s*(?:no|number)?','id\s*(?:no|number)','no\.?\s*kad\s*pengenalan'],2);
- out.push(id?mk('NRIC / ID Number',id.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',id.evidence,'Preserved exactly as detected; no O/0, I/1 or similar substitutions.',/[A-Za-z0-9]/.test(id.value)?'Every character should be checked visually.':''):mk('NRIC / ID Number','UNKNOWN',0,'UNKNOWN','No reliable identification-number label was detected.','Not validated.','No number is inferred.'));
- const nat=labelBlock(ls,['nationality','kewarganegaraan','citizenship'],2);
- const explicitMY=ls.find(x=>/\bwarganegara(?:\s*\/\s*malaysia|\s+malaysia)?\b/i.test(x));
- if(nat)out.push(mk('Nationality',nat.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',nat.evidence,'Explicit nationality field.',c<85?'Verify visually.':''));
- else if(explicitMY)out.push(mk('Nationality','Warganegara / Malaysia',Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',explicitMY,'Explicit Warganegara/Malaysia evidence.',''));
- else out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state/country appearing in an address is not used as nationality.'));
- const sex=labelBlock(ls,['gender','sex','jantina'],2);
- if(sex){const u=sex.value.toUpperCase();let norm=null;if(/\b(PEREMPUAN|FEMALE|F)\b/.test(u))norm='Perempuan / Female / F';else if(/\b(LELAKI|MALE|M)\b/.test(u))norm='Lelaki / Male / M';out.push(mk('Gender / Sex',norm?sex.value+' → '+norm:sex.value,Math.min(c,96),norm&&c>=85?'VERIFIED':'UNCERTAIN',sex.evidence,'Normalization only occurs for explicit gender evidence.',norm?'':'Value is not an unambiguous supported gender marker.'))}
+ const ls=lines(rs), c=Math.min(96,avgConf(rs)), out=[];
+ const exactRule='OCR value preserved exactly. No silent substitution of R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL.';
+
+ const name=findFieldValueSameLine(ls,['full\\s*name','name','nama\\s*penuh','nama']);
+ out.push(name
+  ?mk('Full Name',name.value,c,statusFor(c,true),name.evidence,'Explicit name-label association; multi-line components preserved.',c<85?'OCR confidence is below the verification threshold.':exactRule)
+  :mk('Full Name','UNKNOWN',0,'UNKNOWN','No reliable name label/value association was detected.','Not validated.','The application does not infer a name from arbitrary text.'));
+
+ const id=findFieldValueSameLine(ls,['nric(?:\\s*(?:no|number))?','ic\\s*(?:no|number)?','identification\\s*(?:no|number)?','id\\s*(?:no|number)','no\\.?\\s*kad\\s*pengenalan']);
+ let idObj=id;
+ if(!idObj){
+  for(const x of ls){const m=x.match(/\b(?:\d{6}[- ]\d{2}[- ]\d{4}|[A-Z0-9]{6}[- ]?[A-Z0-9]{2}[- ]?[A-Z0-9]{4})\b/i);if(m){idObj={value:m[0],evidence:x};break}}
+ }
+ if(idObj){const suspicious=hasSuspiciousNumericChars(idObj.value);out.push(mk('NRIC / ID Number',idObj.value,c,suspicious||c<85?'UNCERTAIN':'VERIFIED',idObj.evidence,'Pattern/label evidence only; value is preserved character-for-character. '+exactRule,suspicious?'Potential OCR-confusion character detected; visually verify every digit/letter.':c<85?'OCR confidence is below the verification threshold.':'Critical numeric field — visual verification is recommended.'))}
+ else out.push(mk('NRIC / ID Number','UNKNOWN',0,'UNKNOWN','No reliable identification-number evidence was detected.','Not validated.','No number is inferred.'));
+
+ const nat=findFieldValueSameLine(ls,['nationality','kewarganegaraan','citizenship']);
+ const explicitMY=findLine(ls,/\bwarganegara(?:\s*\/\s*malaysia|\s+malaysia)?\b/i);
+ if(nat) out.push(mk('Nationality',nat.value,c,statusFor(c,true),nat.evidence,'Explicit nationality field. '+exactRule,c<85?'Verify visually.':''));
+ else if(explicitMY) out.push(mk('Nationality',explicitMY,c,statusFor(c,true),explicitMY,'Explicit Warganegara/Malaysia evidence. '+exactRule,''));
+ else out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state/country appearing in an address is not converted into nationality.'));
+
+ const sex=findFieldValueSameLine(ls,['gender','sex','jantina']);
+ if(sex){const raw=sex.value;const u=raw.toUpperCase();const explicitFemale=/\b(?:PEREMPUAN|FEMALE|F)\b/.test(u), explicitMale=/\b(?:LELAKI|MALE|M)\b/.test(u);out.push(mk('Gender / Sex',raw,c,explicitFemale||explicitMale?statusFor(c,true):'UNCERTAIN',sex.evidence,'Explicit gender/sex evidence. Original OCR value is retained; no character substitution.',explicitFemale||explicitMale?'':'Value is not an unambiguous supported gender marker.'))}
  else out.push(mk('Gender / Sex','UNKNOWN',0,'UNKNOWN','No explicit gender/sex field detected.','Not validated.','Gender is never inferred from a name.'));
- const dob=labelBlock(ls,['date\s*of\s*birth','dob','tarikh\s*lahir','birth\s*date'],2);
- if(dob){const ok=/\b(?:\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})\b/.test(dob.value);out.push(mk('Date of Birth',dob.value,Math.min(c,96),ok&&c>=85?'VERIFIED':'UNCERTAIN',dob.evidence,ok?'Date has a recognizable numeric structure.':'Date format is not sufficiently clear.',ok?'':'Verify date visually.'))}
+
+ const dob=findFieldValueSameLine(ls,['date\\s*of\\s*birth','dob','tarikh\\s*lahir','birth\\s*date']);
+ if(dob){const ok=/\b(?:\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})\b/.test(dob.value);out.push(mk('Date of Birth',dob.value,c,ok&&c>=85?'VERIFIED':'UNCERTAIN',dob.evidence,ok?'Recognizable date structure; original OCR preserved.':'Date format is not sufficiently clear.',ok&&c>=85?'':'Verify date visually.'))}
  else out.push(mk('Date of Birth','UNKNOWN',0,'UNKNOWN','No explicit DOB field detected.','Not validated.','No date is inferred.'));
- const addr=labelBlock(ls,['address','alamat','alamat\s*tetap','residential\s*address','mailing\s*address','permanent\s*address'],10);
- if(addr){const ac=Math.min(c,96);out.push(mk('Address',addr.value,ac,ac>=85?'VERIFIED':'UNCERTAIN',addr.evidence,'Captured as a multi-line address block; postcode/city/state are preserved.',ac<85?'Some address characters may need visual verification.':''))}
- else out.push(mk('Address','UNKNOWN',0,'UNKNOWN','No explicit address block detected.','Not validated.','The application does not construct an address from isolated postcode or city text.'));
- const postcode=ls.find(x=>/\b\d{5}\b/.test(x));if(postcode)out.push(mk('Postcode',(postcode.match(/\b\d{5}\b/)||[''])[0],Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',postcode,'Five-digit postcode pattern detected.','Verify against the original.'));
- const states=ls.filter(x=>/\b(Johor|Kedah|Kelantan|Melaka|Malacca|Negeri Sembilan|Pahang|Perak|Perlis|Penang|Pulau Pinang|Sabah|Sarawak|Selangor|Terengganu|Kuala Lumpur|Putrajaya|Labuan)\b/i.test(x));
- if(states.length)out.push(mk('State / Location',states.join('\n'),Math.min(c,92),c>=85?'VERIFIED':'UNCERTAIN',states.join('\n'),'Explicit state/location text retained.','This is not converted into nationality.'));
- const phone=ls.find(x=>/(?:tel|telephone|phone|mobile|telefon)\b/i.test(x));if(phone)out.push(mk('Telephone / Mobile',phone,Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',phone,'Explicit telephone evidence.','Verify digits visually.'));
- const email=ls.find(x=>/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(x));if(email)out.push(mk('Email',email,Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',email,'Email pattern detected.','Verify characters visually.'));
- const conflicts=rs.filter(r=>r.conflict).length;if(conflicts)out.push(mk('OCR / HD Conflict','REVIEW REQUIRED',Math.min(c,60),'UNCERTAIN',conflicts+' page(s) produced materially different OCR between primary and HD pass.','Conflict detected.','Verify affected fields against the original source.'));
- const known=/^(full name|nric \/ id number|nationality|gender \/ sex|date of birth|address|postcode|state \/ location|telephone \/ mobile|email|ocr \/ hd conflict)$/i;
- const other=ls.filter(x=>x.length>1&&!known.test(x));if(other.length)out.push(mk('Other Reliably Read Information',other.join('\n'),Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',other.slice(0,80).join('\n'),'Retained directly from OCR evidence; no semantic invention.',c<85?'Some text may need verification.':''));
- return out
+
+ let addr=findFieldValueSameLine(ls,['address','alamat','alamat\\s*tetap','residential\\s*address','mailing\\s*address','permanent\\s*address']);
+ if(!addr){
+  const idx=ls.findIndex(x=>/\b(?:jalan|jln|lorong|persiaran|taman|kampung|kg|blok|block|lot|unit|tingkat|alamat)\b/i.test(x));
+  const pc=ls.findIndex(x=>/\b\d{5}\b/.test(x));
+  if(idx>=0){let a=[ls[idx]],ev=ls[idx];for(let j=idx+1;j<Math.min(ls.length,idx+10);j++){if(FIELD_STOP_RE.test(ls[j])&&j!==pc)break;a.push(ls[j]);ev+='\n'+ls[j];if(/\b\d{5}\b/.test(ls[j]))break}addr={value:a.join('\n'),evidence:ev}}
+ }
+ out.push(addr?mk('Address',addr.value,c,statusFor(c,true),addr.evidence,'Multi-line address evidence preserved, including postcode/city/state where readable.',c<85?'Some address characters may need visual verification.':''):mk('Address','UNKNOWN',0,'UNKNOWN','No reliable address block was detected.','Not validated.','The application does not construct an address from isolated postcode/city text.'));
+
+ const postcode=findLine(ls,/\b\d{5}\b/); if(postcode)out.push(mk('Postcode',(postcode.match(/\b\d{5}\b/)||[''])[0],c,c>=85?'VERIFIED':'UNCERTAIN',postcode,'Five-digit postcode pattern detected.','Verify against original source.'));
+ const states=ls.filter(x=>/\b(?:Johor|Kedah|Kelantan|Melaka|Malacca|Negeri Sembilan|Pahang|Perak|Perlis|Penang|Pulau Pinang|Sabah|Sarawak|Selangor|Terengganu|Kuala Lumpur|Putrajaya|Labuan)\b/i.test(x)); if(states.length)out.push(mk('State / Location',states.join('\n'),Math.min(c,92),c>=85?'VERIFIED':'UNCERTAIN',states.join('\n'),'Explicit location text retained.','This is not converted into nationality.'));
+ const phone=findLine(ls,/(?:tel|telephone|phone|mobile|telefon)\b/i); if(phone)out.push(mk('Telephone / Mobile',phone,Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',phone,'Explicit telephone evidence.','Verify every digit visually.'));
+ const email=findLine(ls,/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i); if(email)out.push(mk('Email',email,Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',email,'Email pattern detected.','Verify every character visually.'));
+ const conflicts=rs.filter(r=>r.conflict).length; if(conflicts)out.push(mk('OCR / HD Conflict','REVIEW REQUIRED',Math.min(c,60),'UNCERTAIN',conflicts+' page(s) produced materially different OCR between primary and HD pass.','Conflict detected; no version is silently preferred.','Verify affected fields against the original source.'));
+ const consumed=new Set(out.flatMap(f=>String(f.evidence||'').split('\n').map(x=>x.trim()).filter(Boolean)));
+ const other=ls.filter(x=>x.length>1&&!FIELD_STOP_RE.test(x)&&!consumed.has(x));
+ if(other.length)out.push(mk('Other Reliably Read Information',other.join('\n'),Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',other.slice(0,100).join('\n'),'Retained directly from OCR evidence; no semantic invention.',c<85?'Some text may need verification.':''));
+ return out;
 }
 function renderFields(fs){
  els.fields.innerHTML='';let review=0;
  fs.forEach(f=>{if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';
- d.innerHTML='<div class="field-top"><div class="field-name">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.confidence+'%</span></div><div class="field-value">'+esc(f.value)+'</div><div class="field-meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="evidence"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason):'')+'</div>';els.fields.appendChild(d)});
- els.review.textContent=review?review+' REVIEW ITEM(S)':'COMPLETE';els.review.className='badge '+(review?'warn':'ok')
+ d.innerHTML='<div class="field-top"><div class="field-name">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.confidence+'%</span></div><div class="field-value">'+esc(f.value)+'</div><div class="field-meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="evidence"><b>Evidence:</b>\\n'+esc(f.evidence)+(f.reason?'\\n\\n<b>Reason:</b> '+esc(f.reason):'')+'</div>';els.fields.appendChild(d)});
+ els.review.textContent=review?review+' REVIEW ITEM(S)':'COMPLETE';els.review.className='badge '+(review?'warn':'ok');
 }
 
+/* Gold microchip protection: mask strongly gold/yellow pixels before OCR.
+   This is an exclusion mask only; it never writes chip content into results. */
+function maskGoldMicrochip(c){
+ const x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),a=d.data,w=c.width,h=c.height;
+ const mask=new Uint8Array(w*h);let count=0,minX=w,minY=h,maxX=0,maxY=0;
+ for(let y=0;y<h;y+=1)for(let q=0;q<w;q+=1){const i=(y*w+q)*4,r=a[i],g=a[i+1],b=a[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b);const gold=r>105&&g>80&&b<115&&(r-g)<105&&(g-b)>10&&(mx-mn)>35;if(gold){mask[y*w+q]=1;count++;minX=Math.min(minX,q);maxX=Math.max(maxX,q);minY=Math.min(minY,y);maxY=Math.max(maxY,y)}}
+ if(count<Math.max(40,w*h*0.00008))return c;
+ const pad=Math.max(6,Math.round(Math.min(w,h)*0.008));minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(w-1,maxX+pad);maxY=Math.min(h-1,maxY+pad);
+ const area=(maxX-minX+1)*(maxY-minY+1); if(area>w*h*.45)return c;
+ x.fillStyle='#fff';x.fillRect(minX,minY,maxX-minX+1,maxY-minY+1);return c;
+}
 /* Primary OCR first; HD pass follows without hiding the first result. */
 async function runOCR(manual){
  if(state.running||!state.pages.length)return;
