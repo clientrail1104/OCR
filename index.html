@@ -210,11 +210,81 @@ function canvasFrom(im){const max=5200,r=Math.min(1,max/Math.max(im.naturalWidth
 function crop(c,x,y,w,h,scale=5){const sx=Math.max(0,Math.round(c.width*x)),sy=Math.max(0,Math.round(c.height*y)),sw=Math.min(c.width-sx,Math.round(c.width*w)),sh=Math.min(c.height-sy,Math.round(c.height*h));const o=document.createElement('canvas');o.width=Math.max(1,Math.min(7000,sw*scale));o.height=Math.max(1,Math.min(5000,sh*scale));const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);return o}
 function preprocess(c,mode){const x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),a=d.data;for(let i=0;i<a.length;i+=4){const r=a[i],g=a[i+1],b=a[i+2];if(mode==='gold'&&r>145&&g>105&&g<215&&b<135&&r>g*1.05){a[i]=a[i+1]=a[i+2]=255;continue}let v=.299*r+.587*g+.114*b;if(mode==='high')v=(v-128)*1.35+128;else if(mode==='soft')v=(v-128)*1.12+128;a[i]=a[i+1]=a[i+2]=Math.max(0,Math.min(255,v))}x.putImageData(d,0,0);return c}
 function maskGold(c){return preprocess(c,'gold')}
-function splitComposite(c){const h=c.height,w=c.width;let best=Math.round(h*.5),score=1e9;for(let y=Math.round(h*.43);y<Math.round(h*.60);y+=3){const d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,y,w,1).data;let dark=0;for(let x=0;x<w;x+=3){const i=x*4;if((d[i]+d[i+1]+d[i+2])/3<210)dark++}if(dark<score){score=dark;best=y}}if(best<h*.49){const a=crop(c,0,0,1,best/h,1),b=crop(c,0,best/h,1,1-best/h,1);return[a,b]}return[crop(c,0,0,1,.5,1),crop(c,0,.5,1,.5,1)]}
+function splitComposite(c){
+  /* Detect the white separation band between two stacked ID cards.
+     The previous version searched for the darkest row, which could select
+     CamScanner text and make every downstream spatial crop drift. */
+  const ctx=c.getContext('2d',{willReadFrequently:true}), w=c.width, h=c.height;
+  const start=Math.round(h*.35), end=Math.round(h*.68);
+  const runs=[]; let runStart=null;
+  for(let y=start;y<=end;y+=2){
+    const d=ctx.getImageData(0,y,w,1).data;
+    let bright=0, nonWhite=0;
+    for(let x=0;x<w;x+=4){
+      const i=x*4, lum=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+      if(lum>=242) bright++;
+      if(lum<220) nonWhite++;
+    }
+    const whiteRatio=bright/Math.max(1,Math.ceil(w/4));
+    const blank=whiteRatio>=.86 && nonWhite<Math.ceil(w/4)*.12;
+    if(blank && runStart===null) runStart=y;
+    if((!blank || y===end) && runStart!==null){
+      const runEnd=blank&&y===end?y:y-2;
+      if(runEnd-runStart>=Math.max(12,h*.025)) runs.push([runStart,runEnd]);
+      runStart=null;
+    }
+  }
+  if(runs.length){
+    const best=runs.sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0];
+    const split=Math.round((best[0]+best[1])/2);
+    return [crop(c,0,0,1,split/h,1),crop(c,0,split/h,1,1-split/h,1)];
+  }
+  /* Conservative fallback: midpoint. No OCR is performed until Run OCR. */
+  const mid=.5;
+  return [crop(c,0,0,1,mid,1),crop(c,0,mid,1,mid,1)];
+}
 async function makePages(){S.pages=[];for(const f of S.files){const im=await loadImage(f),c=canvasFrom(im),ratio=c.height/c.width;if(ratio>1.15){const [a,b]=splitComposite(c);S.pages.push({file:f,side:'front',canvas:a},{file:f,side:'back',canvas:b})}else S.pages.push({file:f,side:S.pages.some(p=>p.side==='front')?'back':'front',canvas:c})}}
 function renderSlots(){E.front.innerHTML='<span>FRONT ID</span>';E.back.innerHTML='<span>BACK ID</span>';for(const p of S.pages){if(!p.canvas)continue;const im=document.createElement('img');im.src=p.canvas.toDataURL('image/jpeg',.9);im.alt=p.side+' ID';const box=p.side==='front'?E.front:E.back;box.innerHTML='';box.appendChild(im)}}
 async function getWorker(){const lang=E.lang.value;if(S.worker&&S.workerLang===lang)return S.worker;if(S.worker)try{await S.worker.terminate()}catch{}if(!window.Tesseract)throw new Error('Tesseract.js did not load. Check the internet connection and reload.');S.worker=await retry(()=>Tesseract.createWorker(lang,1,{logger:m=>{if(m.status&&m.status.includes('recogn'))prog(30+Math.round((m.progress||0)*55),'OCR '+Math.round((m.progress||0)*100)+'%')}}),2);S.workerLang=lang;return S.worker}
-async function ocr(c,psm){const w=await getWorker();return retry(async()=>{const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});return{text:r.data.text||'',conf:Number(r.data.confidence)||0}},2)}
+async function ocr(c,psm){const w=await getWorker();return retry(async()=>{const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});const lines=Array.isArray(r.data.lines)?r.data.lines.map(l=>({text:String(l.text||''),bbox:l.bbox||null,conf:Number(l.confidence)})).filter(l=>l.text.trim()):[];return{text:r.data.text||'',conf:Number(r.data.confidence)||0,lines}},2)}
+function cleanOCRLine(s){return String(s||'').replace(/[ \t]+/g,' ').trim()}
+window.splitNameAddressByVisibleGap=function splitNameAddressByVisibleGap(result){
+  /* MyKad front layout rule: there is a visible horizontal gap between the
+     complete name block and the five address lines. Every OCR line above that
+     gap belongs to the Full Name; exactly five lines below it belong to Address.
+     We never dictionary-correct, reorder, add, or remove alphabetic content. */
+  const rawLines=Array.isArray(result?.lines)?result.lines:[];
+  const usable=rawLines.map((l,i)=>({text:cleanOCRLine(l.text),bbox:l.bbox,index:i,conf:Number(l.conf)})).filter(l=>l.text);
+  if(usable.length>=6){
+    const withY=usable.map((l,i)=>{
+      const b=l.bbox||{}; const top=Number(b.y0); const bottom=Number(b.y1);
+      return {...l,top:Number.isFinite(top)?top:null,bottom:Number.isFinite(bottom)?bottom:null};
+    });
+    const geom=withY.filter(l=>l.top!==null&&l.bottom!==null);
+    if(geom.length>=6){
+      /* Sort by vertical position. The address is structurally the last five
+         lines in this dedicated crop. The boundary is the gap immediately
+         before those five lines. */
+      const sorted=[...geom].sort((a,b)=>a.top-b.top);
+      const addr=sorted.slice(-5), name=sorted.slice(0,-5);
+      const prev=name[name.length-1], firstAddr=addr[0];
+      const gaps=sorted.slice(1).map((l,i)=>({i:i+1,gap:l.top-sorted[i].bottom}));
+      const boundary=gaps.find(g=>g.i===sorted.length-5);
+      const heights=sorted.map(l=>l.bottom-l.top).filter(v=>v>0).sort((a,b)=>a-b);
+      const median=heights.length?heights[Math.floor(heights.length/2)]:0;
+      const visibleGap=!!boundary && boundary.gap>=Math.max(3,median*.55);
+      return {nameLines:name.map(x=>x.text),addressLines:addr.map(x=>x.text),visibleGap,method:visibleGap?'visible-gap':'five-line-structural',lineCount:sorted.length,gapPx:boundary?.gap||0,medianLineHeight:median};
+    }
+  }
+  /* Tesseract may not expose line bounding boxes in some builds. Because the
+     document layout guarantees exactly five address lines, use the last five
+     OCR lines as the structural address block and preserve every earlier line
+     as name evidence. This is not spelling correction. */
+  const texts=usable.length?usable.map(x=>x.text):String(result?.text||'').split(/\r?\n/).map(cleanOCRLine).filter(Boolean);
+  if(texts.length>=6)return {nameLines:texts.slice(0,-5),addressLines:texts.slice(-5),visibleGap:false,method:'five-line-structural',lineCount:texts.length,gapPx:0,medianLineHeight:0};
+  return {nameLines:[],addressLines:[],visibleGap:false,method:'insufficient-lines',lineCount:texts.length,gapPx:0,medianLineHeight:0};
+}
+
 function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
 function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
 function lines(t){return String(t).split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean)}
@@ -225,30 +295,56 @@ function normalizeEvidenceText(text){
 }
 function exactMatches(text,re){return [...String(text||'').matchAll(re)].map(m=>m[0]);}
 function consensus(candidates){
- const clean=candidates.map(x=>String(x??'')).filter(x=>x.length>0);if(!clean.length)return null;
- const map=new Map();for(const v of clean)map.set(v,(map.get(v)||0)+1);
- const all=[...map.keys()];
- const sorted=[...map.entries()].sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length);
- /* Never select one spelling when competing OCR strings exist. The caller must
-    display UNCERTAIN and preserve every candidate instead of silently choosing. */
- if(all.length>1)return {value:null,votes:sorted[0][1],all};
- return {value:all[0],votes:sorted[0][1],all};
+ const clean=candidates.map(x=>String(x??'').trim()).filter(Boolean);
+ if(!clean.length)return null;
+ const unique=[...new Set(clean)];
+ if(unique.length>1)return {value:null,votes:1,all:unique};
+ return {value:unique[0],votes:clean.length,all:unique};
 }
 function fieldStatus(conf,ambiguous=false){return ambiguous?'UNCERTAIN':Number(conf)>=95?'VERIFIED':'UNCERTAIN'}
 function candidateDisplay(c){return c&&c.all&&c.all.length>1?'UNCERTAIN — competing OCR candidates:\n'+c.all.join('\n'):c?.value||null}
+
+/* Numeric ambiguity is detected ONLY when OCR evidence actually contains a
+   character-confused alternative. A valid numeric token such as 940202 must
+   NOT be flagged merely because it contains "02" or "9". */
 function numericConfusionEvidence(text){
  const t=String(text||'');
  const hits=[];
- /* Only inspect OCR strings that look like numeric-ID candidates. Do not flag
-    ordinary words containing R/K or 9 elsewhere in the document. */
  const chunks=t.match(/[A-Z0-9|]+(?:[- ][A-Z0-9|]+){1,5}/gi)||[];
- for(const c of chunks){
-  if(/(?:01|OI|0I|O1)/i.test(c))hits.push('01↔OI↔0I↔O1');
-  if(/(?:02|O2|OS|0S)/i.test(c))hits.push('02↔O2↔OS↔0S');
+ for(const c0 of chunks){
+  const c=c0.replace(/\s+/g,'');
+  const groups=c.split('-');
+  const idLike=(groups.length===3&&groups[0].length===6&&groups[1].length===2&&groups[2].length===4) ||
+               (groups.length===5&&groups[0].length===6&&groups[1].length===2&&groups[2].length===4&&groups[3].length===2&&groups[4].length===2) ||
+               (groups.length===1&&/^[-A-Z0-9|]{12}$/.test(c));
+  if(!idLike)continue;
+  if(/(?:OI|O1|0I|\bOI\b)/i.test(c))hits.push('01↔OI↔0I↔O1');
+  if(/(?:O2|OS|0S)/i.test(c))hits.push('02↔O2↔OS↔0S');
   if(/[RK]/i.test(c)&&/[0-9]/.test(c)&&/-/.test(c))hits.push('R↔K');
-  if(/9/.test(c)&&/[0-9]/.test(c)&&/-/.test(c))hits.push('9↔2');
+  /* 9↔2 is ambiguous only when a competing candidate/evidence actually
+     differs by that character; a normal 9 is not an error. */
  }
  return [...new Set(hits)];
+}
+function rawNricCandidates(text, extended=false){
+ const t=String(text||'');
+ const pat=extended
+  ? /\b[A-Z0-9|]{6}[- ]?[A-Z0-9|]{2}[- ]?[A-Z0-9|]{4}[- ]?[A-Z0-9|]{2}[- ]?[A-Z0-9|]{2}\b/gi
+  : /\b[A-Z0-9|]{6}[- ]?[A-Z0-9|]{2}[- ]?[A-Z0-9|]{4}\b/gi;
+ return [...t.matchAll(pat)].map(m=>m[0].trim()).filter(x=>/[0-9]/.test(x));
+}
+function exactNricCandidates(text,extended=false){
+ const re=extended?/\b\d{6}-\d{2}-\d{4}-\d{2}-\d{2}\b/g:/\b\d{6}-\d{2}-\d{4}\b/g;
+ return [...String(text||'').matchAll(re)].map(m=>m[0]);
+}
+function nricNumericStatus(rawCandidates, exactCandidates){
+ const raw=[...new Set(rawCandidates||[])], exact=[...new Set(exactCandidates||[])];
+ if(exact.length===1 && raw.length<=1)return {value:exact[0],ambiguous:false,evidence:exact[0],warning:''};
+ if(exact.length>1)return {value:null,ambiguous:true,evidence:exact.join('\n'),warning:'Conflicting exact numeric candidates detected; no winner was selected.'};
+ if(raw.length){
+   return {value:null,ambiguous:true,evidence:raw.join('\n'),warning:'OCR produced a near-pattern containing potentially confusable characters. No substitution was made.'};
+ }
+ return {value:null,ambiguous:false,evidence:'No reliable numeric candidate was read.',warning:'Unable to reliably determine this number from the OCR evidence.'};
 }
 function genderFromNric(nric){
  const m=String(nric||'').match(/^(\d{6})-(\d{2})-(\d{4})$/);if(!m)return null;
@@ -260,30 +356,23 @@ function findExplicitGender(text){
  const m=String(text||'').match(/\b(PEREMPUAN|LELAKI|FEMALE|MALE)\b/i);return m?m[1]:null;
 }
 function findNameCandidates(text){
- const raw=String(text||'').split(/\r?\n/);
- const out=[];
- for(let i=0;i<raw.length;i++){
-  const original=raw[i].trim();
-  if(!original||original.length<5) continue;
-  if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MALAYSIA|MYKAD/i.test(original)) continue;
-  // Preserve the OCR spelling exactly. Only surrounding/duplicate whitespace is removed;
-  // no character, token, A/P, A/L, punctuation or alphabet is substituted.
-  const value=original.replace(/[ \t]+/g,' ').trim();
-  const tokens=value.split(' ');
-  const hasRelation=/\b(A\/P|A\/L|BIN|BINTI|AP|AL)\b/i.test(value);
-  const mostlyName=/^[A-Za-z][A-Za-z'\-.]*(?: [A-Za-z][A-Za-z'\-.]*){1,6}$/.test(value);
-  const hasTooManySymbols=/[^A-Za-z0-9 .\/\-']/.test(value);
-  if(hasRelation || (mostlyName && !hasTooManySymbols)){
-   // If a relation token exists, require at least one alphabetic token on each side.
-   const rel=value.match(/\b(A\/P|A\/L|BIN|BINTI|AP|AL)\b/i);
-   if(rel){
-    const left=value.slice(0,rel.index).trim(), right=value.slice((rel.index||0)+rel[0].length).trim();
-    if(!/[A-Za-z]/.test(left)||!/[A-Za-z]/.test(right)) continue;
-   }
-   if(!out.includes(value)) out.push(value);
-  }
+ const raw=String(text||'').split(/\r?\n/), out=[];
+ const banned=/^(?:KAD|PENGENALAN|IDENTITY|CARD|MALAYSIA|MYKAD|WARGANEGARA|PEREMPUAN|LELAKI|FEMALE|MALE|SCANNED|WITH|CAMSCANNER|DATEMPL\.COM|WWW\b|HTTP\b)$/i;
+ for(const line of raw){
+  const value=line.replace(/[ \t]+/g,' ').trim();
+  if(!value||value.length<5||value.length>80)continue;
+  if(banned.test(value))continue;
+  if(/(?:\.com|https?:\/\/|www\.)/i.test(value))continue;
+  if(/\d/.test(value))continue;
+  if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MYKAD|SCANNED\s+WITH/i.test(value))continue;
+  const relation=/\b(A\/P|A\/L|BIN|BINTI|AP|AL)\b/i.test(value);
+  const mostlyName=/^[A-Za-z][A-Za-z'\-.]*(?:\s+[A-Za-z][A-Za-z'\-.]*){1,7}$/.test(value);
+  if(!mostlyName && !relation)continue;
+  const tokens=value.split(/\s+/);
+  if(tokens.length<2||tokens.length>9)continue;
+  out.push(value);
  }
- return out;
+ return [...new Set(out)];
 }
 function extractAddress(text){
   // Dedicated front-card address crop: the address occupies exactly five lines.
@@ -296,21 +385,23 @@ function extract(front,back){
  const out=[];const ft=String(front.text||''),bt=String(back.text||'');
  const frontNumericSources=[front.nricText,front.wholeText,ft];
  const backNumericSources=[back.nricText,back.wholeText,bt];
- const fCandidates=frontNumericSources.flatMap(t=>exactMatches(t,/\b\d{6}-\d{2}-\d{4}\b/g));
- const bCandidates=backNumericSources.flatMap(t=>exactMatches(t,/\b\d{6}-\d{2}-\d{4}-\d{2}-\d{2}\b/g));
- const fnum=consensus(fCandidates),bnum=consensus(bCandidates);
- const fAmb=!!fnum&&fnum.all.length>1; const bAmb=!!bnum&&bnum.all.length>1;
- const fNumEvidence=fnum?(fnum.value||fnum.all.join('\n')):'No exact 6-2-4 numeric candidate was read.';
- const bNumEvidence=bnum?(bnum.value||bnum.all.join('\n')):'No exact 6-2-4-2-2 numeric candidate was read.';
- const fNumericFlags=numericConfusionEvidence(front.nricText+'\n'+front.wholeText);
- const bNumericFlags=numericConfusionEvidence(back.nricText+'\n'+back.wholeText);
- out.push(mk('NRIC Number',fnum?(fnum.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN',fnum?Math.min(front.nricConf||0,100):0,fnum?fieldStatus(front.nricConf||0,fAmb):'UNKNOWN',fNumEvidence,'Exact 6-2-4 numeric pattern only. Never transform: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fAmb?'Competing NRIC candidates detected; candidates are preserved and no winner is selected.':fNumericFlags.length?'Potentially confusable OCR evidence detected: '+fNumericFlags.join(', ')+'. No substitution was made.':'An unreadable digit is never repaired.'));
+ const fExact=frontNumericSources.flatMap(t=>exactNricCandidates(t,false));
+ const fRaw=frontNumericSources.flatMap(t=>rawNricCandidates(t,false));
+ const bExact=backNumericSources.flatMap(t=>exactNricCandidates(t,true));
+ const bRaw=backNumericSources.flatMap(t=>rawNricCandidates(t,true));
+ const fnum=nricNumericStatus(fRaw,fExact), bnum=nricNumericStatus(bRaw,bExact);
+ const fConfusion=numericConfusionEvidence(front.nricText);
+ const fNumEvidence=fnum.evidence;
+ const fStatus=fnum.value?fieldStatus(front.nricConf||0,fnum.ambiguous):'UNCERTAIN';
+ out.push(mk('NRIC Number',fnum.value||'UNKNOWN — VERIFY CANDIDATES',fnum.value?Math.min(front.nricConf||0,100):0,fStatus,fNumEvidence,'Exact 6-2-4 numeric pattern is required. No character substitution or punctuation insertion is performed.',fnum.warning+(fConfusion.length?' '+fConfusion.join(', ')+'. No substitution was made.':'')));
 
+ /* IMPORTANT: Name is read from the dedicated name crop only. Never fall back
+    to whole-document OCR, because headers, watermarks, URLs and back-side text
+    can otherwise become false name candidates. */
  const nameCropCandidates=findNameCandidates(front.nameText||'');
- const fallbackNameCandidates=findNameCandidates((front.wholeText||'')+'\n'+ft);
- const name=consensus(nameCropCandidates.length?nameCropCandidates:fallbackNameCandidates);
+ const name=consensus(nameCropCandidates);
  const nameValue=name?(name.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN';
- out.push(mk('Full Name',nameValue,name?Math.min(front.nameConf||0,100):0,name?fieldStatus(front.nameConf||0,name.all.length>1):'UNKNOWN',name?(name.value?name.value:name.all.join('\n')):'No reliable name line detected.','Exact OCR candidate preserved. No alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted. Never transform R↔L, J↔I, V↔W, J↔S, VS↔W or any other protected pair.','If OCR passes disagree, all candidates are preserved and the field is UNCERTAIN; no plausible spelling is selected.'));
+ out.push(mk('Full Name',nameValue,name?Math.min(front.nameConf||0,100):0,name?fieldStatus(front.nameConf||0,name.all.length>1):'UNKNOWN',name?(name.value?name.value:name.all.join('\n')):'No reliable name candidate was read from the dedicated name region.','Exact OCR candidate preserved. Every OCR line above the visible name/address gap is treated as name evidence; no alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted.','If name OCR passes disagree, all candidates remain evidence and the field is UNCERTAIN. The name/address boundary is determined from the visible gap when line geometry is available; the five-line address rule is used only as a structural fallback. Document headers, URLs and watermarks are never used as fallback name evidence.'));
 
  const explicitGender=findExplicitGender(front.genderText||ft);
  const derived=genderFromNric(fnum?.value);
@@ -325,7 +416,7 @@ function extract(front,back){
    else genderEvidence+='\nNRIC parity: final digit '+derived.digit+' = '+(derived.digit%2?'odd':'even')+' → '+derived.gender+'.';
   }
  }else if(derived){
-  genderValue=derived.gender;genderStatus=fieldStatus(front.genderConf||0);genderEvidence='NRIC Number '+fnum.value+'; final digit '+derived.digit+' is '+(derived.digit%2?'odd':'even')+'.';genderReason='Derived only from the explicit NRIC number using the Malaysian NRIC parity rule: odd = Lelaki/Male; even = Perempuan/Female.';
+  genderValue=derived.gender;genderStatus=fieldStatus(front.nricConf||0);genderEvidence='NRIC Number '+fnum.value+'; final digit '+derived.digit+' is '+(derived.digit%2?'odd':'even')+'.';genderReason='Derived only from the explicit NRIC number using the Malaysian NRIC parity rule: odd = Lelaki/Male; even = Perempuan/Female.';
  }
  out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,100),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
 
@@ -340,8 +431,9 @@ function extract(front,back){
   out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state or address is never converted into nationality.'));
  }
 
- const address=extractAddress(front.addressText||ft+'\n'+(front.wholeText||''));
- out.push(mk('Address',address.join(' ')||'UNKNOWN',address.length?Math.min(front.addressConf||0,100):0,address.length?fieldStatus(front.addressConf||0):'UNKNOWN',address.length?address.join('\n'):'No reliable address block detected.','Address is assembled only from text directly read from the front ID. No postcode, town or state is invented.',address.length?'Verify every address character against the source image.':''));
+ const address=extractAddress(front.addressText||'');
+ const addressStatus=address.length===5?fieldStatus(front.addressConf||0):'UNCERTAIN';
+ out.push(mk('Address',address.join(' ')||'UNKNOWN',address.length?Math.min(front.addressConf||0,100):0,addressStatus,address.length?address.join('\n'):'No reliable five-line address block detected.','Address is assembled only from the dedicated five-line front-ID address region. No postcode, town, state, word or character is invented or corrected.',address.length===5?'Verify every address character against the source image.':'The address region did not yield all five lines reliably; no missing line is guessed.'));
  // Verified Extraction display order is intentional: Full Name must appear above NRIC Number.
  const nameIndex=out.findIndex(f=>f.name==='Full Name');
  const nricIndex=out.findIndex(f=>f.name==='NRIC Number');
@@ -354,8 +446,7 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
   // Fixed MyKad spatial regions: NRIC is below the header and above the chip;
   // name is below the chip; address is the five-line block below the name.
   ['NRIC',crop(f.canvas,.015,.18,.48,.14,10),7],
-  ['NAME',crop(f.canvas,.015,.60,.67,.12,10),6],
-  ['ADDRESS',crop(f.canvas,.015,.72,.73,.25,8),6],
+  ['NAMEADDRESS',crop(f.canvas,.015,.58,.76,.40,9),6],
   ['GENDER',crop(f.canvas,.59,.755,.39,.205,8),6],
   ['WHOLE',maskGold(crop(f.canvas,0,0,1,1,2)),6]
  ];
@@ -363,9 +454,10 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
  const backJobs=[['NRIC',crop(b.canvas,.02,.05,.96,.45,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
  for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
  for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
- const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAME?.conf||0,addressConf:fr.ADDRESS?.conf||0,genderConf:fr.GENDER?.conf||0,nricText:fr.NRIC?.text||'',nameText:fr.NAME?.text||'',addressText:fr.ADDRESS?.text||'',genderText:fr.GENDER?.text||'',nationalityText:fr.WHOLE?.text||'',wholeText:fr.WHOLE?.text||''};
+ const nameAddress=splitNameAddressByVisibleGap(fr.NAMEADDRESS||{});
+ const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAMEADDRESS?.conf||0,addressConf:fr.NAMEADDRESS?.conf||0,genderConf:fr.GENDER?.conf||0,nricText:fr.NRIC?.text||'',nameText:nameAddress.nameLines.join('\n'),addressText:nameAddress.addressLines.join('\n'),genderText:fr.GENDER?.text||'',nationalityText:fr.WHOLE?.text||'',wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress};
  const backData={text:br.WHOLE?.text||'',conf:br.WHOLE?.conf||0,nricText:br.NRIC?.text||'',wholeText:br.WHOLE?.text||''};
- render(extract(frontData,backData));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = below microchip; Address = five lines below Full Name. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
+ render(extract(frontData,backData));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = every OCR line above the visible name/address gap; Address = exactly five lines below that gap. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();E.run.disabled=true;
 })();
@@ -478,5 +570,43 @@ window.applyStrictUncertaintyPolicy = function(result){
  window.OCR_MASTER_SPATIAL_TEST={passed:Object.values(tests).every(Boolean),tests};
 })();
 </script>
+
+<script id="strict-spatial-regression-tests">
+(function(){
+  const failures=[];
+  const assert=(n,v)=>{if(!v)failures.push(n)};
+  /* Valid 940202 must NOT be reported as an 02 ambiguity or because it contains 9. */
+  assert('valid 940202 has no false numeric confusion', numericConfusionEvidence('940202-10-6330').length===0);
+  assert('valid 02 group has no false ambiguity', numericConfusionEvidence('940202-10-6330').length===0);
+  assert('near O2/OS candidate is flagged', numericConfusionEvidence('940202-O2-6330').includes('02↔O2↔OS↔0S'));
+  assert('near OI candidate is flagged', numericConfusionEvidence('940202-OI-6330').includes('01↔OI↔0I↔O1'));
+  const n=findNameCandidates('JOHN CITIZEN WILLIAM PULAUPINANG\ndatempl.com');
+  assert('URL is excluded from name candidates', !n.some(x=>/datempl\.com/i.test(x)));
+  assert('name candidate remains exact', findNameCandidates('RAJESWARY A/P VASU')[0]==='RAJESWARY A/P VASU');
+  const c=consensus(['RAJESWARY A/P VASU','RAJESWARY A/P VASW']);
+  assert('conflicting names never select a winner', c.value===null && c.all.length===2);
+  const ex=nricNumericStatus(['940202-10-6330'],['940202-10-6330']);
+  assert('exact NRIC accepted', ex.value==='940202-10-6330' && !ex.ambiguous);
+  const amb=nricNumericStatus(['940202-O2-6330'],[]);
+  assert('ambiguous NRIC preserved', amb.value===null && amb.ambiguous);
+  window.OCR_MASTER_STRICT_SPATIAL_TEST={passed:failures.length===0,failures};
+  if(new URLSearchParams(location.search).get('ocrdebug')==='1') console.log('STRICT SPATIAL TESTS',window.OCR_MASTER_STRICT_SPATIAL_TEST);
+})();
+</script>
+
+<script id="name-address-gap-tests">(function(){
+  function run(){
+    const mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+    const sample={lines:[mk('RAJESWARY A/P VASU',0,10),mk('SECOND NAME LINE',14,24),mk('NO 32 BATU 34',40,50),mk('JALAN RAWANG',54,64),mk('KAMPUNG SUNGAI DARAH',68,78),mk('45600 BATANG BERJUNTAI',82,92),mk('SELANGOR',96,106)]};
+    const r=window.splitNameAddressByVisibleGap(sample);
+    const pass=r.nameLines.join(' | ')==='RAJESWARY A/P VASU | SECOND NAME LINE' && r.addressLines.length===5 && r.addressLines[0]==='NO 32 BATU 34' && r.visibleGap===true;
+    const sample2={lines:[mk('NAME ONE',0,10),mk('NAME TWO',14,24),mk('ADDRESS 1',28,38),mk('ADDRESS 2',42,52),mk('ADDRESS 3',56,66),mk('ADDRESS 4',70,80),mk('ADDRESS 5',84,94)]};
+    const r2=window.splitNameAddressByVisibleGap(sample2);
+    const pass2=r2.nameLines.length===2 && r2.addressLines.length===5;
+    window.NAME_ADDRESS_GAP_TESTS={passed:pass&&pass2,details:{visibleGap:pass,fiveLineFallback:pass2}};
+    if(new URLSearchParams(location.search).get('ocrdebug')==='1') console.log(window.NAME_ADDRESS_GAP_TESTS);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+})();</script>
 </body>
 </html>
