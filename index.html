@@ -296,6 +296,14 @@ function canvasFrom(im){const max=5200,r=Math.min(1,max/Math.max(im.naturalWidth
 function crop(c,x,y,w,h,scale=5){const sx=Math.max(0,Math.round(c.width*x)),sy=Math.max(0,Math.round(c.height*y)),sw=Math.min(c.width-sx,Math.round(c.width*w)),sh=Math.min(c.height-sy,Math.round(c.height*h));const o=document.createElement('canvas');o.width=Math.max(1,Math.min(7000,sw*scale));o.height=Math.max(1,Math.min(5000,sh*scale));const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);return o}
 function preprocess(c,mode){const x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),a=d.data;for(let i=0;i<a.length;i+=4){const r=a[i],g=a[i+1],b=a[i+2];if(mode==='gold'&&r>145&&g>105&&g<215&&b<135&&r>g*1.05){a[i]=a[i+1]=a[i+2]=255;continue}let v=.299*r+.587*g+.114*b;if(mode==='high')v=(v-128)*1.35+128;else if(mode==='soft')v=(v-128)*1.12+128;a[i]=a[i+1]=a[i+2]=Math.max(0,Math.min(255,v))}x.putImageData(d,0,0);return c}
 function maskGold(c){return preprocess(c,'gold')}
+function textPreprocess(c){
+ const up=document.createElement('canvas');
+ up.width=Math.max(1,Math.min(9000,Math.round(c.width*2)));
+ up.height=Math.max(1,Math.min(7000,Math.round(c.height*2)));
+ const u=up.getContext('2d',{alpha:false});u.imageSmoothingEnabled=true;u.imageSmoothingQuality='high';u.fillStyle='#fff';u.fillRect(0,0,up.width,up.height);u.drawImage(c,0,0,up.width,up.height);
+ const g=up.getContext('2d',{willReadFrequently:true}),d=g.getImageData(0,0,up.width,up.height),a=d.data;
+ for(let i=0;i<a.length;i+=4){const v=.299*a[i]+.587*a[i+1]+.114*a[i+2];a[i]=a[i+1]=a[i+2]=v;}g.putImageData(d,0,0);return up;
+}
 function splitComposite(c){
   /* Detect the white separation band between two stacked ID cards.
      The previous version searched for the darkest row, which could select
@@ -435,7 +443,7 @@ window.splitNameAddressByVisibleGap=function splitNameAddressByVisibleGap(result
     const starts=geom.map((l,i)=>({i,l}))
       .filter(x=>x.i>=2 && geom.length-x.i>=5 && hasAddressStartAtBeginning(x.l.text));
     const mergedStarts=geom.map((l,i)=>({i,l}))
-      .filter(x=>x.i>=2 && geom.length-x.i>=5 && x.l.mergedAddressStart===true);
+      .filter(x=>x.i>=1 && geom.length-x.i>=5 && x.l.mergedAddressStart===true);
     if(mergedStarts.length){
       const s=mergedStarts[0];
       const name=geom.slice(0,s.i);
@@ -720,26 +728,21 @@ function extract(front,back){
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
 async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');try{const f=S.pages.find(p=>p.side==='front'),b=S.pages.find(p=>p.side==='back');if(!f||!b)throw new Error('Both Front ID and Back ID must be available.');
  const frontJobs=[
-  // MyKad FRONT spatial regions:
-  // NRIC: upper-left, below header and above gold microchip.
-  // NAMEADDRESS: left side only. IMPORTANT: width stops before the portrait /
-  // WARGANEGARA / ISLAM / PEREMPUAN metadata block so metadata can never leak
-  // into the name/address OCR stream.
-  // METADATA: dedicated lower-right label/value block.
   ['NRIC',crop(f.canvas,.015,.18,.48,.14,10),7],
-  ['NAMEADDRESS',crop(f.canvas,.015,.57,.58,.41,10),6],
-  ['METADATA',crop(f.canvas,.66,.72,.32,.25,6),6],
-  ['GENDER',crop(f.canvas,.66,.72,.32,.25,6),6],
+  ['NAME',textPreprocess(crop(f.canvas,.015,.60,.62,.15,10)),6],
+  ['ADDRESS',textPreprocess(crop(f.canvas,.015,.745,.62,.245,10)),6],
+  ['METADATA',crop(f.canvas,.66,.72,.32,.25,8),6],
+  ['GENDER',crop(f.canvas,.66,.72,.32,.25,8),6],
   ['WHOLE',maskGold(crop(f.canvas,0,0,1,1,2)),6]
  ];
  const fr={};const br={};
  const backJobs=[['NRIC',crop(b.canvas,.02,.05,.96,.45,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
  for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
  for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
- const nameAddress=splitNameAddressByVisibleGap(fr.NAMEADDRESS||{});
- const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAMEADDRESS?.conf||0,addressConf:fr.NAMEADDRESS?.conf||0,genderConf:fr.METADATA?.conf||fr.GENDER?.conf||0,metadataConf:fr.METADATA?.conf||0,nricText:fr.NRIC?.text||'',nameText:nameAddress.nameLines.join('\n'),addressText:nameAddress.addressLines.join('\n'),genderText:(fr.METADATA?.text||'')+'\n'+(fr.GENDER?.text||''),nationalityText:fr.METADATA?.text||'',metadataText:fr.METADATA?.text||'',wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress};
+ const nameAddress=splitNameAddressByVisibleGap({lines:[...(fr.NAME?.lines||[]),...(fr.ADDRESS?.lines||[])]});
+ const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAME?.conf||0,addressConf:fr.ADDRESS?.conf||0,genderConf:fr.METADATA?.conf||fr.GENDER?.conf||0,metadataConf:fr.METADATA?.conf||0,nricText:fr.NRIC?.text||'',nameText:String(fr.NAME?.text||'').trim()||nameAddress.nameLines.join('\n'),addressText:String(fr.ADDRESS?.text||'').trim()||nameAddress.addressLines.join('\n'),genderText:(fr.METADATA?.text||'')+'\n'+(fr.GENDER?.text||''),nationalityText:fr.METADATA?.text||'',metadataText:fr.METADATA?.text||'',wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress};
  const backData={text:br.WHOLE?.text||'',conf:br.WHOLE?.conf||0,nricText:br.NRIC?.text||'',wholeText:br.WHOLE?.text||''};
- render(extract(frontData,backData));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = every OCR line above the visible name/address gap; Address = exactly five lines below that gap. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
+ render(extract(frontData,backData));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = dedicated left-side name crop ending at the visible name/address gap; Address = dedicated left-side five-line crop beginning immediately below that gap. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();E.run.disabled=true;
 window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,extractRace,assessFieldConfidence:window.assessFieldConfidence};
@@ -1024,6 +1027,36 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
  assert("Warganegara is explicit nationality evidence",photo.nationality.status==="EVIDENCE");
  assert("Warganegara value resolves to Malaysia",photo.nationality.value===null || /MALAYSIA/i.test(photo.nationality.value));
  window.OCR_MASTER_NATIONALITY_ADDRESS_TEST={passed:failures.length===0,failures};
+})();
+</script>
+
+<script id="dedicated-name-address-regression">
+(function(){
+ const f=[],a=(n,v)=>{if(!v)f.push(n)},A=window.OCR_MASTER_API,mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const r=A.splitNameAddressByVisibleGap({lines:[mk('NOOR AIN BINTI',0,10),mk('MOHAMED',13,23),mk('NO 17',29,39),mk('JALAN PERISAI 3',43,53),mk('BANDAR SEBERANG PERAK',57,67),mk('36800 KAMPUNG GAJAH',71,81),mk('PERAK',85,95)]});
+ a('name exact',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');a('address starts NO 17',r.addressStart==='NO 17');a('five address rows',r.addressLines.length===5);a('no name in address',!/NOOR|MOHAMED/i.test(r.addressLines.join(' ')));
+ const merged=A.splitNameAddressByVisibleGap({lines:[mk('NOOR AIN BINTI MOHAMED NO 17',0,10),mk('JALAN PERISAI 3',14,24),mk('BANDAR SEBERANG PERAK',28,38),mk('36800 KAMPUNG GAJAH',42,52),mk('PERAK',56,66),mk('EXTRA',70,80)]});
+ a('merged name retained',merged.nameLines.some(x=>/MOHAMED/i.test(x)));a('merged address starts NO 17',merged.addressStart==='NO 17');a('merged address excludes MOHAMED',!/MOHAMED/i.test(merged.addressLines.join(' ')));
+ window.OCR_MASTER_DEDICATED_REGION_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+<script id="two-row-merged-final-name-regression">
+(function(){
+ const failures=[]; const a=(n,v)=>{if(!v)failures.push(n)};
+ const mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const r=window.splitNameAddressByVisibleGap({lines:[
+  mk("NOOR AIN BINTI",0,10),
+  mk("MOHAMED NO 17",13,23),
+  mk("JALAN PERISAI 3",29,39),
+  mk("BANDAR SEBERANG PERAK",43,53),
+  mk("36800 KAMPUNG GAJAH",57,67),
+  mk("PERAK",71,81)
+ ]});
+ a("two-row name preserved",r.nameLines.join(" ")==="NOOR AIN BINTI MOHAMED");
+ a("merged row starts address at NO 17",r.addressStart==="NO 17");
+ a("address excludes MOHAMED",!/\bMOHAMED\b/i.test(r.addressLines.join(" ")));
+ a("five address rows",r.addressLines.length===5);
+ window.OCR_MASTER_TWO_ROW_MERGED_FINAL_NAME_TEST={passed:failures.length===0,failures};
 })();
 </script>
 </body>
