@@ -724,73 +724,118 @@ function numericRisk(v){
   return /[0-9]/.test(v) && /[A-Za-z]/.test(v);
 }
 function extractFields(text){
-  const lines=linesOf(text), joined=lines.join(' ');
-  const pages=state.results.filter(x=>x.source==='ocr'); const avg=pages.length?pages.reduce((a,x)=>a+(x.conflict?Math.min(x.confidence,60):x.confidence),0)/pages.length:0;
+  const ls=linesOf(text), joined=ls.join(' ');
+  const pages=state.results.filter(x=>x.source==='ocr');
+  const avg=pages.length?pages.reduce((a,x)=>a+(x.conflict?Math.min(x.confidence,60):x.confidence),0)/pages.length:0;
   const out=[];
-  const name=candidateAfterLabel(lines,['name','full name','nama','nama penuh','holder','cardholder']);
+
+  const name=candidateAfterLabel(ls,['name','full name','nama','nama penuh','holder','cardholder']);
   if(name){
     const c=confidenceFromCandidate(name.value,avg);
     out.push(makeField('Full name',name.value,c,c>=85?'VERIFIED':'UNCERTAIN',name.evidence,'Label-associated candidate; manual visual verification required for legal identity use.',c<85?'OCR confidence or visual ambiguity is too high.':''));
-  }else{
-    // No label => do not invent a person's name from arbitrary text.
-    out.push(makeField('Full name','UNKNOWN',0,'UNKNOWN','No reliable name label/candidate found.','Not validated','A name cannot be safely assigned from arbitrary document text.'));
-  }
+  }else out.push(makeField('Full name','UNKNOWN',0,'UNKNOWN','No reliable name label/candidate found.','Not validated','A name cannot be safely assigned from arbitrary document text.'));
 
-  const id=candidateAfterLabel(lines,['id no','id number','identification no','identification number','mykad','nric','ic no','no. kad pengenalan','no kad pengenalan']);
+  const id=candidateAfterLabel(ls,['id no','id number','identification no','identification number','mykad','nric','ic no','no. kad pengenalan','no kad pengenalan']);
   if(id){
-    const c=confidenceFromCandidate(id.value,avg);
-    const risk=numericRisk(id.value);
+    const c=confidenceFromCandidate(id.value,avg),risk=numericRisk(id.value);
     out.push(makeField('Identity / document number',id.value,Math.min(c,risk?65:c),c>=85&&!risk?'VERIFIED':'UNCERTAIN',id.evidence,'No universal checksum is applied because document type is not known with certainty.',risk?'Contains mixed numeric/alphabetic characters; look-alike substitution is not allowed.':c<85?'OCR evidence is not strong enough.':'','numeric'));
   }else out.push(makeField('Identity / document number','UNKNOWN',0,'UNKNOWN','No reliable identity-number label/candidate found.','Not validated','No number is inferred.','numeric'));
 
-  const dob=candidateAfterLabel(lines,['dob','date of birth','birth date','tarikh lahir','born']);
+  const dob=candidateAfterLabel(ls,['dob','date of birth','birth date','tarikh lahir','born']);
   if(dob){
     const v=validateDate(dob.value),c=confidenceFromCandidate(dob.value,avg);
-    out.push(makeField('Date of birth',dob.value,Math.min(c,v.ok?95:60),c>=85&&v.ok?'VERIFIED':'UNCERTAIN',dob.evidence,v.msg,v.ok?'': 'Date syntax or OCR evidence is insufficient.','date'));
+    out.push(makeField('Date of birth',dob.value,Math.min(c,v.ok?95:60),c>=85&&v.ok?'VERIFIED':'UNCERTAIN',dob.evidence,v.msg,v.ok?'':'Date syntax or OCR evidence is insufficient.','date'));
   }else out.push(makeField('Date of birth','UNKNOWN',0,'UNKNOWN','No reliable DOB label/candidate found.','Not validated','No date is inferred.','date'));
 
-  const gender=candidateAfterLabel(lines,['gender','sex','jantina']);
+  const gender=candidateAfterLabel(ls,['gender','sex','jantina']);
   if(gender){
-    const v=gender.value.trim().toUpperCase(), mapped=(v==='M'||/^MALE\b/.test(v))?'M — Male':(v==='F'||/^FEMALE\b/.test(v))?'F — Female':null;
+    const v=gender.value.trim().toUpperCase(),mapped=(v==='M'||/^MALE\b/.test(v))?'M — Male':(v==='F'||/^FEMALE\b/.test(v))?'F — Female':null;
     const c=confidenceFromCandidate(gender.value,avg);
     out.push(makeField('Sex / gender',mapped||gender.value,c,mapped&&c>=85?'VERIFIED':'UNCERTAIN',gender.evidence,'Only explicit M/F or Male/Female evidence is mapped.',mapped?'':'Value is not an unambiguous supported sex marker.'));
   }
 
   const nationality = /\bWarganegara\s+Malaysia\b/i.test(joined) ? 'Malaysia' : null;
   if(nationality){
-    const line=lines.find(x=>/Warganegara/i.test(x));
+    const line=ls.find(x=>/Warganegara/i.test(x));
     out.push(makeField('Nationality',nationality,Math.min(avg,92),'VERIFIED',line||'Warganegara Malaysia','Explicit nationality wording detected.',''));
   }else if(/\bWarganegara\b/i.test(joined)){
-    const line=lines.find(x=>/Warganegara/i.test(x));
+    const line=ls.find(x=>/Warganegara/i.test(x));
     out.push(makeField('Nationality','UNKNOWN',0,'UNCERTAIN',line||'Warganegara','Nationality wording detected, but country is not explicit.','The application does not infer Malaysia from the word Warganegara alone.'));
   }else{
-    const nat=candidateAfterLabel(lines,['nationality','citizenship','kewarganegaraan']);
-    if(nat){
-      const c=confidenceFromCandidate(nat.value,avg);
-      out.push(makeField('Nationality',nat.value,c,c>=85?'VERIFIED':'UNCERTAIN',nat.evidence,'Label-associated candidate; not inferred from a state/country name alone.',c<85?'Evidence is not strong enough.':''));
-    }else out.push(makeField('Nationality','UNKNOWN',0,'UNKNOWN','No reliable nationality evidence found.','Not validated','A state/country name is not treated as nationality without explicit evidence.'));
+    const nat=candidateAfterLabel(ls,['nationality','citizenship','kewarganegaraan']);
+    if(nat){const c=confidenceFromCandidate(nat.value,avg);out.push(makeField('Nationality',nat.value,c,c>=85?'VERIFIED':'UNCERTAIN',nat.evidence,'Label-associated candidate; not inferred from a state/country name alone.',c<85?'Evidence is not strong enough.':''));}
+    else out.push(makeField('Nationality','UNKNOWN',0,'UNKNOWN','No reliable nationality evidence found.','Not validated','A state/country name is not treated as nationality without explicit evidence.'));
   }
 
-  const postcode=joined.match(/\b\d{5}\b/g)?.[0];
-  const address=candidateAfterLabel(lines,['address','alamat','permanent address','residential address','home address']);
-  if(address){
-    let value=address.value;
-    // Include following lines until a likely new labelled field, preserving complete address evidence.
-    const idx=lines.indexOf(address.value);
-    if(idx>=0){
-      const extra=[];
-      for(let j=idx+1;j<Math.min(lines.length,idx+5);j++){
-        if(/^(name|nama|dob|date of birth|gender|sex|jantina|nationality|citizenship|id no|ic no)\b/i.test(lines[j]))break;
-        extra.push(lines[j]);
-      }
-      if(extra.length)value += '\n'+extra.join('\n');
-    }
-    const c=confidenceFromCandidate(value,avg);
-    out.push(makeField('Postal / residential address',value,c,c>=85?'VERIFIED':'UNCERTAIN',address.evidence+(postcode?`\\nPostcode candidate: ${postcode}`:''),'Complete-address extraction is evidence-based; postcode alone is never returned as the address.',c<85?'Address evidence may be incomplete or noisy.':''));
-  }else out.push(makeField('Postal / residential address','UNKNOWN',0,'UNKNOWN','No reliable address label/candidate found.','Not validated','Do not construct an address from isolated city/postcode text.'));
+  /*
+     ADDRESS EXTRACTION — deliberately conservative but much more complete.
+     We preserve the contiguous address block instead of returning only a
+     postcode/city.  OCR line breaks are evidence, so each usable line is kept.
+     We stop only at a strong next-field label or obvious document metadata.
+  */
+  const addressLabels=['address','alamat','alamat tetap','alamat rumah','permanent address','residential address','home address','mailing address','postal address','correspondence address'];
+  const stopLabels=/^(name|full\s*name|nama(?:\s*penuh)?|dob|date\s*of\s*birth|birth\s*date|tarikh\s*lahir|gender|sex|jantina|nationality|citizenship|kewarganegaraan|id\s*(?:no|number)?|identification\s*(?:no|number)?|nric|ic\s*no|no\.?\s*kad\s*pengenalan|occupation|pekerjaan|phone|telephone|tel|mobile|email|e-?mail|date\s*issued|issue\s*date|expiry|valid\s*until|tarikh\s*luput)\s*[:\-]?\s*/i;
+  const addressStartRe=new RegExp('^\\s*(?:'+addressLabels.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')\\s*[:\\-]?\\s*(.*)$','i');
 
-  // Explicit numeric scan is an audit warning, not a field assignment.
-  const suspicious=lines.filter(x=>/[0-9]/.test(x)&&/[A-Za-z]/.test(x)&&/[0-9][A-Za-z]|[A-Za-z][0-9]/.test(x));
+  function cleanAddressLine(x){
+    return String(x||'').replace(/[|]+/g,' ').replace(/[ \t]{2,}/g,' ').trim();
+  }
+  function looksLikeAddressLine(x){
+    const v=cleanAddressLine(x); if(v.length<2)return false;
+    if(stopLabels.test(v))return false;
+    if(/^(page|www\.|https?:\/\/|email\s*[:\-]|tel\s*[:\-])/i.test(v))return false;
+    const postcode=/\b\d{5}\b/.test(v);
+    const street=/(jalan|jln\.?|lorong|lrg\.?|persiaran|taman|kampung|kg\.?|no\.?\s*\d+|road|street|st\.?\b|avenue|ave\.?\b|drive|dr\.?\b|lane|block|blok|lot|unit|floor|tingkat|residensi|residence|apartment|apartmen|condominium|condo|flat|suite|building|bangunan)/i.test(v);
+    const place=/(kuala|selangor|perak|penang|pulau pinang|johor|melaka|malacca|negeri sembilan|pahang|terengganu|kelantan|kedah|perlis|sabah|sarawak|putrajaya|labuan|malaysia|singapore|singapura|indonesia|city|bandar|town|district|daerah|wilayah)/i.test(v);
+    return postcode||street||place||/[A-Za-z]{3,}.*\d/.test(v);
+  }
+  function findAddressBlock(){
+    for(let i=0;i<ls.length;i++){
+      const m=ls[i].match(addressStartRe); if(!m)continue;
+      const collected=[]; const first=cleanAddressLine(m[1]);
+      if(first)collected.push(first);
+      for(let j=i+1;j<Math.min(ls.length,i+12);j++){
+        const line=cleanAddressLine(ls[j]);
+        if(!line)continue;
+        if(stopLabels.test(line))break;
+        if(/^(signature|sign|photo|date|place of birth|religion|race|ethnicity)\b/i.test(line))break;
+        if(/^(page\s+\d+|www\.|https?:\/\/)/i.test(line))break;
+        /* Keep address-looking lines. Once an address is strongly established,
+           allow ordinary short locality lines too, but stop on a new field. */
+        if(collected.length===0 || looksLikeAddressLine(line) || collected.some(x=>/\b\d{5}\b/.test(x))){
+          collected.push(line);
+        }else if(collected.length>=2){
+          break;
+        }
+      }
+      if(collected.length)return {start:i,value:collected.join('\n'),evidence:[ls[i],...collected].join('\n')};
+    }
+    return null;
+  }
+
+  const address=findAddressBlock();
+  const postcodeCandidates=[...joined.matchAll(/\b\d{5}\b/g)].map(m=>m[0]);
+  const uniquePostcodes=[...new Set(postcodeCandidates)];
+  const postcodeText=uniquePostcodes.length?uniquePostcodes.join(', '):'';
+  if(address){
+    const lineCount=address.value.split('\n').length;
+    const hasPostcode=/\b\d{5}\b/.test(address.value);
+    const hasStreet=/(jalan|jln\.?|lorong|lrg\.?|persiaran|taman|kampung|kg\.?|road|street|avenue|drive|lane|block|blok|lot|unit|floor|tingkat|residen|apartment|apartmen|condominium|condo|flat|suite|building|bangunan)/i.test(address.value);
+    const c0=confidenceFromCandidate(address.value,avg);
+    const c=Math.min(95,c0+(hasPostcode?2:0)+(lineCount>=3?2:0));
+    const completeScore=(hasPostcode?1:0)+(hasStreet?1:0)+(lineCount>=2?1:0);
+    const st=c>=85&&completeScore>=2?'VERIFIED':'UNCERTAIN';
+    const reason=st==='VERIFIED'?'':'Address block was detected, but one or more components may be missing, merged, blurred, or misread. Verify every line against the original.';
+    out.push(makeField('Postal / residential address',address.value,c,st,address.evidence,`Captured ${lineCount} contiguous address line(s)${hasPostcode?' including postcode':''}. No address text was invented or reconstructed from a city/postcode alone.`,reason));
+  }else{
+    /* If there is no explicit label, do not manufacture an address. However,
+       expose the presence of postcode evidence so a reviewer knows why it was
+       not silently promoted into an address. */
+    const postcodeEvidence=uniquePostcodes.length?ls.filter(x=>/\b\d{5}\b/.test(x)).join('\n'):'';
+    out.push(makeField('Postal / residential address','UNKNOWN',0,'UNKNOWN',postcodeEvidence||'No reliable address label/candidate found.','Not validated','An isolated postcode, city, state, or country is never converted into a complete address.'));
+  }
+
+  const suspicious=ls.filter(x=>/[0-9]/.test(x)&&/[A-Za-z]/.test(x)&&/[0-9][A-Za-z]|[A-Za-z][0-9]/.test(x));
   if(suspicious.length){
     out.push(makeField('Numeric ambiguity audit','REVIEW REQUIRED',Math.min(avg,70),'UNCERTAIN',suspicious.slice(0,8).join('\n'),'Look-alike character substitutions were not performed.','Mixed alphanumeric evidence may contain OCR confusions such as 0/O, 1/I/l, 5/S, 8/B/6, etc. Verify against the source image.','numeric'));
   }
