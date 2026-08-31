@@ -594,23 +594,28 @@ function normalizeNameEvidence(line){
   return s;
 }
 function findNameCandidates(text){
-  const raw=String(text||'').split(/\r?\n/), out=[];
+  /* NAMEADDRESS is spatially segmented by the visible name/address gap. Every
+     surviving OCR row is name evidence. A one-token final row such as MOHAMED
+     is valid and must not be discarded. No spelling/character/punctuation
+     correction is performed. */
+  const raw=String(text||"").split(/\r?\n/),rows=[];
   const banned=/^(?:KAD|PENGENALAN|IDENTITY|CARD|MALAYSIA|MYKAD|WARGANEGARA|PEREMPUAN|LELAKI|FEMALE|MALE|SCANNED|WITH|CAMSCANNER|DATEMPL\.COM|WWW\b|HTTP\b)$/i;
   for(const line of raw){
     const value=normalizeNameEvidence(line);
     if(!value||value.length<2||value.length>100)continue;
-    if(banned.test(value))continue;
-    if(/(?:\.com|https?:\/\/|www\.)/i.test(value))continue;
+    if(banned.test(value)||/(?:\.com|https?:\/\/|www\.)/i.test(value))continue;
     if(/\d/.test(value))continue;
     if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MYKAD|SCANNED\s+WITH/i.test(value))continue;
     const tokens=value.split(/\s+/).filter(Boolean);
-    const alphaTokens=tokens.filter(t=>/[A-Za-z\p{L}]/u.test(t));
-    if(alphaTokens.length<2||alphaTokens.length>12)continue;
-    // Internal punctuation is evidence and is preserved. Leading punctuation is rejected.
-    if(!/^[\p{L}\p{N}][\p{L}\p{N}'’./·()\-]*(?:\s+(?:[\p{L}\p{N}][\p{L}\p{N}'’./·()\-]*|\/))+$/u.test(value.replace(/\s+$/,'')))continue;
-    out.push(value);
+    if(!tokens.length||tokens.length>12)continue;
+    if(!tokens.every(t=>/^[\p{L}\p{N}][\p{L}\p{N}'’./·()\-]*$/u.test(t)||t==="/"))continue;
+    rows.push(value);
   }
-  return [...new Set(out)];
+  if(!rows.length)return [];
+  const candidates=[],joined=rows.join(" ");
+  if(joined.length>=2&&joined.length<=100)candidates.push(joined);
+  for(const row of rows)candidates.push(row);
+  return [...new Set(candidates)];
 }
 function extractAddress(text){
   // Dedicated front-card address crop: the address occupies exactly five lines.
@@ -919,7 +924,12 @@ function run(){
  const exactName=window.splitNameAddressByVisibleGap({lines:base("25 BATANG")});
  assert("name exact preservation",exactName.nameLines[1]==="NAME TWO");
  assert("address exact preservation",exactName.addressLines[0]==="25 BATANG");
- window.NAME_ADDRESS_GAP_TESTS={passed:failures.length===0,failures};
+  const nameRows=findNameCandidates("JOHN CITIZEN\nMOHAMED");
+ assert("single-token final name row retained",nameRows.includes("JOHN CITIZEN MOHAMED"));
+ assert("MOHAMED retained as final token",nameRows.some(x=>x.endsWith("MOHAMED")));
+ const onlyMohamed=findNameCandidates("MOHAMED");
+ assert("single-token name accepted",onlyMohamed.includes("MOHAMED"));
+window.NAME_ADDRESS_GAP_TESTS={passed:failures.length===0,failures};
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});else run();
 })();</script>
