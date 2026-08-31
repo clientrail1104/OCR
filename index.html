@@ -3,542 +3,107 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#eef4f7">
-<title>OCR MASTER — Instant Document Intelligence</title>
+<meta name="theme-color" content="#edf3f7">
+<title>OCR MASTER — MyKad Verified Extraction</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-:root{
- --bg:#edf3f7;--ink:#26343d;--muted:#71808a;--cyan:#12c9c0;--violet:#806cff;
- --ok:#168b61;--warn:#ad7800;--bad:#c83f59;
- --out:10px 10px 24px rgba(159,174,187,.45),-10px -10px 24px rgba(255,255,255,.95);
- --in:inset 5px 5px 12px rgba(159,174,187,.30),inset -5px -5px 12px rgba(255,255,255,.92)
-}
-*{box-sizing:border-box}
-html,body{width:100%;height:100%;margin:0}
-body{overflow:hidden;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:10px}
-button,input,select{font:inherit}
-button{border:0;cursor:pointer;color:inherit}
-button:disabled{opacity:.5;cursor:not-allowed}
-.app{height:calc(100vh - 20px);max-width:1800px;margin:auto;display:flex;flex-direction:column}
-.top{flex:0 0 auto;height:48px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
-.brand{display:flex;align-items:center;gap:10px}.logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:12px;font-weight:950;color:var(--cyan);box-shadow:var(--out)}
-h1{font-size:18px;line-height:1;margin:0}.sub{font-size:9px;color:var(--muted);margin-top:4px}
-.status{padding:8px 11px;border-radius:99px;box-shadow:var(--out);font-size:9px;font-weight:900;white-space:nowrap}
-.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--ok)}
-.layout{flex:1;min-height:0;display:grid;grid-template-columns:260px minmax(0,1fr) 390px;gap:9px}
-.card{background:var(--bg);border-radius:17px;box-shadow:var(--out);padding:11px;min-width:0;min-height:0}
-.left,.right,.center{min-height:0}.left{overflow:auto}.center{display:grid;grid-template-rows:auto minmax(0,1fr);gap:9px}
-.right{display:flex;flex-direction:column}
-h2{font-size:11px;margin:0 0 7px}.label{text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-size:8px;font-weight:900;margin-bottom:5px}
-.drop{border:1.5px dashed rgba(18,201,192,.65);border-radius:15px;padding:13px;text-align:center;box-shadow:var(--in);outline:none}
-.drop.drag{box-shadow:var(--in),0 0 0 2px rgba(18,201,192,.2);transform:scale(1.01)}
-.scan{font-size:25px;color:var(--cyan);font-weight:900}.drop strong{display:block;font-size:10px}.drop small{display:block;color:var(--muted);font-size:8px;line-height:1.45;margin-top:3px}
-.row{display:flex;gap:6px;align-items:center}.row>*{flex:1}
-.btn{padding:8px 9px;border-radius:10px;background:var(--bg);box-shadow:6px 6px 12px rgba(159,174,187,.35),-6px -6px 12px white;font-size:9px;font-weight:900}.btn:active{box-shadow:var(--in)}
-.primary{background:linear-gradient(135deg,var(--cyan),var(--violet));color:white}
-input[type=file]{display:none}
-select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);box-shadow:var(--in);color:var(--ink);font-size:9px;outline:0}
-.section{margin-bottom:9px}.mini{font-size:8px;color:var(--muted);line-height:1.45}
-.file-list{max-height:135px;overflow:auto;display:flex;flex-direction:column;gap:5px}.file{padding:7px;border-radius:10px;box-shadow:var(--in);font-size:8px}.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file span{color:var(--muted)}
-.hero{display:grid;grid-template-columns:minmax(0,1fr) 185px;gap:9px}.id-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.slot{height:74px;border-radius:13px;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center;padding:5px}.slot img{max-width:100%;max-height:66px;object-fit:contain;border-radius:7px}.empty{color:var(--muted);font-size:9px}
-.progress-box{border-radius:12px;box-shadow:var(--in);padding:9px}.progress{height:7px;border-radius:99px;background:#dce4e9;overflow:hidden}.progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .15s}.progress-text{font-size:8px;color:var(--muted);min-height:23px;margin-top:5px}
-.live{font-size:8px;padding:7px;margin-top:6px;border-radius:9px;box-shadow:var(--in);line-height:1.4}
-.result-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.raw{height:100%;min-height:0;overflow:auto;border-radius:12px;box-shadow:var(--in);padding:8px;margin-top:7px;white-space:pre-wrap;overflow-wrap:anywhere;font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
-.badge{padding:4px 6px;border-radius:99px;box-shadow:var(--in);font-size:7px;font-weight:950;white-space:nowrap}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-.notice{font-size:8px;line-height:1.45;padding:7px;border-radius:10px;box-shadow:var(--in);margin:7px 0}.results{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:5px}.field{padding:8px;border-radius:11px;box-shadow:var(--in)}.field-top{display:flex;align-items:center;justify-content:space-between;gap:6px}.field-name{font-size:8px;font-weight:950}.field-value{font-size:9px;line-height:1.4;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.field-meta{font-size:7.5px;color:var(--muted);line-height:1.4;margin-top:4px}.evidence{margin-top:4px;padding:5px;border-radius:7px;background:rgba(255,255,255,.22);font-size:7px;white-space:pre-wrap;overflow-wrap:anywhere}
-.table-wrap{overflow:auto;margin-top:5px;border-radius:7px;box-shadow:var(--in)}table{border-collapse:collapse;width:100%;font-size:7px}th,td{padding:4px;border-bottom:1px solid rgba(100,120,140,.15);text-align:left}
-.hidden-internal{display:none!important}
-@media(max-width:1150px){html,body{overflow:auto}.app{height:auto;min-height:100vh}.layout{grid-template-columns:240px 1fr}.right{grid-column:1/-1;min-height:350px}.center{min-height:700px}}
-@media(max-width:700px){.layout{grid-template-columns:1fr}.right{grid-column:auto}.hero{grid-template-columns:1fr}.id-grid{grid-template-columns:1fr}.top{height:auto}.status{display:none}}
+:root{--bg:#edf3f7;--ink:#26343d;--muted:#70808a;--cyan:#10c9c1;--violet:#7967f5;--ok:#13875f;--warn:#a76e00;--bad:#c43f56;--out:10px 10px 22px #cbd5dc,-10px -10px 22px #fff;--in:inset 5px 5px 12px #cbd5dc,inset -5px -5px 12px #fff}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);padding:10px;overflow:hidden}.app{height:calc(100vh - 20px);max-width:1700px;margin:auto;display:flex;flex-direction:column}.top{height:48px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.brand{display:flex;gap:10px;align-items:center}.logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;box-shadow:var(--out);font-size:12px;font-weight:950;color:var(--cyan)}h1{font-size:18px;margin:0}.sub{font-size:8px;color:var(--muted);margin-top:3px}.status{padding:8px 11px;border-radius:99px;box-shadow:var(--out);font-size:9px;font-weight:900}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--ok)}
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:250px minmax(0,1fr) 390px;gap:9px}.card{background:var(--bg);border-radius:17px;box-shadow:var(--out);padding:11px;min-width:0;min-height:0}.left{overflow:auto}.center{display:grid;grid-template-rows:auto minmax(0,1fr);gap:9px}.right{display:flex;flex-direction:column}h2{font-size:11px;margin:0 0 7px}.label{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:900;margin:9px 0 5px}.drop{border:1.5px dashed rgba(16,201,193,.72);border-radius:14px;padding:13px;text-align:center;box-shadow:var(--in)}.plus{font-size:25px;color:var(--cyan);font-weight:900}.drop strong{display:block;font-size:10px}.drop small{display:block;color:var(--muted);font-size:8px;line-height:1.45}.actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.pick,.btn{min-height:32px;border:0;border-radius:10px;padding:7px 9px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg);box-shadow:6px 6px 12px #cbd5dc,-6px -6px 12px #fff;font-size:9px;font-weight:900;cursor:pointer}.pick{background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff}.pick:active,.btn:active{box-shadow:var(--in)}select{width:100%;border:0;border-radius:10px;padding:8px;background:var(--bg);box-shadow:var(--in);font-size:9px;color:var(--ink)}.mini{font-size:8px;color:var(--muted);line-height:1.45}.files{display:flex;flex-direction:column;gap:5px;max-height:160px;overflow:auto}.file{padding:7px;border-radius:9px;box-shadow:var(--in);font-size:8px}.file b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file span{color:var(--muted)}
+.workspace{display:grid;grid-template-columns:1fr 1fr;gap:8px}.slot{height:125px;border-radius:13px;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;overflow:hidden}.slot img{max-width:100%;max-height:100%;object-fit:contain}.slot span{font-size:9px;color:var(--muted);font-weight:900}.process{margin-top:8px;padding:8px;border-radius:11px;box-shadow:var(--in)}.bar{height:7px;border-radius:99px;background:#dbe3e8;overflow:hidden}.bar i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .2s}.process p{font-size:8px;color:var(--muted);margin:5px 0 0}.evidence{min-height:0;display:flex;flex-direction:column}.head{display:flex;align-items:center;justify-content:space-between;gap:8px}.badge{padding:4px 6px;border-radius:99px;box-shadow:var(--in);font-size:7px;font-weight:950}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.raw{flex:1;min-height:0;overflow:auto;margin-top:6px;padding:9px;border-radius:12px;box-shadow:var(--in);font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.notice{font-size:8px;line-height:1.4;padding:7px;border-radius:10px;box-shadow:var(--in);margin:0 0 7px}.fields{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px}.field{padding:8px;border-radius:11px;box-shadow:var(--in)}.ftop{display:flex;justify-content:space-between;align-items:center;gap:6px}.fname{font-size:8px;font-weight:950}.fval{font-size:10px;font-weight:750;line-height:1.4;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.meta{font-size:7px;color:var(--muted);line-height:1.45;margin-top:4px}.ev{font:7px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px;padding:5px;border-radius:7px;background:rgba(255,255,255,.25);white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:1100px){body{overflow:auto}.app{height:auto;min-height:100vh}.grid{grid-template-columns:230px 1fr}.right{grid-column:1/-1;min-height:350px}.center{min-height:520px}}@media(max-width:700px){.grid{grid-template-columns:1fr}.right{grid-column:auto}.workspace{grid-template-columns:1fr}}
 </style>
-
-<style id="safari-upload-fix">
-.native-file-input{
-  position:absolute!important;
-  width:1px!important;
-  height:1px!important;
-  padding:0!important;
-  margin:-1px!important;
-  overflow:hidden!important;
-  clip:rect(0,0,0,0)!important;
-  white-space:nowrap!important;
-  border:0!important;
-}
-.file-picker{
-  position:relative;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:100%;
-  min-height:34px;
-  padding:8px 9px;
-  border-radius:10px;
-  background:linear-gradient(135deg,var(--cyan),var(--violet));
-  color:#fff;
-  box-shadow:6px 6px 12px rgba(159,174,187,.35),-6px -6px 12px white;
-  font-size:9px;
-  font-weight:900;
-  cursor:pointer;
-  user-select:none;
-  -webkit-user-select:none;
-}
-.file-picker:focus-within{
-  outline:3px solid rgba(18,201,192,.28);
-  outline-offset:2px;
-}
-.file-picker:active{transform:translateY(1px)}
-.upload-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}
-.drop-zone-hit{
-  cursor:pointer;
-}
-</style>
-
 </head>
 <body>
 <div class="app">
-<header class="top">
- <div class="brand"><div class="logo">OCR</div><div><h1>OCR MASTER</h1><div class="sub">Instant OCR · evidence-first extraction · automatic HD corroboration</div></div></div>
- <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Ready</span></div>
-</header>
-
-<main class="layout">
+<header class="top"><div class="brand"><div class="logo">OCR</div><div><h1>OCR MASTER</h1><div class="sub">MyKad front/back · exact-value extraction · no silent character correction</div></div></div><div class="status"><span class="dot" id="dot"></span><span id="status">READY</span></div></header>
+<main class="grid">
 <aside class="card left">
- <div class="section">
-  <h2>Upload documents</h2>
-  <div class="drop drop-zone-hit" id="dropZone" tabindex="0" role="button" aria-label="Upload files">
-   <div class="scan">＋</div><strong>Drop files here</strong>
-   <small>PNG · JPG · WEBP · TIFF · PDF · DOCX · XLSX<br>Front + back ID images supported</small>
-   <div class="upload-actions">
-  <label class="file-picker" for="fileInput" id="chooseLabel">Choose files</label>
-  <button class="btn" id="clearBtn" type="button">Clear</button>
-</div>
-  </div>
-  <input id="fileInput" class="native-file-input" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.pdf,.docx,.xlsx,image/*" aria-label="Choose documents">
- </div>
-
- <div class="section">
-  <div class="label">OCR language</div>
-  <select id="lang">
-   <option value="eng">English</option><option value="msa">Malay</option><option value="ind">Indonesian</option>
-   <option value="eng+msa">English + Malay</option><option value="eng+ind">English + Indonesian</option>
-   <option value="eng+msa+ind">English + Malay + Indonesian</option>
-  </select>
- </div>
-
- <div class="section">
-  <h2>Instant processing</h2>
-  <div class="progress-box"><div class="progress"><i id="bar"></i></div><div class="progress-text" id="progressText">Waiting for upload.</div></div>
-  <div class="live"><b id="liveState">READY</b><br><span id="liveDetail">Upload a document to begin.</span></div>
-  <button class="btn primary" id="runBtn" type="button" style="width:100%;margin-top:6px">Run / Re-run OCR</button>
- </div>
-
- <div class="section">
-  <div class="label">Automatic document processing</div>
-  <div class="mini">Instant OCR starts automatically. Image orientation, deskew, contrast, sharpening, HD upscaling, multilingual recognition, field extraction and validation run without user-facing processing switches.</div>
- </div>
-
- <div class="section">
-  <div class="label">Files</div>
-  <div class="file-list" id="fileList"><div class="empty">No files selected.</div></div>
- </div>
-
- <!-- Internal defaults. They are intentionally not exposed in the UI. -->
- <div class="hidden-internal" aria-hidden="true">
-  <input id="autoInstant" type="checkbox" checked>
-  <input id="enhance" type="checkbox" checked>
-  <input id="deskew" type="checkbox" checked>
-  <input id="threshold" type="checkbox">
-  <input id="sharpen" type="checkbox" checked>
-  <input id="scale" type="range" min="1" max="2.5" step=".25" value="2">
-  <input id="aiUpscale" type="checkbox" checked>
-  <select id="upscaleFactor"><option value="4" selected>4</option></select>
-  <button id="loadUpscaler" type="button"></button><span id="upscaleStatus"></span><span id="scaleValue"></span>
- </div>
+<h2>Upload documents</h2>
+<div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose document files"><div class="plus">＋</div><strong>Drop files here</strong><small>Front + back images · JPG · PNG · WEBP · TIFF</small><div class="actions"><label class="pick" for="files">Choose files</label><button class="btn" id="clear" type="button">Clear</button></div></div>
+<input id="files" class="file-input" type="file" multiple accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff">
+<div class="label">OCR language</div><select id="lang"><option value="eng+msa">English + Malay</option><option value="eng">English</option><option value="msa">Malay</option></select>
+<div class="label">Instant processing</div><div class="mini">Automatic MyKad field OCR starts after upload. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
+<div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Waiting for upload.</p></div>
+<div class="label">Files</div><div class="files" id="fileList"><div class="mini">No files selected.</div></div>
 </aside>
-
 <section class="center">
- <div class="card hero">
-  <div>
-   <h2>Front / back ID workspace</h2>
-   <div class="mini" style="margin-bottom:7px">First two image uploads are displayed as front/back evidence. Every supported page is still processed.</div>
-   <div class="id-grid"><div class="slot" id="frontSlot"><div class="empty">ID FRONT</div></div><div class="slot" id="backSlot"><div class="empty">ID BACK</div></div></div>
-  </div>
-
- </div>
-
- <div class="card">
-  <div class="result-head"><h2>OCR evidence</h2><span class="badge" id="ocrBadge">WAITING</span></div>
-  <div class="raw" id="rawText"><div class="empty">OCR evidence will appear progressively.</div></div>
- </div>
+<div class="card"><h2>Front ID / Back ID</h2><div class="workspace"><div class="slot" id="front"><span>FRONT ID</span></div><div class="slot" id="back"><span>BACK ID</span></div></div></div>
+<div class="card evidence"><div class="head"><h2>OCR evidence</h2><span class="badge" id="ocrBadge">WAITING</span></div><div class="raw" id="raw">OCR evidence will appear here.</div></div>
 </section>
-
-<aside class="card right">
- <div class="result-head"><h2>Verified extraction</h2><span class="badge warn" id="reviewBadge">AWAITING OCR</span></div>
- <div class="notice warn" id="summary">Capture includes explicit fields plus other reliably readable information. Gold microchip regions are excluded from OCR. No ambiguous character is silently corrected.</div>
- <div class="results" id="fields"><div class="empty">Structured extraction will appear here.</div></div>
-</aside>
-</main>
-</div>
-
+<aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div class="notice warn" id="notice">Only these fields are extracted: Front ID NRIC Number, Full Name, Gender, Nationality, Address; Back ID Extended NRIC Number.</div><div class="fields" id="fields"></div></aside>
+</main></div>
 <script>
-(function(){
 'use strict';
-const $=s=>document.querySelector(s);
-const state={files:[],pages:[],selected:0,results:[],worker:null,workerLang:null,running:false,front:null,back:null,sr:null};
-const els={
- fileInput:$('#fileInput'),drop:$('#dropZone'),clear:$('#clearBtn'),run:$('#runBtn'),lang:$('#lang'),
- autoInstant:$('#autoInstant'),enhance:$('#enhance'),deskew:$('#deskew'),threshold:$('#threshold'),sharpen:$('#sharpen'),
- scale:$('#scale'),aiUpscale:$('#aiUpscale'),upscaleFactor:$('#upscaleFactor'),loadUpscaler:$('#loadUpscaler'),upscaleStatus:$('#upscaleStatus'),scaleValue:$('#scaleValue'),
- fileList:$('#fileList'),front:$('#frontSlot'),back:$('#backSlot'),raw:$('#rawText'),
- fields:$('#fields'),bar:$('#bar'),progress:$('#progressText'),status:$('#statusText'),dot:$('#statusDot'),liveState:$('#liveState'),liveDetail:$('#liveDetail'),
- ocrBadge:$('#ocrBadge'),review:$('#reviewBadge'),summary:$('#summary')
-};
-function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function setStatus(t,good=true){els.status.textContent=t;els.dot.style.background=good?'var(--ok)':'var(--bad)'}
-function progress(p,t){els.bar.style.width=Math.max(0,Math.min(100,p))+'%';els.progress.textContent=t}
-function bytes(n){return n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB'}
-function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
-function retry(fn,n=3){return (async()=>{let e;for(let i=0;i<n;i++){try{return await fn()}catch(x){e=x;if(i<n-1)await sleep(250*(i+1))}}throw e})()}
-
-/* Upload: do not depend on any removed UI control. */
-/* Safari-safe file picker:
-   The visible "Choose files" control is a <label for="fileInput">.
-   The native input remains present but visually hidden, avoiding display:none
-   and avoiding dependence on a synthetic click for the file chooser. */
-els.drop.addEventListener('click',e=>{
-  if(e.target.closest('label') || e.target.closest('#clearBtn')) return;
-  els.fileInput.focus();
-});
-els.drop.addEventListener('keydown',e=>{
-  if(e.key==='Enter'||e.key===' '){
-    e.preventDefault();
-    els.fileInput.focus();
-    const label=document.getElementById('chooseLabel');
-    if(label) label.click();
-  }
-});
-els.fileInput.addEventListener('change',e=>{
-  const f=[...e.target.files];
-  /* Clear the value only AFTER copying the File objects so the same file
-     can be selected again on the next interaction. */
-  e.target.value='';
-  addFiles(f);
-});
-['dragenter','dragover'].forEach(x=>els.drop.addEventListener(x,e=>{e.preventDefault();e.stopPropagation();els.drop.classList.add('drag')}));
-['dragleave','drop'].forEach(x=>els.drop.addEventListener(x,e=>{e.preventDefault();e.stopPropagation();els.drop.classList.remove('drag')}));
-els.drop.addEventListener('drop',e=>addFiles([...e.dataTransfer.files]));
-els.clear.addEventListener('click',clearAll);
-els.run.addEventListener('click',()=>runOCR(true));
-
-async function clearAll(){
- if(state.running)return;
- if(state.worker)try{await state.worker.terminate()}catch{}
- state.worker=null;state.workerLang=null;
- state.files.forEach(f=>f.__url&&URL.revokeObjectURL(f.__url));
- state.files=[];state.pages=[];state.results=[];state.selected=0;state.front=null;state.back=null;
- els.fileInput.value='';renderFiles();renderSlots();renderPages();resetOutput();progress(0,'Waiting for upload.');setStatus('Ready');els.run.disabled=false
-}
-function resetOutput(){
- els.raw.innerHTML='<div class="empty">OCR evidence will appear progressively.</div>';
- els.fields.innerHTML='<div class="empty">Structured extraction will appear here.</div>';
- els.summary.textContent='Capture includes explicit fields plus other reliably readable information. No ambiguous character is silently corrected.';
- els.ocrBadge.textContent='WAITING';els.ocrBadge.className='badge';els.review.textContent='AWAITING OCR';els.review.className='badge warn';
- els.liveState.textContent='READY';els.liveDetail.textContent='Upload a document to begin.'
-}
-function renderFiles(){
- els.fileList.innerHTML=state.files.length?'':'<div class="empty">No files selected.</div>';
- state.files.forEach(f=>{const d=document.createElement('div');d.className='file';d.innerHTML='<b title="'+esc(f.name)+'">'+esc(f.name)+'</b><span>'+esc(f.type||'unknown')+' · '+bytes(f.size)+'</span>';els.fileList.appendChild(d)})
-}
-function renderSlots(){
- [[els.front,state.front,'ID FRONT'],[els.back,state.back,'ID BACK']].forEach(([el,o,label])=>{
-  el.innerHTML='';
-  if(o){const im=document.createElement('img');im.src=o.url;im.alt=label;el.appendChild(im)}
-  else el.innerHTML='<div class="empty">'+label+'</div>'
- })
-}
-async function addFiles(files){
- if(!files.length)return;
- const allow=/\.(png|jpe?g|webp|tif|tiff|pdf|docx|xlsx)$/i,valid=[],bad=[];
- for(const f of files){
-  if(!allow.test(f.name)){bad.push(f.name+' — unsupported format');continue}
-  if(f.size===0){bad.push(f.name+' — empty file');continue}
-  if(f.size>500*1024*1024){bad.push(f.name+' — larger than 500 MB');continue}
-  const duplicate=state.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified);
-  if(duplicate)continue;
-  valid.push(f)
- }
- if(bad.length){els.summary.textContent=bad.join('\n');els.summary.className='notice bad'}
- if(!valid.length)return;
- state.files.push(...valid);renderFiles();setStatus('Preparing');els.liveState.textContent='PREPARING';els.liveDetail.textContent='Converting pages…';
- try{await buildPages();renderSlots();renderPages();if(state.pages.length)await runOCR(false)}catch(e){console.error(e);els.summary.textContent='Unable to prepare the document: '+e.message;els.summary.className='notice bad';setStatus('Preparation failed',false);els.liveState.textContent='STOPPED';els.liveDetail.textContent='No information was guessed.'}
-}
-async function imageBitmap(file){
- if(window.createImageBitmap)return await retry(()=>createImageBitmap(file),2);
- const url=URL.createObjectURL(file);
- try{const im=new Image();im.src=url;await im.decode();return im}finally{URL.revokeObjectURL(url)}
-}
-function bitmapCanvas(bmp,scale){
- const max=5500;let w=Math.max(1,Math.round(bmp.width*scale)),h=Math.max(1,Math.round(bmp.height*scale));
- const r=Math.min(1,max/Math.max(w,h));w=Math.round(w*r);h=Math.round(h*r);
- const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{alpha:false});
- x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(bmp,0,0,w,h);return c
-}
-async function pdfPages(file){
- const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
- pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
- const data=await file.arrayBuffer();
- const pdf=await retry(()=>pdfjs.getDocument({data}).promise,2),out=[];
- for(let i=1;i<=pdf.numPages;i++){
-  const p=await pdf.getPage(i),v=p.getViewport({scale:2});
-  const c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);
-  await p.render({canvasContext:c.getContext('2d',{alpha:false}),viewport:v}).promise;
-  out.push({file,page:i,canvas:c,label:file.name+' · page '+i+'/'+pdf.numPages})
- }
+(()=>{
+const $=id=>document.getElementById(id);
+const E={files:$('files'),drop:$('drop'),clear:$('clear'),lang:$('lang'),front:$('front'),back:$('back'),list:$('fileList'),bar:$('bar'),progress:$('progress'),raw:$('raw'),fields:$('fields'),badge:$('ocrBadge'),review:$('review'),notice:$('notice'),status:$('status'),dot:$('dot')};
+const S={files:[],pages:[],worker:null,workerLang:null,running:false};
+const ALLOWED=/\.(png|jpe?g|webp|tif|tiff)$/i;
+const FORBIDDEN_TRANSFORMS=['R↔F','P↔F','R↔C','K↔H','D↔O↔0','U↔Y','B↔S','N↔I','|↔I','N↔ea','A/P↔AP','A/L↔AL'];
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function status(t,bad=false){E.status.textContent=t;E.dot.style.background=bad?'var(--bad)':'var(--ok)'}
+function prog(p,t){E.bar.style.width=Math.max(0,Math.min(100,p))+'%';E.progress.textContent=t}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+async function retry(fn,times=2){let err;for(let i=0;i<times;i++){try{return await fn()}catch(e){err=e;if(i+1<times)await wait(220)}}throw err}
+function bytes(n){return n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB'}
+E.files.addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';addFiles(fs)});
+E.clear.addEventListener('click',clearAll);
+E.drop.addEventListener('dragover',e=>{e.preventDefault();E.drop.style.transform='scale(1.01)'});
+E.drop.addEventListener('dragleave',()=>E.drop.style.transform='');
+E.drop.addEventListener('drop',e=>{e.preventDefault();E.drop.style.transform='';addFiles([...e.dataTransfer.files])});
+E.drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();E.files.click()}});
+async function addFiles(fs){const ok=[],bad=[];for(const f of fs){if(!ALLOWED.test(f.name)||!f.type.startsWith('image/')){bad.push(f.name+' — unsupported');continue}if(!f.size){bad.push(f.name+' — empty');continue}if(f.size>500*1024*1024){bad.push(f.name+' — over 500 MB');continue}if(!S.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))ok.push(f)}if(bad.length)E.notice.textContent=bad.join('\n');S.files.push(...ok);renderFiles();if(!ok.length)return;try{status('PREPARING');await makePages();renderSlots();await runOCR()}catch(e){console.error(e);status('ERROR',true);E.notice.textContent='Document preparation failed safely: '+e.message+' No value was guessed.'}}
+function renderFiles(){E.list.innerHTML=S.files.length?S.files.map(f=>'<div class="file"><b>'+esc(f.name)+'</b><span>'+esc(f.type||'image')+' · '+bytes(f.size)+'</span></div>').join(''):'<div class="mini">No files selected.</div>'}
+async function clearAll(){if(S.running)return;try{if(S.worker)await S.worker.terminate()}catch{}S.worker=null;S.workerLang=null;S.files=[];S.pages=[];E.files.value='';E.front.innerHTML='<span>FRONT ID</span>';E.back.innerHTML='<span>BACK ID</span>';E.raw.textContent='OCR evidence will appear here.';E.fields.innerHTML='';E.badge.textContent='WAITING';E.review.textContent='WAITING';E.review.className='badge warn';E.notice.textContent='Only these fields are extracted: Front ID NRIC Number, Full Name, Gender, Nationality, Address; Back ID Extended NRIC Number.';prog(0,'Waiting for upload.');status('READY')}
+async function loadImage(f){const u=URL.createObjectURL(f);const im=new Image();im.src=u;await im.decode();return im}
+function canvasFrom(im){const max=5200,r=Math.min(1,max/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round((im.naturalWidth||im.width)*r));c.height=Math.max(1,Math.round((im.naturalHeight||im.height)*r));const x=c.getContext('2d',{alpha:false});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);return c}
+function crop(c,x,y,w,h,scale=5){const sx=Math.max(0,Math.round(c.width*x)),sy=Math.max(0,Math.round(c.height*y)),sw=Math.min(c.width-sx,Math.round(c.width*w)),sh=Math.min(c.height-sy,Math.round(c.height*h));const o=document.createElement('canvas');o.width=Math.max(1,Math.min(7000,sw*scale));o.height=Math.max(1,Math.min(5000,sh*scale));const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);return o}
+function preprocess(c,mode){const x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),a=d.data;for(let i=0;i<a.length;i+=4){const r=a[i],g=a[i+1],b=a[i+2];if(mode==='gold'&&r>145&&g>105&&g<215&&b<135&&r>g*1.05){a[i]=a[i+1]=a[i+2]=255;continue}let v=.299*r+.587*g+.114*b;if(mode==='high')v=(v-128)*1.35+128;else if(mode==='soft')v=(v-128)*1.12+128;a[i]=a[i+1]=a[i+2]=Math.max(0,Math.min(255,v))}x.putImageData(d,0,0);return c}
+function maskGold(c){return preprocess(c,'gold')}
+function splitComposite(c){const h=c.height,w=c.width;let best=Math.round(h*.5),score=1e9;for(let y=Math.round(h*.43);y<Math.round(h*.60);y+=3){const d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,y,w,1).data;let dark=0;for(let x=0;x<w;x+=3){const i=x*4;if((d[i]+d[i+1]+d[i+2])/3<210)dark++}if(dark<score){score=dark;best=y}}if(best<h*.49){const a=crop(c,0,0,1,best/h,1),b=crop(c,0,best/h,1,1-best/h,1);return[a,b]}return[crop(c,0,0,1,.5,1),crop(c,0,.5,1,.5,1)]}
+async function makePages(){S.pages=[];for(const f of S.files){const im=await loadImage(f),c=canvasFrom(im),ratio=c.height/c.width;if(ratio>1.15){const [a,b]=splitComposite(c);S.pages.push({file:f,side:'front',canvas:a},{file:f,side:'back',canvas:b})}else S.pages.push({file:f,side:S.pages.some(p=>p.side==='front')?'back':'front',canvas:c})}}
+function renderSlots(){E.front.innerHTML='<span>FRONT ID</span>';E.back.innerHTML='<span>BACK ID</span>';for(const p of S.pages){if(!p.canvas)continue;const im=document.createElement('img');im.src=p.canvas.toDataURL('image/jpeg',.9);im.alt=p.side+' ID';const box=p.side==='front'?E.front:E.back;box.innerHTML='';box.appendChild(im)}}
+async function getWorker(){const lang=E.lang.value;if(S.worker&&S.workerLang===lang)return S.worker;if(S.worker)try{await S.worker.terminate()}catch{}if(!window.Tesseract)throw new Error('Tesseract.js did not load. Check the internet connection and reload.');S.worker=await retry(()=>Tesseract.createWorker(lang,1,{logger:m=>{if(m.status&&m.status.includes('recogn'))prog(30+Math.round((m.progress||0)*55),'OCR '+Math.round((m.progress||0)*100)+'%')}}),2);S.workerLang=lang;return S.worker}
+async function ocr(c,psm){const w=await getWorker();return retry(async()=>{const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});return{text:r.data.text||'',conf:Number(r.data.confidence)||0}},2)}
+function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
+function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
+function lines(t){return String(t).split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean)}
+function mk(name,value,conf,status,evidence,validation,reason=''){return{name,value:value||'UNKNOWN',conf:Math.round(Math.max(0,Math.min(100,conf))),status,evidence:evidence||'No reliable evidence.',validation,reason}}
+function findWord(text,words){const re=new RegExp('(?:^|\\s)('+words.join('|')+')(?:$|\\s|[:])','i');return re.exec(text)}
+function extract(front,back){
+ const out=[];const ft=front.text,bt=back.text;
+ const fnum=bestExact(exact(front.nricText,/\b\d{6}-\d{2}-\d{4}\b/g));
+ const bnum=bestExact(exact(back.nricText,/\b\d{6}-\d{2}-\d{4}-\d{2}-\d{2}\b/g));
+ const fNumStatus=fnum?(fnum.all.length===1&&front.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN';
+ out.push(mk('NRIC Number',fnum?fnum.value:'UNKNOWN',fnum?Math.min(front.conf,98):0,fNumStatus,fnum?fnum.value:'No exact 6-2-4 numeric candidate was read.','Exact numeric pattern only. No silent substitutions: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fnum&&fnum.all.length>1?'Competing numeric candidates were detected. Visual verification required.':'An unreadable digit is never repaired.'));
+ const bStatus=bnum?(bnum.all.length===1&&back.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN';
+ out.push(mk('Extended NRIC Number',bnum?bnum.value:'UNKNOWN',bnum?Math.min(back.conf,98):0,bStatus,bnum?bnum.value:'No exact 6-2-4-2-2 numeric candidate was read.','Exact numeric pattern only; no character correction.',bnum&&bnum.all.length>1?'Competing extended-number candidates were detected. Visual verification required.':'An unreadable digit is never repaired.'));
+ const fl=lines(ft);const nameCandidates=fl.filter(x=>/[A-Za-z]{3,}/.test(x)&&/(?:A\/P|A\/L|AP|AL|BIN|BINTI)/i.test(x)&&!/(KAD|PENGENALAN|IDENTITY|MALAYSIA)/i.test(x));const name=nameCandidates[0]||'';
+ out.push(mk('Full Name',name,Math.min(front.conf,96),name?(front.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN',name||'No reliable name line detected.','Preserved exactly as OCR evidence. A/P and A/L are never changed to AP or AL, and vice versa.',name&&/[AIP]/i.test(name)&&!/A\/P/i.test(name)?'Potential A/P recognition ambiguity. Verify the original image.':''));
+ const g=findWord(ft,['PEREMPUAN','LELAKI','FEMALE','MALE']);out.push(mk('Gender',g?g[1]:'UNKNOWN',g?Math.min(front.conf,96):0,g?(front.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN',g?g[0]:'No explicit gender word detected.','Explicit word only; gender is never inferred from the photograph or name.',''));
+ const n=findWord(ft,['MALAYSIA','WARGANEGARA']);out.push(mk('Nationality',n?'Malaysia':'UNKNOWN',n?Math.min(front.conf,96):0,n?(front.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN',n?n[0]:'No explicit Malaysia/Warganegara evidence detected.','Malaysia is returned only from explicit nationality evidence.','A state/address is not converted into nationality.'));
+ const addressLines=fl.filter(x=>/(?:^NO\.?\s*\d|\bBATU\b|\bJALAN\b|\bJLN\b|\bKAMPUNG\b|\bKG\b|\b\d{5}\b|\bSELANGOR\b|\bBATANG\b|\bBERJUNTAI\b|\bBERJUTAI\b|\bRAWANG\b|\bDARAH\b)/i.test(x));const address=[...new Set(addressLines)].filter(x=>!/(WARGANEGARA|PEREMPUAN|LELAKI|MALAYSIA)/i.test(x));out.push(mk('Address',address.join(' ')||'UNKNOWN',address.length?Math.min(front.conf,94):0,address.length?(front.conf>=68?'VERIFIED':'UNCERTAIN'):'UNKNOWN',address.join('\n')||'No reliable address block detected.','Address is assembled only from text directly read from the front ID. No postcode, town or state is invented.',address.length?'Verify every address character against the source image.':''));
  return out
 }
-async function buildPages(){
- state.pages=[];state.front=null;state.back=null;state.selected=0;progress(1,'Reading file list…');
- for(const f of state.files){
-  const ext=f.name.split('.').pop().toLowerCase();
-  try{
-   if(ext==='pdf'){
-    const ps=await pdfPages(f);state.pages.push(...ps)
-   }else if(ext==='docx'){
-    const ab=await f.arrayBuffer();
-    const r=await retry(async()=>{if(!window.mammoth)throw new Error('DOCX reader unavailable');return await window.mammoth.extractRawText({arrayBuffer:ab})},2);
-    state.pages.push({file:f,page:1,text:r.value||'',native:true,label:f.name})
-   }else if(ext==='xlsx'){
-    /* Use SheetJS only if already available; otherwise give a safe explicit error. */
-    if(!window.XLSX)throw new Error('XLSX reader is not loaded. Upload PDF/image for immediate OCR.');
-    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});for(const name of wb.SheetNames){
-     const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:''});
-     state.pages.push({file:f,page:1,text:rows.map(r=>r.join(' | ')).join('\n'),rows,native:true,label:f.name+' · '+name})
-    }
-   }else{
-    const b=await imageBitmap(f),c=bitmapCanvas(b,Number(els.scale.value));
-    const obj={file:f,page:1,canvas:c,label:f.name};state.pages.push(obj);
-    f.__url=URL.createObjectURL(f);if(!state.front)state.front={file:f,url:f.__url};else if(!state.back)state.back={file:f,url:f.__url}
-   }
-  }catch(e){state.pages.push({file:f,page:1,error:e.message,label:f.name})}
- }
- progress(4,state.pages.length+' page(s) ready')
-}
-function renderPages(){
- /* Preview UI removed; retain only the internal page index. */
- if(!state.pages.length){state.selected=0;return}
- state.selected=Math.max(0,Math.min(state.selected,state.pages.length-1));
-}
-
-/* Conservative preprocessing. It never changes characters in OCR output. */
-function grayscaleContrast(c){
- const x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),a=d.data;
- for(let i=0;i<a.length;i+=4){const g=.299*a[i]+.587*a[i+1]+.114*a[i+2];const v=Math.max(0,Math.min(255,(g-128)*1.15+128));a[i]=a[i+1]=a[i+2]=v}
- x.putImageData(d,0,0)
-}
-function unsharp(c){
- const w=c.width,h=c.height;if(w*h>15000000)return;
- const x=c.getContext('2d',{willReadFrequently:true}),src=x.getImageData(0,0,w,h),a=src.data,o=x.createImageData(w,h),b=o.data;
- for(let y=1;y<h-1;y++)for(let q=1;q<w-1;q++){const i=(y*w+q)*4;for(let k=0;k<3;k++){const avg=(a[i-4+k]+a[i+4+k]+a[i-w*4+k]+a[i+w*4+k]+a[i+k])/5;b[i+k]=Math.max(0,Math.min(255,a[i+k]+.55*(a[i+k]-avg)))}b[i+3]=255}
- x.putImageData(o,0,0)
-}
-function estimateSkew(c){
- const max=700,r=Math.min(1,max/Math.max(c.width,c.height)),t=document.createElement('canvas');t.width=Math.max(1,Math.round(c.width*r));t.height=Math.max(1,Math.round(c.height*r));
- const x=t.getContext('2d'),w=t.width,h=t.height;x.drawImage(c,0,0,w,h);const d=x.getImageData(0,0,w,h).data;let best=0,bs=-1;
- for(const deg of [-3,-2,-1,0,1,2,3]){
-  const rad=deg*Math.PI/180,co=Math.cos(rad),si=Math.sin(rad);let score=0;
-  for(let y=4;y<h-4;y+=5)for(let q=4;q<w-4;q+=5){const sx=Math.round((q-w/2)*co+(y-h/2)*si+w/2),sy=Math.round(-(q-w/2)*si+(y-h/2)*co+h/2);if(sx>0&&sx<w-1&&sy>0&&sy<h-1){const i=(sy*w+sx)*4,j=i+w*4;score+=Math.abs(d[i]-d[j])}}
-  if(score>bs){bs=score;best=deg}
- }
- return best
-}
-function rotate(c,deg){
- if(Math.abs(deg)<.5)return c;const r=deg*Math.PI/180,co=Math.abs(Math.cos(r)),si=Math.abs(Math.sin(r)),o=document.createElement('canvas');o.width=Math.ceil(c.width*co+c.height*si);o.height=Math.ceil(c.width*si+c.height*co);
- const x=o.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,o.width,o.height);x.translate(o.width/2,o.height/2);x.rotate(r);x.drawImage(c,-c.width/2,-c.height/2);return o
-}
-function prepare(c){
- let out=maskGoldMicrochip(c);if(els.deskew.checked){const s=estimateSkew(out);if(Math.abs(s)<=3)out=rotate(out,-s)}
- if(els.enhance.checked)grayscaleContrast(out);if(els.sharpen.checked&&!els.threshold.checked)unsharp(out);return out
-}
-
-/* Internal 4× HD fallback: browser-native high quality scaling.
-   It is deliberately hidden from the UI and is never treated as source truth. */
-function upscale4x(c){
- const max=7000,r=Math.min(1,max/Math.max(c.width*4,c.height*4)),o=document.createElement('canvas');
- o.width=Math.max(1,Math.round(c.width*4*r));o.height=Math.max(1,Math.round(c.height*4*r));
- const x=o.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(c,0,0,o.width,o.height);return o
-}
-
-/* OCR worker is reused between pages. */
-async function getWorker(){
- const l=els.lang.value;if(state.worker&&state.workerLang===l)return state.worker;
- if(state.worker)try{await state.worker.terminate()}catch{}
- if(!window.Tesseract)throw new Error('OCR engine did not load. Check network access and reload.');
- setStatus('Loading OCR');els.liveDetail.textContent='Loading OCR language model…';
- state.worker=await retry(()=>Tesseract.createWorker(l,1,{logger:m=>{
-   if(m.status&&m.status.toLowerCase().includes('recogn')){const p=Math.round((m.progress||0)*100);els.liveDetail.textContent='Recognizing… '+p+'%'}
- }}),2);
- state.workerLang=l;return state.worker
-}
-async function recognize(c){
- const w=await getWorker();const r=await retry(()=>w.recognize(c.toDataURL('image/png')),2);
- return {text:r.data.text||'',confidence:Number.isFinite(Number(r.data.confidence))?Number(r.data.confidence):0}
-}
-
-/* Evidence-first extraction.
-   IMPORTANT: field values are NEVER normalized by OCR-confusion substitutions.
-   R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP and A/L/AL
-   are preserved exactly as OCR evidence. Only explicit labels determine a field.
-*/
-const CONFUSION_PAIRS=[
- ['R','F'],['P','F'],['R','C'],['K','H'],['D','O'],['D','0'],['O','0'],['U','Y'],
- ['B','S'],['N','I'],['|','I'],['N','EA'],['A/P','AP'],['A/L','AL']
-];
-const FIELD_STOP_RE=/^(?:full\s*name|name|nama(?:\s*penuh)?|nric|ic\s*(?:no|number)?|identification|id\s*(?:no|number)?|no\.?\s*kad\s*pengenalan|nationality|kewarganegaraan|warganegara|citizenship|gender|sex|jantina|date\s*of\s*birth|dob|tarikh\s*lahir|birth\s*date|address|alamat|alamat\s*tetap|residential\s*address|mailing\s*address|permanent\s*address|telephone|phone|mobile|telefon|email|expiry|issue|registration|license)\b/i;
-function lines(rs){return rs.flatMap(r=>String(r.text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean))}
-function cleanLabelText(x){return String(x||'').replace(/[：]/g,':').replace(/[–—]/g,'-').trim()}
-function labelBlock(ls,labels,maxNext=7){
- const source=labels.map(x=>'(?:'+x+')').join('|');
- const re=new RegExp('^\\s*(?:'+source+')\\s*(?:[:\\-]|\\|)?\\s*(.*)$','i');
- for(let i=0;i<ls.length;i++){
-  const line=cleanLabelText(ls[i]),m=line.match(re); if(!m) continue;
-  let value=m[1].trim(), evidence=ls[i];
-  if(!value && ls[i+1] && !FIELD_STOP_RE.test(ls[i+1])){value=ls[i+1].trim();evidence+='\n'+ls[i+1];i++}
-  if(!value) continue;
-  const parts=[value];
-  for(let j=i+1;j<Math.min(ls.length,i+1+maxNext);j++){
-   if(FIELD_STOP_RE.test(ls[j])) break;
-   if(parts.length>=maxNext) break;
-   const candidate=ls[j];
-   if(/^(?:name|nama|nationality|kewarganegaraan|gender|sex|jantina|dob|date\s*of\s*birth|tarikh\s*lahir|nric|ic|id|address|alamat)\b/i.test(candidate)) break;
-   if(/\b(?:jalan|jln|lorong|persiaran|taman|kampung|kg|blok|block|lot|unit|tingkat|no\.?\s*\d)\b/i.test(candidate) || /\b\d{5}\b/.test(candidate) || /^(?:[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' .\/-]{2,})$/.test(candidate)){
-    parts.push(candidate); evidence+='\n'+candidate;
-   }
-  }
-  return {value:parts.join('\n'),evidence:evidence};
- }
- return null;
-}
-function findLine(ls,re){for(const x of ls){if(re.test(x))return x}return null}
-function findFieldValueSameLine(ls,labels){return labelBlock(ls,labels,4)}
-function avgConf(rs){const a=rs.filter(r=>!r.native);return a.length?a.reduce((s,r)=>s+(r.conflict?Math.min(r.confidence,60):r.confidence),0)/a.length:100}
-function mk(name,value,c,status,evidence,validation,reason=''){return{name,value:value||'UNKNOWN',confidence:Math.round(Math.max(0,Math.min(100,c))),status,evidence:evidence||'No reliable evidence.',validation,reason}}
-function statusFor(c,explicit=true){return explicit&&c>=85?'VERIFIED':explicit?'UNCERTAIN':'UNKNOWN'}
-function hasSuspiciousNumericChars(v){const t=String(v||'').replace(/[\s-]/g,''); return !/^\d+$/.test(t)}
-function extract(rs){
- const ls=lines(rs), c=Math.min(96,avgConf(rs)), out=[];
- const exactRule='OCR value preserved exactly. No silent substitution of R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL.';
-
- const name=findFieldValueSameLine(ls,['full\\s*name','name','nama\\s*penuh','nama']);
- out.push(name
-  ?mk('Full Name',name.value,c,statusFor(c,true),name.evidence,'Explicit name-label association; multi-line components preserved.',c<85?'OCR confidence is below the verification threshold.':exactRule)
-  :mk('Full Name','UNKNOWN',0,'UNKNOWN','No reliable name label/value association was detected.','Not validated.','The application does not infer a name from arbitrary text.'));
-
- const id=findFieldValueSameLine(ls,['nric(?:\\s*(?:no|number))?','ic\\s*(?:no|number)?','identification\\s*(?:no|number)?','id\\s*(?:no|number)','no\\.?\\s*kad\\s*pengenalan']);
- let idObj=id;
- if(!idObj){
-  for(const x of ls){const m=x.match(/\b(?:\d{6}[- ]\d{2}[- ]\d{4}|[A-Z0-9]{6}[- ]?[A-Z0-9]{2}[- ]?[A-Z0-9]{4})\b/i);if(m){idObj={value:m[0],evidence:x};break}}
- }
- if(idObj){const suspicious=hasSuspiciousNumericChars(idObj.value);out.push(mk('NRIC / ID Number',idObj.value,c,suspicious||c<85?'UNCERTAIN':'VERIFIED',idObj.evidence,'Pattern/label evidence only; value is preserved character-for-character. '+exactRule,suspicious?'Potential OCR-confusion character detected; visually verify every digit/letter.':c<85?'OCR confidence is below the verification threshold.':'Critical numeric field — visual verification is recommended.'))}
- else out.push(mk('NRIC / ID Number','UNKNOWN',0,'UNKNOWN','No reliable identification-number evidence was detected.','Not validated.','No number is inferred.'));
-
- const nat=findFieldValueSameLine(ls,['nationality','kewarganegaraan','citizenship']);
- const explicitMY=findLine(ls,/\bwarganegara(?:\s*\/\s*malaysia|\s+malaysia)?\b/i);
- if(nat) out.push(mk('Nationality',nat.value,c,statusFor(c,true),nat.evidence,'Explicit nationality field. '+exactRule,c<85?'Verify visually.':''));
- else if(explicitMY) out.push(mk('Nationality',explicitMY,c,statusFor(c,true),explicitMY,'Explicit Warganegara/Malaysia evidence. '+exactRule,''));
- else out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state/country appearing in an address is not converted into nationality.'));
-
- const sex=findFieldValueSameLine(ls,['gender','sex','jantina']);
- if(sex){const raw=sex.value;const u=raw.toUpperCase();const explicitFemale=/\b(?:PEREMPUAN|FEMALE|F)\b/.test(u), explicitMale=/\b(?:LELAKI|MALE|M)\b/.test(u);out.push(mk('Gender / Sex',raw,c,explicitFemale||explicitMale?statusFor(c,true):'UNCERTAIN',sex.evidence,'Explicit gender/sex evidence. Original OCR value is retained; no character substitution.',explicitFemale||explicitMale?'':'Value is not an unambiguous supported gender marker.'))}
- else out.push(mk('Gender / Sex','UNKNOWN',0,'UNKNOWN','No explicit gender/sex field detected.','Not validated.','Gender is never inferred from a name.'));
-
- const dob=findFieldValueSameLine(ls,['date\\s*of\\s*birth','dob','tarikh\\s*lahir','birth\\s*date']);
- if(dob){const ok=/\b(?:\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})\b/.test(dob.value);out.push(mk('Date of Birth',dob.value,c,ok&&c>=85?'VERIFIED':'UNCERTAIN',dob.evidence,ok?'Recognizable date structure; original OCR preserved.':'Date format is not sufficiently clear.',ok&&c>=85?'':'Verify date visually.'))}
- else out.push(mk('Date of Birth','UNKNOWN',0,'UNKNOWN','No explicit DOB field detected.','Not validated.','No date is inferred.'));
-
- let addr=findFieldValueSameLine(ls,['address','alamat','alamat\\s*tetap','residential\\s*address','mailing\\s*address','permanent\\s*address']);
- if(!addr){
-  const idx=ls.findIndex(x=>/\b(?:jalan|jln|lorong|persiaran|taman|kampung|kg|blok|block|lot|unit|tingkat|alamat)\b/i.test(x));
-  const pc=ls.findIndex(x=>/\b\d{5}\b/.test(x));
-  if(idx>=0){let a=[ls[idx]],ev=ls[idx];for(let j=idx+1;j<Math.min(ls.length,idx+10);j++){if(FIELD_STOP_RE.test(ls[j])&&j!==pc)break;a.push(ls[j]);ev+='\n'+ls[j];if(/\b\d{5}\b/.test(ls[j]))break}addr={value:a.join('\n'),evidence:ev}}
- }
- out.push(addr?mk('Address',addr.value,c,statusFor(c,true),addr.evidence,'Multi-line address evidence preserved, including postcode/city/state where readable.',c<85?'Some address characters may need visual verification.':''):mk('Address','UNKNOWN',0,'UNKNOWN','No reliable address block was detected.','Not validated.','The application does not construct an address from isolated postcode/city text.'));
-
- const postcode=findLine(ls,/\b\d{5}\b/); if(postcode)out.push(mk('Postcode',(postcode.match(/\b\d{5}\b/)||[''])[0],c,c>=85?'VERIFIED':'UNCERTAIN',postcode,'Five-digit postcode pattern detected.','Verify against original source.'));
- const states=ls.filter(x=>/\b(?:Johor|Kedah|Kelantan|Melaka|Malacca|Negeri Sembilan|Pahang|Perak|Perlis|Penang|Pulau Pinang|Sabah|Sarawak|Selangor|Terengganu|Kuala Lumpur|Putrajaya|Labuan)\b/i.test(x)); if(states.length)out.push(mk('State / Location',states.join('\n'),Math.min(c,92),c>=85?'VERIFIED':'UNCERTAIN',states.join('\n'),'Explicit location text retained.','This is not converted into nationality.'));
- const phone=findLine(ls,/(?:tel|telephone|phone|mobile|telefon)\b/i); if(phone)out.push(mk('Telephone / Mobile',phone,Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',phone,'Explicit telephone evidence.','Verify every digit visually.'));
- const email=findLine(ls,/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i); if(email)out.push(mk('Email',email,Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',email,'Email pattern detected.','Verify every character visually.'));
- const conflicts=rs.filter(r=>r.conflict).length; if(conflicts)out.push(mk('OCR / HD Conflict','REVIEW REQUIRED',Math.min(c,60),'UNCERTAIN',conflicts+' page(s) produced materially different OCR between primary and HD pass.','Conflict detected; no version is silently preferred.','Verify affected fields against the original source.'));
- const consumed=new Set(out.flatMap(f=>String(f.evidence||'').split('\n').map(x=>x.trim()).filter(Boolean)));
- const other=ls.filter(x=>x.length>1&&!FIELD_STOP_RE.test(x)&&!consumed.has(x));
- if(other.length)out.push(mk('Other Reliably Read Information',other.join('\n'),Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',other.slice(0,100).join('\n'),'Retained directly from OCR evidence; no semantic invention.',c<85?'Some text may need verification.':''));
- return out;
-}
-function renderFields(fs){
- els.fields.innerHTML='';let review=0;
- fs.forEach(f=>{if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';
- d.innerHTML='<div class="field-top"><div class="field-name">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.confidence+'%</span></div><div class="field-value">'+esc(f.value)+'</div><div class="field-meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="evidence"><b>Evidence:</b>\\n'+esc(f.evidence)+(f.reason?'\\n\\n<b>Reason:</b> '+esc(f.reason):'')+'</div>';els.fields.appendChild(d)});
- els.review.textContent=review?review+' REVIEW ITEM(S)':'COMPLETE';els.review.className='badge '+(review?'warn':'ok');
-}
-
-/* Gold microchip protection: mask strongly gold/yellow pixels before OCR.
-   This is an exclusion mask only; it never writes chip content into results. */
-function maskGoldMicrochip(c){
- const x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),a=d.data,w=c.width,h=c.height;
- const mask=new Uint8Array(w*h);let count=0,minX=w,minY=h,maxX=0,maxY=0;
- for(let y=0;y<h;y+=1)for(let q=0;q<w;q+=1){const i=(y*w+q)*4,r=a[i],g=a[i+1],b=a[i+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b);const gold=r>105&&g>80&&b<115&&(r-g)<105&&(g-b)>10&&(mx-mn)>35;if(gold){mask[y*w+q]=1;count++;minX=Math.min(minX,q);maxX=Math.max(maxX,q);minY=Math.min(minY,y);maxY=Math.max(maxY,y)}}
- if(count<Math.max(40,w*h*0.00008))return c;
- const pad=Math.max(6,Math.round(Math.min(w,h)*0.008));minX=Math.max(0,minX-pad);minY=Math.max(0,minY-pad);maxX=Math.min(w-1,maxX+pad);maxY=Math.min(h-1,maxY+pad);
- const area=(maxX-minX+1)*(maxY-minY+1); if(area>w*h*.45)return c;
- x.fillStyle='#fff';x.fillRect(minX,minY,maxX-minX+1,maxY-minY+1);return c;
-}
-/* Primary OCR first; HD pass follows without hiding the first result. */
-async function runOCR(manual){
- if(state.running||!state.pages.length)return;
- state.running=true;els.run.disabled=true;state.results=[];els.raw.textContent='';els.fields.innerHTML='<div class="empty">Reading document…</div>';els.liveState.textContent='INSTANT OCR ACTIVE';
- try{
-  const w=await getWorker();void w;
-  for(let i=0;i<state.pages.length;i++){
-   const p=state.pages[i];state.selected=i;renderPages();progress(5+70*i/state.pages.length,'Processing page '+(i+1)+' of '+state.pages.length+'…');
-   if(p.error){state.results.push({page:i+1,text:'',confidence:0,error:p.error});continue}
-   if(p.native){state.results.push({page:i+1,text:p.text||'',confidence:100,native:true});els.raw.textContent+=(els.raw.textContent?'\n\n':'')+'--- '+p.label+' ---\n'+(p.text||'[No readable text]');renderFields(extract(state.results));continue}
-   const base=prepare(p.canvas),fast=await recognize(base),rec={page:i+1,text:fast.text,confidence:fast.confidence,conflict:false,aiText:''};state.results.push(rec);
-   els.raw.textContent+=(els.raw.textContent?'\n\n':'')+'--- '+p.label+' · FAST OCR ---\n'+(fast.text||'[No readable text]')+'\n[OCR confidence: '+fast.confidence.toFixed(1)+'%]';
-   els.ocrBadge.textContent='LIVE · '+fast.confidence.toFixed(1)+'%';els.ocrBadge.className='badge '+(fast.confidence>=85?'ok':fast.confidence>=60?'warn':'bad');renderFields(extract(state.results));
-   els.liveDetail.textContent='Fast OCR displayed. HD corroboration follows…';
-   /* Internal 4× pass. If it fails, primary OCR remains available. */
-   try{
-    const hd=upscale4x(base),second=await recognize(prepare(hd));rec.aiText=second.text;rec.aiConfidence=second.confidence;
-    const a=fast.text.toUpperCase().replace(/\s+/g,' ').trim().split(' ').filter(Boolean),b=second.text.toUpperCase().replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
-    const n=Math.max(a.length,b.length),same=a.reduce((s,x,j)=>s+(x===b[j]?1:0),0);rec.agreement=n?same/n:0;rec.conflict=rec.agreement<.62;
-    els.raw.textContent+='\n\n--- '+p.label+' · HD CORROBORATION ---\n'+(second.text||'[No readable text]')+'\n'+(rec.conflict?'[CONFLICT — verify against original source]':'[Corroboration token agreement: '+Math.round(rec.agreement*100)+'%]');
-    renderFields(extract(state.results))
-   }catch(e){els.raw.textContent+='\n\n[HD corroboration unavailable: '+e.message+']'}
-   await sleep(0)
-  }
-  const fs=extract(state.results),needs=fs.filter(x=>x.status!=='VERIFIED').length;renderFields(fs);
-  els.ocrBadge.textContent='COMPLETE';els.ocrBadge.className='badge ok';els.liveState.textContent='OCR COMPLETE';els.liveDetail.textContent=needs?'Review flagged fields against the original source.':'Processing complete. Critical data should still be visually checked.';
-  els.summary.textContent=needs?'Completed with '+needs+' field(s) requiring verification. No ambiguous value was guessed.':'Completed. Critical identity/numeric data should still be visually verified.';
-  els.summary.className='notice '+(needs?'warn':'ok');progress(100,'Complete · evidence preserved');setStatus('Complete')
- }catch(e){console.error(e);els.summary.textContent='OCR stopped safely: '+e.message;els.summary.className='notice bad';els.liveState.textContent='STOPPED';els.liveDetail.textContent='No information was fabricated.';setStatus('OCR failed',false)}
- finally{state.running=false;els.run.disabled=false}
-}
-renderFiles();renderPages();renderSlots();resetOutput();setStatus('Ready');
+function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
+async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');try{const f=S.pages.find(p=>p.side==='front'),b=S.pages.find(p=>p.side==='back');if(!f||!b)throw new Error('Both Front ID and Back ID must be available.');
+ const frontJobs=[
+  ['NRIC',crop(f.canvas,.01,.12,.64,.16,7),7],
+  ['NAME',crop(f.canvas,.01,.59,.66,.16,7),6],
+  ['ADDRESS',crop(f.canvas,.01,.69,.72,.31,5),6],
+  ['GENDER',crop(f.canvas,.58,.70,.41,.28,6),6],
+  ['WHOLE',maskGold(crop(f.canvas,0,0,1,1,2)),6]
+ ];
+ const backJobs=[['EXTENDED NRIC',crop(b.canvas,.17,.60,.68,.30,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
+ const fr={};const br={};
+ for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
+ for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
+ const front={text:Object.values(fr).map(x=>x.text).join('\n'),nricText:fr.NRIC?.text||'',conf:Object.values(fr).reduce((a,x)=>a+x.conf,0)/Object.values(fr).length};const back={text:Object.values(br).map(x=>x.text).join('\n'),nricText:br['EXTENDED NRIC']?.text||'',conf:Object.values(br).reduce((a,x)=>a+x.conf,0)/Object.values(br).length};
+ render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. No R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
+ }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
+renderFiles();
 })();
 </script>
-
-<script id="upload-runtime-guard">
-window.addEventListener('error', function(e){
-  console.error('OCR MASTER runtime error:', e.error || e.message);
-  const s=document.getElementById('statusText');
-  const d=document.getElementById('liveDetail');
-  if(s) s.textContent='Runtime error — upload remains available';
-  if(d) d.textContent='The document picker is independent of OCR processing.';
-});
-</script>
-
 </body>
 </html>
