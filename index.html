@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -72,20 +71,89 @@ function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null
 function lines(t){return String(t).split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean)}
 function mk(name,value,conf,status,evidence,validation,reason=''){return{name,value:value||'UNKNOWN',conf:Math.round(Math.max(0,Math.min(100,conf))),status,evidence:evidence||'No reliable evidence.',validation,reason}}
 function findWord(text,words){const re=new RegExp('(?:^|\\s)('+words.join('|')+')(?:$|\\s|[:])','i');return re.exec(text)}
+function normalizeEvidenceText(text){
+ return String(text||'').replace(/\r/g,'').split(/\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean).join('\n');
+}
+function exactMatches(text,re){return [...String(text||'').matchAll(re)].map(m=>m[0]);}
+function consensus(candidates){
+ const clean=candidates.map(x=>String(x||'').trim()).filter(Boolean);if(!clean.length)return null;
+ const map=new Map();for(const v of clean)map.set(v,(map.get(v)||0)+1);
+ const sorted=[...map.entries()].sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length);
+ return {value:sorted[0][0],votes:sorted[0][1],all:[...map.keys()]};
+}
+function fieldStatus(conf,ambiguous=false){return ambiguous?'UNCERTAIN':conf>=75?'VERIFIED':'UNCERTAIN'}
+function genderFromNric(nric){
+ const m=String(nric||'').match(/^(\d{6})-(\d{2})-(\d{4})$/);if(!m)return null;
+ const last=Number(m[3].slice(-1));
+ if(!Number.isInteger(last))return null;
+ return {digit:last,gender:last%2?'Lelaki':'Perempuan',english:last%2?'Male':'Female'};
+}
+function findExplicitGender(text){
+ const m=String(text||'').match(/\b(PEREMPUAN|LELAKI|FEMALE|MALE)\b/i);return m?m[1]:null;
+}
+function findNameCandidates(text){
+ return String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(x=>{
+  if(!x||x.length<5)return false;
+  if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MALAYSIA|MYKAD/i.test(x))return false;
+  return /\b(?:A\/P|A\/L|BIN|BINTI|AP|AL)\b/i.test(x) || /^[A-Z][A-Z ]{5,}$/i.test(x);
+ });
+}
+function extractAddress(text){
+ const ls=String(text||'').split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean);
+ const hits=[];
+ for(const x of ls){
+  if(/^(?:NO\.?\s*\d|\d+\s+BATU\b|BATU\b|JALAN\b|JLN\b|KAMPUNG\b|KG\b|TAMAN\b|PERSIARAN\b|\d{5}\b|\d{5}\s|[A-Z ]+\s+\d{5}\b)/i.test(x) ||
+     /\b(?:RAWANG|SUNGAI|DARAH|BATANG|BERJUNTAI|BERJUTAI|SELANGOR)\b/i.test(x) || /\b\d{5}\b/.test(x)) hits.push(x);
+ }
+ return [...new Set(hits)];
+}
 function extract(front,back){
- const out=[];const ft=front.text,bt=back.text;
- const fnum=bestExact(exact(front.nricText,/\b\d{6}-\d{2}-\d{4}\b/g));
- const bnum=bestExact(exact(back.nricText,/\b\d{6}-\d{2}-\d{4}-\d{2}-\d{2}\b/g));
- const fNumStatus=fnum?(fnum.all.length===1&&front.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN';
- out.push(mk('NRIC Number',fnum?fnum.value:'UNKNOWN',fnum?Math.min(front.conf,98):0,fNumStatus,fnum?fnum.value:'No exact 6-2-4 numeric candidate was read.','Exact numeric pattern only. No silent substitutions: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fnum&&fnum.all.length>1?'Competing numeric candidates were detected. Visual verification required.':'An unreadable digit is never repaired.'));
- const bStatus=bnum?(bnum.all.length===1&&back.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN';
- out.push(mk('Extended NRIC Number',bnum?bnum.value:'UNKNOWN',bnum?Math.min(back.conf,98):0,bStatus,bnum?bnum.value:'No exact 6-2-4-2-2 numeric candidate was read.','Exact numeric pattern only; no character correction.',bnum&&bnum.all.length>1?'Competing extended-number candidates were detected. Visual verification required.':'An unreadable digit is never repaired.'));
- const fl=lines(ft);const nameCandidates=fl.filter(x=>/[A-Za-z]{3,}/.test(x)&&/(?:A\/P|A\/L|AP|AL|BIN|BINTI)/i.test(x)&&!/(KAD|PENGENALAN|IDENTITY|MALAYSIA)/i.test(x));const name=nameCandidates[0]||'';
- out.push(mk('Full Name',name,Math.min(front.conf,96),name?(front.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN',name||'No reliable name line detected.','Preserved exactly as OCR evidence. A/P and A/L are never changed to AP or AL, and vice versa.',name&&/[AIP]/i.test(name)&&!/A\/P/i.test(name)?'Potential A/P recognition ambiguity. Verify the original image.':''));
- const g=findWord(ft,['PEREMPUAN','LELAKI','FEMALE','MALE']);out.push(mk('Gender',g?g[1]:'UNKNOWN',g?Math.min(front.conf,96):0,g?(front.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN',g?g[0]:'No explicit gender word detected.','Explicit word only; gender is never inferred from the photograph or name.',''));
- const n=findWord(ft,['MALAYSIA','WARGANEGARA']);out.push(mk('Nationality',n?'Malaysia':'UNKNOWN',n?Math.min(front.conf,96):0,n?(front.conf>=75?'VERIFIED':'UNCERTAIN'):'UNKNOWN',n?n[0]:'No explicit Malaysia/Warganegara evidence detected.','Malaysia is returned only from explicit nationality evidence.','A state/address is not converted into nationality.'));
- const addressLines=fl.filter(x=>/(?:^NO\.?\s*\d|\bBATU\b|\bJALAN\b|\bJLN\b|\bKAMPUNG\b|\bKG\b|\b\d{5}\b|\bSELANGOR\b|\bBATANG\b|\bBERJUNTAI\b|\bBERJUTAI\b|\bRAWANG\b|\bDARAH\b)/i.test(x));const address=[...new Set(addressLines)].filter(x=>!/(WARGANEGARA|PEREMPUAN|LELAKI|MALAYSIA)/i.test(x));out.push(mk('Address',address.join(' ')||'UNKNOWN',address.length?Math.min(front.conf,94):0,address.length?(front.conf>=68?'VERIFIED':'UNCERTAIN'):'UNKNOWN',address.join('\n')||'No reliable address block detected.','Address is assembled only from text directly read from the front ID. No postcode, town or state is invented.',address.length?'Verify every address character against the source image.':''));
- return out
+ const out=[];const ft=String(front.text||''),bt=String(back.text||'');
+ const frontNumericSources=[front.nricText,front.wholeText,ft];
+ const backNumericSources=[back.nricText,back.wholeText,bt];
+ const fCandidates=frontNumericSources.flatMap(t=>exactMatches(t,/\b\d{6}-\d{2}-\d{4}\b/g));
+ const bCandidates=backNumericSources.flatMap(t=>exactMatches(t,/\b\d{6}-\d{2}-\d{4}-\d{2}-\d{2}\b/g));
+ const fnum=consensus(fCandidates),bnum=consensus(bCandidates);
+ const fAmb=!!fnum&&fnum.all.length>1; const bAmb=!!bnum&&bnum.all.length>1;
+ out.push(mk('NRIC Number',fnum?fnum.value:'UNKNOWN',fnum?Math.min(front.conf,98):0,fnum?fieldStatus(front.conf,fAmb):'UNKNOWN',fnum?fnum.value:'No exact 6-2-4 numeric candidate was read.','Exact 6-2-4 numeric pattern only. No silent substitutions: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fAmb?'Competing NRIC candidates detected; visual verification required.':'An unreadable digit is never repaired.'));
+ out.push(mk('Extended NRIC Number',bnum?bnum.value:'UNKNOWN',bnum?Math.min(back.conf,98):0,bnum?fieldStatus(back.conf,bAmb):'UNKNOWN',bnum?bnum.value:'No exact 6-2-4-2-2 numeric candidate was read.','Exact 6-2-4-2-2 numeric pattern only; no character correction.',bAmb?'Competing extended NRIC candidates detected; visual verification required.':'An unreadable digit is never repaired.'));
+
+ const nameCropCandidates=findNameCandidates(front.nameText||'');
+ const fallbackNameCandidates=findNameCandidates((front.wholeText||'')+'\n'+ft);
+ const name=consensus(nameCropCandidates.length?nameCropCandidates:fallbackNameCandidates);
+ out.push(mk('Full Name',name?name.value:'UNKNOWN',name?Math.min(front.conf,96):0,name?fieldStatus(front.conf,name.all.length>1):'UNKNOWN',name?name.value:'No reliable name line detected.','Preserved exactly as OCR evidence. A/P and A/L are never changed to AP or AL, and vice versa.',name&&name.all.length>1?'Competing name candidates detected; verify the source image.':''));
+
+ const explicitGender=findExplicitGender(front.genderText||ft);
+ const derived=genderFromNric(fnum?.value);
+ let genderValue='UNKNOWN',genderStatus='UNKNOWN',genderEvidence='No explicit gender word and no valid NRIC parity evidence was available.',genderReason='Gender is never inferred from the photograph or name.';
+ if(explicitGender){
+  const u=explicitGender.toUpperCase();const explicit=(u==='PEREMPUAN'||u==='FEMALE')?'Perempuan':'Lelaki';
+  genderValue=explicit;
+  genderStatus=fieldStatus(front.conf);
+  genderEvidence=explicitGender;
+  if(derived){
+   if(explicit!==derived.gender){genderStatus='UNCERTAIN';genderReason='Explicit gender text conflicts with the NRIC final-digit parity rule. No value is silently overridden.'}
+   else genderEvidence+='\nNRIC parity: final digit '+derived.digit+' = '+(derived.digit%2?'odd':'even')+' → '+derived.gender+'.';
+  }
+ }else if(derived){
+  genderValue=derived.gender;genderStatus=fieldStatus(front.conf);genderEvidence='NRIC Number '+fnum.value+'; final digit '+derived.digit+' is '+(derived.digit%2?'odd':'even')+'.';genderReason='Derived only from the explicit NRIC number using the Malaysian NRIC parity rule: odd = Lelaki/Male; even = Perempuan/Female.';
+ }
+ out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,96),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
+
+ const natText=(front.nationalityText||ft)+'\n'+(front.wholeText||'');
+ const natMatch=natText.match(/\bWARGANEGARA\b/i);
+ const malaysiaMatch=natText.match(/\bMALAYSIA\b/i);
+ if(natMatch){
+  out.push(mk('Nationality','Malaysia',Math.min(front.conf,96),fieldStatus(front.conf),natMatch[0],'Explicit "WARGANEGARA" evidence on the MyKad indicates Malaysian nationality. The displayed value is Malaysia; no state/address is used to infer nationality.','"Warganegara" is evidence, not a character-replacement rule.'));
+ }else if(malaysiaMatch){
+  out.push(mk('Nationality','Malaysia',Math.min(front.conf,96),fieldStatus(front.conf),malaysiaMatch[0],'Explicit Malaysia evidence retained.',''));
+ }else{
+  out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state or address is never converted into nationality.'));
+ }
+
+ const address=extractAddress(front.addressText||ft+'\n'+(front.wholeText||''));
+ out.push(mk('Address',address.join(' ')||'UNKNOWN',address.length?Math.min(front.conf,94):0,address.length?fieldStatus(front.conf):'UNKNOWN',address.length?address.join('\n'):'No reliable address block detected.','Address is assembled only from text directly read from the front ID. No postcode, town or state is invented.',address.length?'Verify every address character against the source image.':''));
+ return out;
 }
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
 async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');try{const f=S.pages.find(p=>p.side==='front'),b=S.pages.find(p=>p.side==='back');if(!f||!b)throw new Error('Both Front ID and Back ID must be available.');
@@ -100,8 +168,8 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
  const fr={};const br={};
  for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
  for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
- const front={text:Object.values(fr).map(x=>x.text).join('\n'),nricText:fr.NRIC?.text||'',conf:Object.values(fr).reduce((a,x)=>a+x.conf,0)/Object.values(fr).length};const back={text:Object.values(br).map(x=>x.text).join('\n'),nricText:br['EXTENDED NRIC']?.text||'',conf:Object.values(br).reduce((a,x)=>a+x.conf,0)/Object.values(br).length};
- render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. No R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
+ const front={text:Object.values(fr).map(x=>x.text).join('\n'),wholeText:fr.WHOLE?.text||'',nricText:fr.NRIC?.text||'',nameText:fr.NAME?.text||'',addressText:fr.ADDRESS?.text||'',genderText:fr.GENDER?.text||'',nationalityText:fr.WHOLE?.text||'',conf:Object.values(fr).reduce((a,x)=>a+x.conf,0)/Object.values(fr).length};const back={text:Object.values(br).map(x=>x.text).join('\n'),wholeText:br.WHOLE?.text||'',nricText:br['EXTENDED NRIC']?.text||'',conf:Object.values(br).reduce((a,x)=>a+x.conf,0)/Object.values(br).length};
+ render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();
 })();
