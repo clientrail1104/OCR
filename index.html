@@ -1434,5 +1434,64 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 })();
 </script>
 
+
+<script id="v17-verified-extraction-cleanup">
+(function () {
+  "use strict";
+
+  function cleanVerifiedExtraction() {
+    const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,div,span,strong,label"));
+    const verified = headings.find(function (el) {
+      return (el.textContent || "").trim().toLowerCase() === "verified extraction";
+    });
+
+    if (!verified) return;
+
+    let container = verified;
+    for (let i = 0; i < 5 && container.parentElement; i++) {
+      const text = (container.textContent || "").toLowerCase();
+      if (text.includes("full name") && text.includes("nric number") && text.includes("nationality")) {
+        break;
+      }
+      container = container.parentElement;
+    }
+
+    const forbidden = ["race", "address"];
+
+    Array.from(container.querySelectorAll("*")).forEach(function (el) {
+      if (el.children.length !== 0) return;
+
+      const label = (el.textContent || "").trim().toLowerCase();
+      if (!forbidden.includes(label)) return;
+
+      let card = el;
+      for (let i = 0; i < 5 && card.parentElement; i++, card = card.parentElement) {
+        const cls = String(card.className || "").toLowerCase();
+        const role = String(card.getAttribute("data-field") || "").toLowerCase();
+        if (/field|card|row|item/.test(cls) || role === label) {
+          card.style.display = "none";
+          return;
+        }
+      }
+
+      el.style.display = "none";
+    });
+  }
+
+  function run() {
+    cleanVerifiedExtraction();
+    window.OCR_MASTER_V17 = {
+      verifiedExtractionCleaned: true
+    };
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run, { once: true });
+  } else {
+    run();
+  }
+})();
+</script>
+
 </body>
 </html>
