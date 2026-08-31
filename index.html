@@ -152,7 +152,6 @@ window.assessFieldConfidence = function(field, confidence, candidates=[], opts={
 <div class="card"><h2>Front ID / Back ID</h2><div class="workspace"><div class="slot" id="front"><span>FRONT ID</span></div><div class="slot" id="back"><span>BACK ID</span></div></div></div>
 <div class="card evidence"><div class="head"><h2>OCR evidence</h2><span class="badge" id="ocrBadge">WAITING</span></div><div class="raw" id="raw">OCR evidence will appear here.</div></div>
 </section>
-<aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div class="notice warn" id="notice">Only these fields are extracted: Front ID NRIC Number, Full Name, Gender, Nationality, Address; Back ID Extended NRIC Number.</div><div class="fields" id="fields"></div></aside>
 </main></div>
 <script>
 'use strict';
@@ -177,7 +176,6 @@ E.drop.addEventListener('drop',e=>{e.preventDefault();E.drop.style.transform='';
 E.drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();E.files.click()}});
 async function addFiles(fs){const ok=[],bad=[];for(const f of fs){if(!ALLOWED.test(f.name)||!f.type.startsWith('image/')){bad.push(f.name+' — unsupported');continue}if(!f.size){bad.push(f.name+' — empty');continue}if(f.size>500*1024*1024){bad.push(f.name+' — over 500 MB');continue}if(!S.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))ok.push(f)}if(bad.length)E.notice.textContent=bad.join('\n');S.files.push(...ok);renderFiles();if(!ok.length)return;try{status('PREPARING');E.run.disabled=true;await makePages();renderSlots();E.run.disabled=false;prog(0,'Upload ready. Click Run OCR to begin.');E.badge.textContent='READY';E.badge.className='badge warn';E.raw.textContent='OCR has not started. Click Run OCR to process the uploaded document.';E.fields.innerHTML='';E.review.textContent='WAITING';E.review.className='badge warn';status('READY');E.notice.textContent='Files loaded. OCR is manual: click Run OCR. No OCR is performed automatically after upload.'}catch(e){console.error(e);E.run.disabled=true;status('ERROR',true);E.notice.textContent='Document preparation failed safely: '+e.message+' No value was guessed.'}}
 function renderFiles(){E.list.innerHTML=S.files.length?S.files.map(f=>'<div class="file"><b>'+esc(f.name)+'</b><span>'+esc(f.type||'image')+' · '+bytes(f.size)+'</span></div>').join(''):'<div class="mini">No files selected.</div>'}
-async function clearAll(){if(S.running)return;try{if(S.worker)await S.worker.terminate()}catch{}S.worker=null;S.workerLang=null;S.files=[];S.pages=[];E.files.value='';E.run.disabled=true;E.front.innerHTML='<span>FRONT ID</span>';E.back.innerHTML='<span>BACK ID</span>';E.raw.textContent='OCR evidence will appear here.';E.fields.innerHTML='';E.badge.textContent='WAITING';E.review.textContent='WAITING';E.review.className='badge warn';E.notice.textContent='Only these fields are extracted: Front ID NRIC Number, Full Name, Gender, Nationality, Address; Back ID Extended NRIC Number.';prog(0,'Waiting for upload.');status('READY')}
 async function loadImage(f){const u=URL.createObjectURL(f);const im=new Image();im.src=u;await im.decode();return im}
 function canvasFrom(im){const max=5200,r=Math.min(1,max/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round((im.naturalWidth||im.width)*r));c.height=Math.max(1,Math.round((im.naturalHeight||im.height)*r));const x=c.getContext('2d',{alpha:false});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);return c}
 function crop(c,x,y,w,h,scale=5){const sx=Math.max(0,Math.round(c.width*x)),sy=Math.max(0,Math.round(c.height*y)),sw=Math.min(c.width-sx,Math.round(c.width*w)),sh=Math.min(c.height-sy,Math.round(c.height*h));const o=document.createElement('canvas');o.width=Math.max(1,Math.min(7000,sw*scale));o.height=Math.max(1,Math.min(5000,sh*scale));const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);return o}
@@ -280,7 +278,6 @@ function extract(front,back){
  const fNumericFlags=numericConfusionEvidence(front.nricText+'\n'+front.wholeText);
  const bNumericFlags=numericConfusionEvidence(back.nricText+'\n'+back.wholeText);
  out.push(mk('NRIC Number',fnum?(fnum.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN',fnum?Math.min(front.conf,98):0,fnum?fieldStatus(front.conf,fAmb):'UNKNOWN',fNumEvidence,'Exact 6-2-4 numeric pattern only. Never transform: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fAmb?'Competing NRIC candidates detected; candidates are preserved and no winner is selected.':fNumericFlags.length?'Potentially confusable OCR evidence detected: '+fNumericFlags.join(', ')+'. No substitution was made.':'An unreadable digit is never repaired.'));
- out.push(mk('Extended NRIC Number',bnum?(bnum.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN',bnum?Math.min(back.conf,98):0,bnum?fieldStatus(back.conf,bAmb):'UNKNOWN',bNumEvidence,'Exact 6-2-4-2-2 numeric pattern only. Never transform: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',bAmb?'Competing extended-NRIC candidates detected; candidates are preserved and no winner is selected.':bNumericFlags.length?'Potentially confusable OCR evidence detected: '+bNumericFlags.join(', ')+'. No substitution was made.':'An unreadable digit is never repaired.'));
 
  const nameCropCandidates=findNameCandidates(front.nameText||'');
  const fallbackNameCandidates=findNameCandidates((front.wholeText||'')+'\n'+ft);
@@ -329,11 +326,9 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
   ['GENDER',crop(f.canvas,.58,.70,.41,.28,6),6],
   ['WHOLE',maskGold(crop(f.canvas,0,0,1,1,2)),6]
  ];
- const backJobs=[['EXTENDED NRIC',crop(b.canvas,.17,.60,.68,.30,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
  const fr={};const br={};
  for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
  for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
- const front={text:Object.values(fr).map(x=>x.text).join('\n'),wholeText:fr.WHOLE?.text||'',nricText:fr.NRIC?.text||'',nameText:fr.NAME?.text||'',addressText:fr.ADDRESS?.text||'',genderText:fr.GENDER?.text||'',nationalityText:fr.WHOLE?.text||'',conf:Object.values(fr).reduce((a,x)=>a+x.conf,0)/Object.values(fr).length};const back={text:Object.values(br).map(x=>x.text).join('\n'),wholeText:br.WHOLE?.text||'',nricText:br['EXTENDED NRIC']?.text||'',conf:Object.values(br).reduce((a,x)=>a+x.conf,0)/Object.values(br).length};
  render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();E.run.disabled=true;
@@ -429,6 +424,27 @@ window.applyStrictUncertaintyPolicy = function(result){
   } else {
     run();
   }
+})();
+</script>
+
+
+<script id="no-extended-nric-guard">
+(function(){
+  function removeExtended(){
+    const nodes = document.querySelectorAll('body *');
+    for(const el of nodes){
+      if(el.children.length === 0){
+        const t=(el.textContent||'').trim().toLowerCase();
+        if(t === 'extended nric number' || t === 'extended nric'){
+          const box=el.closest('.field,.card,.result,.extract,.row') || el;
+          if(box && box.parentNode) box.parentNode.removeChild(box);
+        }
+      }
+    }
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', removeExtended, {once:true});
+  } else removeExtended();
 })();
 </script>
 
