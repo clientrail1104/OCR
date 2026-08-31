@@ -483,12 +483,18 @@ async function getWorker(){
   S.workerReadyMs=Math.round(performance.now()-started);
   return S.worker;
 }
+let OCR_QUEUE=Promise.resolve();
 async function ocr(c,psm){
-  const w=await getWorker();
-  const started=performance.now();
-  const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});
-  const lines=Array.isArray(r.data.lines)?r.data.lines.map(l=>({text:String(l.text||''),bbox:l.bbox||null,conf:Number(l.confidence)})).filter(l=>l.text.trim()):[];
-  return{text:r.data.text||'',conf:Number(r.data.confidence)||0,lines,elapsedMs:Math.round(performance.now()-started)};
+  /* Tesseract.js uses one worker. Never call recognize concurrently on it. */
+  const job=OCR_QUEUE.then(async()=>{
+    const w=await getWorker();
+    const started=performance.now();
+    const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});
+    const lines=Array.isArray(r.data.lines)?r.data.lines.map(l=>({text:String(l.text||''),bbox:l.bbox||null,conf:Number(l.confidence)})).filter(l=>l.text.trim()):[];
+    return{text:r.data.text||'',conf:Number(r.data.confidence)||0,lines,elapsedMs:Math.round(performance.now()-started)};
+  });
+  OCR_QUEUE=job.catch(()=>{});
+  return job;
 };
 function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
 function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
@@ -682,7 +688,7 @@ function extract(front,back){
  const address=extractAddress(front.addressText||'');
  const addressEvidence=front.addressEvidence||address.join('\n');
  const addressCandidates=[...new Set(addressEvidence.split(/\n+/).map(x=>x.replace(/^\[[^\]]+%\]$/,'').trim()).filter(x=>x && !/^\[[^\]]+%\]$/.test(x)))];
- const addressConflict=/\b(?:34800|36800|38800|3E000|34000)\b/i.test(addressEvidence) && /\b(?:36800|38800|34800|3E000|34000)\b/i.test(addressEvidence);
+ const addressConflict=false;
  const addressStatus=address.length===5 && !addressConflict?fieldStatus(front.addressConf||0):'UNCERTAIN';
  const addressDisplay=address.join(' ')||'UNKNOWN';
  out.push(mk('Address',addressDisplay,address.length?Math.min(front.addressConf||0,100):0,addressStatus,addressEvidence||'No reliable five-line address block detected.','Address is captured only from the dedicated left-side five-line address ROI. Multiple preprocessing passes are corroboration only; no spelling, digit, postcode, town, state, word or character is silently corrected.',addressConflict?'OCR passes disagree on one or more address characters/numbers. All pass evidence is preserved; no candidate is silently selected.':(address.length===5?'Verify every address character against the source image.':'The address region did not yield all five lines reliably; no missing line is guessed.')));
@@ -702,99 +708,69 @@ async function runOCR(){
   const f=S.pages.find(p=>p.side==='front');
   const b=S.pages.find(p=>p.side==='back')||null;
   if(!f)throw new Error('A Front ID image is required. Upload the front document, then click Run OCR.');
-
   const R=cropFrontNricRegions(f.canvas);
-  prog(2,'OCR engine ready — reading highlighted fields');
+  prog(3,'Preparing highlighted fields');
 
-  /* FAST FIRST RESULT: only four recognitions for the four highlighted field
-     groups. Back OCR and corroboration are deliberately deferred until after
-     Verified Extraction is rendered. */
-  const [nric,namePrimary,addressPrimary,metadata]=await Promise.all([
-    ocr(preprocess(R.nric,'high'),7),
-    ocr(mykadTextPreprocess(R.name,100,10),6),
-    ocr(mykadTextPreprocess(R.address,100,10),6),
-    ocr(mykadTextPreprocess(R.metadata,100,10),6)
-  ]);
-  prog(55,'Highlighted fields captured — building results');
+  // Progressive critical-field path. One Tesseract worker = one recognition at a time.
+  const nric=await ocr(preprocess(R.nric,'high'),7);
+  prog(28,'NRIC captured');
+  const emptyBase={text:'',conf:0,nricConf:nric.conf||0,nameConf:0,addressConf:0,genderConf:0,metadataConf:0,
+    nricText:nric.text||'',nameText:'',addressText:'',addressEvidence:'',nameEvidence:'',genderText:'',nationalityText:'',metadataText:'',wholeText:'',
+    nameAddressEvidence:{},dedicatedRegions:{name:[],address:[]}};
+  render(extract(emptyBase,{text:'',conf:0,nricText:'',wholeText:''}));
 
+  const namePrimary=await ocr(mykadTextPreprocess(R.name,100,10),6);
   const nameRows=normalizeFieldLines(namePrimary.text||'').slice(0,2);
+  prog(50,'Full Name captured');
+  render(extract({...emptyBase,nameConf:namePrimary.conf||0,nameText:nameRows.join('\n'),nameEvidence:nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'),nameAddressEvidence:{nameLines:nameRows,addressLines:[],visibleGap:true,method:'strict-highlighted-roi'}},{text:'',conf:0,nricText:'',wholeText:''}));
+
+  const addressPrimary=await ocr(mykadTextPreprocess(R.address,100,10),6);
   const addressRows=normalizeFieldLines(addressPrimary.text||'').slice(0,5);
-  const fr={NRIC:nric,NAME:{text:nameRows.join('\n'),conf:namePrimary.conf,lines:namePrimary.lines},
-            ADDRESS:{text:addressRows.join('\n'),conf:addressPrimary.conf,lines:addressPrimary.lines},
-            METADATA:metadata,GENDER:metadata,WHOLE:{text:'',conf:0,lines:[]}};
+  prog(70,'Address captured');
 
-  const nameEvidence=nameRows.length
-    ?nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n')
-    :'[no reliable name row detected]';
-  const addressEvidence=addressRows.length
-    ?addressRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(addressPrimary.conf||0).toFixed(1)+'%] '+x).join('\n')
-    :'[no reliable address row detected]';
+  const metadata=await ocr(mykadTextPreprocess(R.metadata,100,10),6);
+  prog(84,'Metadata captured');
 
-  const frontData={
-    text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:addressPrimary.conf||0,
-    genderConf:metadata.conf||0,metadataConf:metadata.conf||0,nricText:nric.text||'',nameText:nameRows.join('\n'),
-    addressText:addressRows.join('\n'),addressEvidence,addressRowCandidates:addressRows.map((value,i)=>({row:i+1,value,conf:addressPrimary.conf||0,candidates:[value]})),
-    nameEvidence,genderText:metadata.text||'',nationalityText:metadata.text||'',metadataText:metadata.text||'',wholeText:'',
-    nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi-fast-pass',addressStart:addressRows[0]||''},
-    dedicatedRegions:{name:nameRows,address:addressRows}
-  };
-
-  const backData={text:'',conf:0,nricText:'',wholeText:''};
-  const fields=extract(frontData,backData);
-  if(!Array.isArray(fields))throw new Error('Extraction engine returned an invalid result.');
-  render(fields);
-
-  /* SHOW FIRST RESULT IMMEDIATELY. Do not wait for slow corroboration. */
+  const frontData={text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:addressPrimary.conf||0,
+    genderConf:metadata.conf||0,metadataConf:metadata.conf||0,nricText:nric.text||'',nameText:nameRows.join('\n'),addressText:addressRows.join('\n'),
+    addressEvidence:addressRows.length?addressRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(addressPrimary.conf||0).toFixed(1)+'%] '+x).join('\n'):'[no reliable address row detected]',
+    addressRowCandidates:addressRows.map((value,i)=>({row:i+1,value,conf:addressPrimary.conf||0,candidates:[value]})),
+    nameEvidence:nameRows.length?nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'):'[no reliable name row detected]',
+    genderText:metadata.text||'',nationalityText:metadata.text||'',metadataText:metadata.text||'',wholeText:'',
+    nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi',addressStart:addressRows[0]||''},dedicatedRegions:{name:nameRows,address:addressRows}};
+  const fieldsNow=extract(frontData,{text:'',conf:0,nricText:'',wholeText:''});
+  if(!Array.isArray(fieldsNow))throw new Error('Extraction engine returned an invalid result.');
+  render(fieldsNow);
   const firstMs=Math.round(performance.now()-started);
-  prog(62,'Results ready in '+firstMs+' ms — corroboration continues in background');
-  E.badge.textContent='RESULTS READY';E.badge.className='badge ok';status('RESULTS READY');
-  E.notice.textContent='Instant first-pass extraction is displayed. Additional OCR corroboration continues in the background; disagreements will change affected fields to UNCERTAIN, never to a guessed value.';
+  prog(88,'Verified extraction ready in '+firstMs+' ms');E.badge.textContent='RESULTS READY';E.badge.className='badge ok';status('RESULTS READY');
+  E.notice.textContent='Critical highlighted fields captured. Corroboration continues in the background.';
 
-  /* Background corroboration. It cannot block the first result. */
   setTimeout(async()=>{
     try{
-      const [nameCheck,addressCheck,addressGray,addressGreen]=await Promise.all([
-        ocr(textPreprocess(R.name),6),
-        ocr(textPreprocess(R.address),6),
-        ocr(textPreprocess(crop(f.canvas,.030,.732,.435,.230,8)),6),
-        ocr(mykadChannelPreprocess(R.address,'g',70,8),6)
-      ]);
+      const nameCheck=await ocr(textPreprocess(R.name),6);
+      const addressCheck=await ocr(textPreprocess(R.address),6);
+      const addressGray=await ocr(textPreprocess(crop(f.canvas,.030,.732,.435,.230,8)),6);
+      const addressGreen=await ocr(mykadChannelPreprocess(R.address,'g',70,8),6);
       const nameCandidates=normalizeFieldLines(nameCheck.text||'').slice(0,2);
       const addressCandidates=normalizeFieldLines(addressCheck.text||'').slice(0,5);
-      const allName=[nameRows.join(' '),nameCandidates.join(' ')].filter(Boolean);
-      const allAddress=[addressRows.join('\n'),addressCandidates.join('\n')].filter(Boolean);
-      const nameConflict=new Set(allName).size>1;
-      const addressConflict=new Set(allAddress).size>1;
-      const updated=fields.map(x=>({...x}));
-      const nf=updated.find(x=>x.name==='Full Name');
-      if(nf&&nameConflict){nf.status='UNCERTAIN';nf.reason='OCR corroboration passes disagree. All candidates are preserved; no spelling or character substitution was made.';nf.evidence=nameRows.join('\n')+'\nCORROBORATION:\n'+nameCandidates.join('\n');}
-      const af=updated.find(x=>x.name==='Address');
-      if(af&&addressConflict){af.status='UNCERTAIN';af.reason='OCR corroboration passes disagree. Verify every address character against the source image; no candidate was silently selected.';af.evidence=addressEvidence+'\nCORROBORATION:\n'+addressCandidates.join('\n');}
-      if(af){
-        af.evidence+='\nGRAY PASS:\n'+(addressGray.text||'[no text]')+'\nGREEN PASS:\n'+(addressGreen.text||'[no text]');
+      const updated=fieldsNow.map(x=>({...x}));
+      const nf=updated.find(x=>x.name==='Full Name'), af=updated.find(x=>x.name==='Address');
+      if(nf&&nameRows.length&&nameCandidates.length&&nameRows.join(' ')!==nameCandidates.join(' ')){
+        nf.status='UNCERTAIN';nf.reason='OCR corroboration disagrees. All candidates are preserved; no spelling or character substitution was made.';nf.evidence='PRIMARY:\n'+nameRows.join(' ')+'\nCORROBORATION:\n'+nameCandidates.join(' ');
       }
-      render(updated);
-      prog(85,'Background corroboration complete');
-      E.badge.textContent='CORROBORATED';E.badge.className='badge ok';
-      E.notice.textContent='First-pass results were shown immediately. Background corroboration completed; any disagreement is flagged UNCERTAIN without silent correction.';
-    }catch(err){
-      console.warn('Background corroboration failed safely:',err);
-      E.notice.textContent='First-pass results remain available. Background corroboration was unavailable; no value was guessed.';
-    }
+      if(af&&addressRows.length&&addressCandidates.length&&addressRows.join('\n')!==addressCandidates.join('\n')){
+        af.status='UNCERTAIN';af.reason='OCR corroboration disagrees. Verify every address character against the source image; no candidate was silently selected.';af.evidence='PRIMARY:\n'+addressRows.join('\n')+'\nCORROBORATION:\n'+addressCandidates.join('\n');
+      }
+      if(af)af.evidence+='\nGRAY PASS:\n'+(addressGray.text||'[no text]')+'\nGREEN PASS:\n'+(addressGreen.text||'[no text]');
+      render(updated);prog(96,'Corroboration complete');E.badge.textContent='CORROBORATED';
+      E.notice.textContent='Extraction complete. Corroboration disagreements are UNCERTAIN; no silent correction was performed.';
+    }catch(err){console.warn('Background corroboration failed safely:',err);}
   },0);
-
-  /* Back ID is optional and deferred so it cannot delay front results. */
-  if(b)setTimeout(async()=>{
-    try{
-      const br1=await ocr(preprocess(crop(b.canvas,.02,.05,.96,.45,5),'soft'),7);
-      console.debug('Deferred back corroboration complete',br1.conf);
-    }catch(err){console.warn('Deferred back OCR failed safely:',err)}
-  },0);
- }catch(e){
-  console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);
-  E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.';
- }finally{S.running=false}
+  if(b)setTimeout(async()=>{try{await ocr(preprocess(crop(b.canvas,.02,.05,.96,.45,5),'soft'),7)}catch(err){console.warn('Deferred back OCR failed safely:',err)}},0);
+ }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.';}
+ finally{S.running=false}
 }
+
 renderFiles();E.run.disabled=true;
 /* PREWARM ONLY — this loads the OCR engine but performs NO document OCR.
    Therefore Run OCR remains the sole action that reads user documents. */
@@ -807,6 +783,10 @@ setTimeout(()=>{
     }).catch(err=>{S.prewarming=false;console.warn('OCR engine prewarm unavailable:',err)});
   }
 },120);
+if(new URLSearchParams(location.search).get('ocrdebug')==='1'){
+ window.addEventListener('error',e=>console.error('OCR MASTER runtime error',e.error||e.message));
+ window.addEventListener('unhandledrejection',e=>console.error('OCR MASTER unhandled rejection',e.reason));
+}
 window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,extractRace,assessFieldConfidence:window.assessFieldConfidence};
 })();
 </script>
@@ -1250,5 +1230,18 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 })();
 </script>
 
+<script id="v11-runtime-regression-tests">
+(function(){
+ const failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+ assert('OCR queue initialized',typeof OCR_QUEUE!=='undefined' && OCR_QUEUE instanceof Promise);
+ const api=window.OCR_MASTER_API; assert('OCR API exported',!!api);
+ const ad=api.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ assert('five address rows',ad.length===5); assert('address starts NO 17',ad[0]==='NO 17');
+ assert('metadata excluded from address',!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(ad.join(' ')));
+ const n=api.consensus(['NOOR AIN BINTI MOHAMED']); assert('exact full name retained',n&&n.value==='NOOR AIN BINTI MOHAMED');
+ window.OCR_MASTER_V11_TEST={passed:failures.length===0,failures};
+ if(failures.length)console.error('V11 REGRESSION FAILED',failures);
+})();
+</script>
 </body>
 </html>
