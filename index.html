@@ -613,10 +613,13 @@ function findNameCandidates(text){
     rows.push(value);
   }
   if(!rows.length)return [];
-  const candidates=[],joined=rows.join(" ");
-  if(joined.length>=2&&joined.length<=100)candidates.push(joined);
-  for(const row of rows)candidates.push(row);
-  return [...new Set(candidates)];
+  /* A multi-row name is ONE field candidate, not several competing candidates.
+     Returning each row as an alternative made a valid two-line name such as
+     "NOOR AIN BINTI" + "MOHAMED" incorrectly become UNCERTAIN. Row-level
+     evidence is already preserved by nameText; the field value must be the
+     ordered concatenation of the accepted name rows. */
+  const joined=rows.join(" ");
+  return joined.length>=2&&joined.length<=100?[joined]:[];
 }
 function extractAddress(text){
   /*
@@ -641,6 +644,15 @@ function extractAddress(text){
     if(cleaned) out.push(cleaned);
   }
   return out.slice(0,5);
+}
+function extractRace(text){
+ const t=String(text||'');
+ const explicit=t.match(/\b(?:Race|Bangsa|Kaum)\b\s*[:=\-]?\s*(Hindu|India|Cina|Chinese|Indian|Malay|Melayu|Islam|Buddha|Buddhist|Kristian|Christian)\b/i);
+ if(explicit)return explicit[1];
+ for(const v of ['Hindu','India','Cina','Chinese','Indian','Malay','Melayu','Islam','Buddha','Buddhist','Kristian','Christian']){
+   if(new RegExp('(?:^|\\s)'+v+'(?:$|\\s)','i').test(t))return v;
+ }
+ return null;
 }
 function extract(front,back){
  const out=[];const ft=String(front.text||''),bt=String(back.text||'');
@@ -681,17 +693,20 @@ function extract(front,back){
  }
  out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,100),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
 
- const natText=(front.nationalityText||ft)+'\n'+(front.wholeText||'');
+ const natText=(front.nationalityText||'')+'\n'+(front.metadataText||'')+'\n'+(front.wholeText||'');
  const natMatch=natText.match(/\bWARGANEGARA\b/i);
- const natStandalone=natText.match(/(?:^|\n|\s)(?:WARG)(?:\s|$)/i);
  const malaysiaMatch=natText.match(/\bMALAYSIA\b/i);
- if(natMatch || natStandalone){
-  out.push(mk('Nationality','Malaysia',Math.min(front.conf,100),fieldStatus(front.conf),natMatch[0],'Explicit "WARGANEGARA" evidence on the MyKad indicates Malaysian nationality. The displayed value is Malaysia; no state/address is used to infer nationality.','"Warganegara" is evidence, not a character-replacement rule.'));
+ if(natMatch){
+  out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),natMatch[0],'Explicit WARGANEGARA label detected in the dedicated front-card metadata region. Display value is Malaysia; no address/name inference is used.','The word Warganegara is an explicit Malaysian nationality label on this document type.'));
  }else if(malaysiaMatch){
-  out.push(mk('Nationality','Malaysia',Math.min(front.conf,100),fieldStatus(front.conf),malaysiaMatch[0],'Explicit Malaysia evidence retained.',''));
+  out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),malaysiaMatch[0],'Explicit Malaysia text detected in the front-card evidence.','No state/address inference was used.'));
  }else{
-  out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state or address is never converted into nationality.'));
+  out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state, address, race, name, or photograph is never converted into nationality.'));
  }
+
+ const raceText=(front.metadataText||'')+'\n'+(front.wholeText||'');
+ const race=extractRace(raceText);
+ out.push(mk('Race',race||'UNKNOWN',race?Math.min(front.metadataConf||front.conf,100):0,race?fieldStatus(front.metadataConf||front.conf):'UNKNOWN',race||'No explicit race/religion value detected.','Only explicitly printed race/religion evidence is accepted; no inference from name, nationality, photograph, or address.','If the printed value is unreadable or competing values are detected, verify against the source image.'));
 
  const address=extractAddress(front.addressText||'');
  const addressStatus=address.length===5?fieldStatus(front.addressConf||0):'UNCERTAIN';
@@ -705,11 +720,16 @@ function extract(front,back){
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
 async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');try{const f=S.pages.find(p=>p.side==='front'),b=S.pages.find(p=>p.side==='back');if(!f||!b)throw new Error('Both Front ID and Back ID must be available.');
  const frontJobs=[
-  // Fixed MyKad spatial regions: NRIC is below the header and above the chip;
-  // name is below the chip; address is the five-line block below the name.
+  // MyKad FRONT spatial regions:
+  // NRIC: upper-left, below header and above gold microchip.
+  // NAMEADDRESS: left side only. IMPORTANT: width stops before the portrait /
+  // WARGANEGARA / ISLAM / PEREMPUAN metadata block so metadata can never leak
+  // into the name/address OCR stream.
+  // METADATA: dedicated lower-right label/value block.
   ['NRIC',crop(f.canvas,.015,.18,.48,.14,10),7],
-  ['NAMEADDRESS',crop(f.canvas,.015,.58,.76,.40,9),6],
-  ['GENDER',crop(f.canvas,.59,.755,.39,.205,8),6],
+  ['NAMEADDRESS',crop(f.canvas,.015,.57,.58,.41,10),6],
+  ['METADATA',crop(f.canvas,.66,.72,.32,.25,6),6],
+  ['GENDER',crop(f.canvas,.66,.72,.32,.25,6),6],
   ['WHOLE',maskGold(crop(f.canvas,0,0,1,1,2)),6]
  ];
  const fr={};const br={};
@@ -717,12 +737,12 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
  for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
  for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
  const nameAddress=splitNameAddressByVisibleGap(fr.NAMEADDRESS||{});
- const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAMEADDRESS?.conf||0,addressConf:fr.NAMEADDRESS?.conf||0,genderConf:fr.GENDER?.conf||0,nricText:fr.NRIC?.text||'',nameText:nameAddress.nameLines.join('\n'),addressText:nameAddress.addressLines.join('\n'),genderText:fr.GENDER?.text||'',nationalityText:fr.WHOLE?.text||'',wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress};
+ const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAMEADDRESS?.conf||0,addressConf:fr.NAMEADDRESS?.conf||0,genderConf:fr.METADATA?.conf||fr.GENDER?.conf||0,metadataConf:fr.METADATA?.conf||0,nricText:fr.NRIC?.text||'',nameText:nameAddress.nameLines.join('\n'),addressText:nameAddress.addressLines.join('\n'),genderText:(fr.METADATA?.text||'')+'\n'+(fr.GENDER?.text||''),nationalityText:fr.METADATA?.text||'',metadataText:fr.METADATA?.text||'',wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress};
  const backData={text:br.WHOLE?.text||'',conf:br.WHOLE?.conf||0,nricText:br.NRIC?.text||'',wholeText:br.WHOLE?.text||''};
  render(extract(frontData,backData));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = every OCR line above the visible name/address gap; Address = exactly five lines below that gap. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();E.run.disabled=true;
-window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,assessFieldConfidence:window.assessFieldConfidence};
+window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,extractRace,assessFieldConfidence:window.assessFieldConfidence};
 })();
 </script>
 
@@ -944,10 +964,10 @@ function run(){
  assert("name exact preservation",exactName.nameLines[1]==="NAME TWO");
  assert("address exact preservation",exactName.addressLines[0]==="25 BATANG");
   const nameRows=findNameCandidates("JOHN CITIZEN\nMOHAMED");
- assert("single-token final name row retained",nameRows.includes("JOHN CITIZEN MOHAMED"));
- assert("MOHAMED retained as final token",nameRows.some(x=>x.endsWith("MOHAMED")));
+ assert("multi-row name joined exactly",nameRows.length===1 && nameRows[0]==="JOHN CITIZEN MOHAMED");
+ assert("MOHAMED retained as final token",nameRows[0].endsWith("MOHAMED"));
  const onlyMohamed=findNameCandidates("MOHAMED");
- assert("single-token name accepted",onlyMohamed.includes("MOHAMED"));
+ assert("single-token name accepted",onlyMohamed.length===1 && onlyMohamed[0]==="MOHAMED");
 window.NAME_ADDRESS_GAP_TESTS={passed:failures.length===0,failures};
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});else run();
@@ -974,6 +994,30 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
  const five=A.extractAddress("NO 124 BATU\nJALAN RAWANG\nKAMPUNG SUNGAI DARAH\n45600 BATANG BERJUNTAI\nSELANGOR\nWARG ISLAM");
  assert("five real address lines preserved",five.length===5);
  assert("five-line address exact spelling preserved",five[3]==="45600 BATANG BERJUNTAI");
+
+ // Supplied MyKad regression fixture: two-line name + five-line address,
+ // with WARGANEGARA / ISLAM / PEREMPUAN in the separate lower-right block.
+ const sampleSplit=split({lines:[
+   mk("NOOR AIN BINTI",0,10),
+   mk("MOHAMED",13,23),
+   mk("NO 17",29,39),
+   mk("JALAN PERISAI 3",43,53),
+   mk("BANDAR SEBERANG PERAK",57,67),
+   mk("36800 KAMPUNG GAJAH",71,81),
+   mk("PERAK",85,95)
+ ]});
+ assert("sample full name keeps both rows",sampleSplit.nameLines.join(" ")==="NOOR AIN BINTI MOHAMED");
+ assert("sample address starts NO 17",sampleSplit.addressStart==="NO 17");
+ assert("sample address has five rows",sampleSplit.addressLines.length===5);
+ assert("sample address has no name",!sampleSplit.addressLines.some(x=>/NOOR|MOHAMED/i.test(x)));
+ const samplePhoto=window.extractFrontPhotoSideFields([
+   {text:"WARGANEGARA",y:1},{text:"ISLAM",y:2},{text:"PEREMPUAN",y:3}
+ ]);
+ assert("sample Warganegara evidence",samplePhoto.nationality.status==="EVIDENCE");
+ assert("sample Warganegara resolves Malaysia",/MALAYSIA/i.test(samplePhoto.nationality.value||''));
+ assert("sample Islam religion",samplePhoto.religion.value==="ISLAM");
+ const sampleRace=window.OCR_MASTER_API.extractRace("WARGANEGARA\\nISLAM\\nPEREMPUAN");
+ assert("sample Race resolves Islam",sampleRace==="Islam");
  const photo=window.extractFrontPhotoSideFields([
    {text:"WARGANEGARA",y:10},{text:"HINDU",y:20},{text:"PEREMPUAN",y:40}
  ]);
