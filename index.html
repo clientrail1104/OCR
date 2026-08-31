@@ -30,7 +30,7 @@ h1{font-size:18px;line-height:1;margin:0}.sub{font-size:9px;color:var(--muted);m
 .dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--ok)}
 .layout{flex:1;min-height:0;display:grid;grid-template-columns:260px minmax(0,1fr) 390px;gap:9px}
 .card{background:var(--bg);border-radius:17px;box-shadow:var(--out);padding:11px;min-width:0;min-height:0}
-.left,.right,.center{min-height:0}.left{overflow:auto}.center{display:grid;grid-template-rows:auto minmax(130px,1fr) minmax(130px,1fr);gap:9px}
+.left,.right,.center{min-height:0}.left{overflow:auto}.center{display:grid;grid-template-rows:auto minmax(0,1fr);gap:9px}
 .right{display:flex;flex-direction:column}
 h2{font-size:11px;margin:0 0 7px}.label{text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-size:8px;font-weight:900;margin-bottom:5px}
 .drop{border:1.5px dashed rgba(18,201,192,.65);border-radius:15px;padding:13px;text-align:center;box-shadow:var(--in);outline:none}
@@ -46,8 +46,8 @@ select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);b
 .hero{display:grid;grid-template-columns:minmax(0,1fr) 185px;gap:9px}.id-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.slot{height:74px;border-radius:13px;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center;padding:5px}.slot img{max-width:100%;max-height:66px;object-fit:contain;border-radius:7px}.empty{color:var(--muted);font-size:9px}
 .progress-box{border-radius:12px;box-shadow:var(--in);padding:9px}.progress{height:7px;border-radius:99px;background:#dce4e9;overflow:hidden}.progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .15s}.progress-text{font-size:8px;color:var(--muted);min-height:23px;margin-top:5px}
 .live{font-size:8px;padding:7px;margin-top:6px;border-radius:9px;box-shadow:var(--in);line-height:1.4}
-.result-head{display:flex;align-items:center;justify-content:space-between;gap:6px}.tabs{display:flex;gap:4px;max-width:70%;overflow:auto}.tab{padding:5px 7px;border-radius:8px;background:var(--bg);box-shadow:var(--in);font-size:8px;white-space:nowrap}.tab.active{box-shadow:var(--out);font-weight:900;color:#5d59b9}
-.preview{height:100%;min-height:0;border-radius:12px;box-shadow:var(--in);padding:7px;overflow:auto;margin-top:7px}.preview img{max-width:100%;display:block;margin:auto;border-radius:7px}.raw{height:100%;min-height:0;overflow:auto;border-radius:12px;box-shadow:var(--in);padding:8px;margin-top:7px;white-space:pre-wrap;overflow-wrap:anywhere;font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+.result-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.raw{height:100%;min-height:0;overflow:auto;border-radius:12px;box-shadow:var(--in);padding:8px;margin-top:7px;white-space:pre-wrap;overflow-wrap:anywhere;font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
 .badge{padding:4px 6px;border-radius:99px;box-shadow:var(--in);font-size:7px;font-weight:950;white-space:nowrap}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
 .notice{font-size:8px;line-height:1.45;padding:7px;border-radius:10px;box-shadow:var(--in);margin:7px 0}.results{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:5px}.field{padding:8px;border-radius:11px;box-shadow:var(--in)}.field-top{display:flex;align-items:center;justify-content:space-between;gap:6px}.field-name{font-size:8px;font-weight:950}.field-value{font-size:9px;line-height:1.4;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.field-meta{font-size:7.5px;color:var(--muted);line-height:1.4;margin-top:4px}.evidence{margin-top:4px;padding:5px;border-radius:7px;background:rgba(255,255,255,.22);font-size:7px;white-space:pre-wrap;overflow-wrap:anywhere}
 .table-wrap{overflow:auto;margin-top:5px;border-radius:7px;box-shadow:var(--in)}table{border-collapse:collapse;width:100%;font-size:7px}th,td{padding:4px;border-bottom:1px solid rgba(100,120,140,.15);text-align:left}
@@ -130,6 +130,13 @@ select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);b
  </div>
 
  <div class="section">
+  <h2>Instant processing</h2>
+  <div class="progress-box"><div class="progress"><i id="bar"></i></div><div class="progress-text" id="progressText">Waiting for upload.</div></div>
+  <div class="live"><b id="liveState">READY</b><br><span id="liveDetail">Upload a document to begin.</span></div>
+  <button class="btn primary" id="runBtn" type="button" style="width:100%;margin-top:6px">Run / Re-run OCR</button>
+ </div>
+
+ <div class="section">
   <div class="label">Automatic document processing</div>
   <div class="mini">Instant OCR starts automatically. Image orientation, deskew, contrast, sharpening, HD upscaling, multilingual recognition, field extraction and validation run without user-facing processing switches.</div>
  </div>
@@ -160,17 +167,7 @@ select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);b
    <div class="mini" style="margin-bottom:7px">First two image uploads are displayed as front/back evidence. Every supported page is still processed.</div>
    <div class="id-grid"><div class="slot" id="frontSlot"><div class="empty">ID FRONT</div></div><div class="slot" id="backSlot"><div class="empty">ID BACK</div></div></div>
   </div>
-  <div>
-   <h2>Instant processing</h2>
-   <div class="progress-box"><div class="progress"><i id="bar"></i></div><div class="progress-text" id="progressText">Waiting for upload.</div></div>
-   <div class="live"><b id="liveState">READY</b><br><span id="liveDetail">Upload a document to begin.</span></div>
-   <button class="btn primary" id="runBtn" type="button" style="width:100%;margin-top:6px">Run / Re-run OCR</button>
-  </div>
- </div>
 
- <div class="card">
-  <div class="result-head"><h2>Source preview</h2><div class="tabs" id="pageTabs"></div></div>
-  <div class="preview" id="preview"><div class="empty">Upload a document to preview it.</div></div>
  </div>
 
  <div class="card">
@@ -196,7 +193,7 @@ const els={
  fileInput:$('#fileInput'),drop:$('#dropZone'),clear:$('#clearBtn'),run:$('#runBtn'),lang:$('#lang'),
  autoInstant:$('#autoInstant'),enhance:$('#enhance'),deskew:$('#deskew'),threshold:$('#threshold'),sharpen:$('#sharpen'),
  scale:$('#scale'),aiUpscale:$('#aiUpscale'),upscaleFactor:$('#upscaleFactor'),loadUpscaler:$('#loadUpscaler'),upscaleStatus:$('#upscaleStatus'),scaleValue:$('#scaleValue'),
- fileList:$('#fileList'),front:$('#frontSlot'),back:$('#backSlot'),tabs:$('#pageTabs'),preview:$('#preview'),raw:$('#rawText'),
+ fileList:$('#fileList'),front:$('#frontSlot'),back:$('#backSlot'),raw:$('#rawText'),
  fields:$('#fields'),bar:$('#bar'),progress:$('#progressText'),status:$('#statusText'),dot:$('#statusDot'),liveState:$('#liveState'),liveDetail:$('#liveDetail'),
  ocrBadge:$('#ocrBadge'),review:$('#reviewBadge'),summary:$('#summary')
 };
@@ -274,7 +271,7 @@ async function addFiles(files){
   if(duplicate)continue;
   valid.push(f)
  }
- if(bad.length){els.summary.textContent=bad.join('\\n');els.summary.className='notice bad'}
+ if(bad.length){els.summary.textContent=bad.join('\n');els.summary.className='notice bad'}
  if(!valid.length)return;
  state.files.push(...valid);renderFiles();setStatus('Preparing');els.liveState.textContent='PREPARING';els.liveDetail.textContent='Converting pages…';
  try{await buildPages();renderSlots();renderPages();if(state.pages.length)await runOCR(false)}catch(e){console.error(e);els.summary.textContent='Unable to prepare the document: '+e.message;els.summary.className='notice bad';setStatus('Preparation failed',false);els.liveState.textContent='STOPPED';els.liveDetail.textContent='No information was guessed.'}
@@ -293,7 +290,8 @@ function bitmapCanvas(bmp,scale){
 async function pdfPages(file){
  const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
  pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
- const pdf=await retry(()=>pdfjs.getDocument({data:await file.arrayBuffer()}).promise,2),out=[];
+ const data=await file.arrayBuffer();
+ const pdf=await retry(()=>pdfjs.getDocument({data}).promise,2),out=[];
  for(let i=1;i<=pdf.numPages;i++){
   const p=await pdf.getPage(i),v=p.getViewport({scale:2});
   const c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);
@@ -318,7 +316,7 @@ async function buildPages(){
     if(!window.XLSX)throw new Error('XLSX reader is not loaded. Upload PDF/image for immediate OCR.');
     const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});for(const name of wb.SheetNames){
      const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:''});
-     state.pages.push({file:f,page:1,text:rows.map(r=>r.join(' | ')).join('\\n'),rows,native:true,label:f.name+' · '+name})
+     state.pages.push({file:f,page:1,text:rows.map(r=>r.join(' | ')).join('\n'),rows,native:true,label:f.name+' · '+name})
     }
    }else{
     const b=await imageBitmap(f),c=bitmapCanvas(b,Number(els.scale.value));
@@ -330,13 +328,9 @@ async function buildPages(){
  progress(4,state.pages.length+' page(s) ready')
 }
 function renderPages(){
- els.tabs.innerHTML='';
- state.pages.forEach((p,i)=>{const b=document.createElement('button');b.type='button';b.className='tab'+(i===state.selected?' active':'');b.textContent=String(i+1);b.title=p.label;b.onclick=()=>{state.selected=i;renderPages()};els.tabs.appendChild(b)});
- const p=state.pages[state.selected];els.preview.innerHTML='';
- if(!p){els.preview.innerHTML='<div class="empty">Upload a document to preview it.</div>';return}
- if(p.error){els.preview.innerHTML='<div class="notice bad">'+esc(p.error)+'</div>';return}
- if(p.canvas){const im=document.createElement('img');im.src=p.canvas.toDataURL('image/jpeg',.9);im.alt='Source page';els.preview.appendChild(im)}
- else els.preview.innerHTML='<div class="raw" style="height:auto;box-shadow:none;margin:0">'+esc(p.text||'')+'</div>'
+ /* Preview UI removed; retain only the internal page index. */
+ if(!state.pages.length){state.selected=0;return}
+ state.selected=Math.max(0,Math.min(state.selected,state.pages.length-1));
 }
 
 /* Conservative preprocessing. It never changes characters in OCR output. */
@@ -397,9 +391,9 @@ async function recognize(c){
 /* Evidence-first extraction. */
 function lines(rs){return rs.flatMap(r=>String(r.text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean))}
 function labelBlock(ls,labels,maxNext=7){
- const re=new RegExp('^\\s*(?:'+labels.join('|')+')\\s*[:\\-]?\\s*(.*)$','i');
- for(let i=0;i<ls.length;i++){const m=ls[i].match(re);if(!m)continue;let v=m[1].trim(),ev=ls[i];if(!v&&ls[i+1]){v=ls[i+1];ev+='\\n'+ls[i+1];i++}
-  if(v){for(let j=i+1;j<Math.min(ls.length,i+1+maxNext);j++){if(/^(full\\s*name|name|nama|dob|date\\s*of\\s*birth|tarikh\\s*lahir|gender|sex|jantina|nationality|kewarganegaraan|citizenship|nric|ic\\s*no|id\\s*(?:no|number)|address|alamat|telephone|phone|email|expiry|issue|registration|license)\\b/i.test(ls[j]))break;if(/\\d{5}/.test(ls[j])||/\\b(jalan|jln|lorong|persiaran|taman|kampung|kg|blok|block|lot|unit|tingkat|no\\.?\\s*\\d)/i.test(ls[j])){v+='\\n'+ls[j];ev+='\\n'+ls[j]}}
+ const re=new RegExp('^\s*(?:'+labels.join('|')+')\s*[:\-]?\s*(.*)$','i');
+ for(let i=0;i<ls.length;i++){const m=ls[i].match(re);if(!m)continue;let v=m[1].trim(),ev=ls[i];if(!v&&ls[i+1]){v=ls[i+1];ev+='\n'+ls[i+1];i++}
+  if(v){for(let j=i+1;j<Math.min(ls.length,i+1+maxNext);j++){if(/^(full\s*name|name|nama|dob|date\s*of\s*birth|tarikh\s*lahir|gender|sex|jantina|nationality|kewarganegaraan|citizenship|nric|ic\s*no|id\s*(?:no|number)|address|alamat|telephone|phone|email|expiry|issue|registration|license)\b/i.test(ls[j]))break;if(/\d{5}/.test(ls[j])||/\b(jalan|jln|lorong|persiaran|taman|kampung|kg|blok|block|lot|unit|tingkat|no\.?\s*\d)/i.test(ls[j])){v+='\n'+ls[j];ev+='\n'+ls[j]}}
    return {value:v,evidence:ev}
   }
  }
@@ -412,38 +406,38 @@ function findGeneric(ls,patterns){
 }
 function extract(rs){
  const ls=lines(rs),c=avgConf(rs),out=[];
- const name=labelBlock(ls,['full\\s*name','name','nama\\s*penuh','nama'],5);
+ const name=labelBlock(ls,['full\s*name','name','nama\s*penuh','nama'],5);
  out.push(name?mk('Full Name',name.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',name.evidence,'Explicit name-label association.',c<85?'OCR confidence is below the verification threshold.':''):mk('Full Name','UNKNOWN',0,'UNKNOWN','No reliable name field was detected.','Not validated.','The application does not infer a name from unrelated text.'));
- const id=labelBlock(ls,['nric(?:\\s*(?:no|number))?','ic\\s*(?:no|number)?','identification\\s*(?:no|number)?','id\\s*(?:no|number)','no\\.?\\s*kad\\s*pengenalan'],2);
+ const id=labelBlock(ls,['nric(?:\s*(?:no|number))?','ic\s*(?:no|number)?','identification\s*(?:no|number)?','id\s*(?:no|number)','no\.?\s*kad\s*pengenalan'],2);
  out.push(id?mk('NRIC / ID Number',id.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',id.evidence,'Preserved exactly as detected; no O/0, I/1 or similar substitutions.',/[A-Za-z0-9]/.test(id.value)?'Every character should be checked visually.':''):mk('NRIC / ID Number','UNKNOWN',0,'UNKNOWN','No reliable identification-number label was detected.','Not validated.','No number is inferred.'));
  const nat=labelBlock(ls,['nationality','kewarganegaraan','citizenship'],2);
- const explicitMY=ls.find(x=>/\\bwarganegara(?:\\s*\\/\\s*malaysia|\\s+malaysia)?\\b/i.test(x));
+ const explicitMY=ls.find(x=>/\bwarganegara(?:\s*\/\s*malaysia|\s+malaysia)?\b/i.test(x));
  if(nat)out.push(mk('Nationality',nat.value,Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',nat.evidence,'Explicit nationality field.',c<85?'Verify visually.':''));
  else if(explicitMY)out.push(mk('Nationality','Warganegara / Malaysia',Math.min(c,96),c>=85?'VERIFIED':'UNCERTAIN',explicitMY,'Explicit Warganegara/Malaysia evidence.',''));
  else out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state/country appearing in an address is not used as nationality.'));
  const sex=labelBlock(ls,['gender','sex','jantina'],2);
- if(sex){const u=sex.value.toUpperCase();let norm=null;if(/\\b(PEREMPUAN|FEMALE|F)\\b/.test(u))norm='Perempuan / Female / F';else if(/\\b(LELAKI|MALE|M)\\b/.test(u))norm='Lelaki / Male / M';out.push(mk('Gender / Sex',norm?sex.value+' → '+norm:sex.value,Math.min(c,96),norm&&c>=85?'VERIFIED':'UNCERTAIN',sex.evidence,'Normalization only occurs for explicit gender evidence.',norm?'':'Value is not an unambiguous supported gender marker.'))}
+ if(sex){const u=sex.value.toUpperCase();let norm=null;if(/\b(PEREMPUAN|FEMALE|F)\b/.test(u))norm='Perempuan / Female / F';else if(/\b(LELAKI|MALE|M)\b/.test(u))norm='Lelaki / Male / M';out.push(mk('Gender / Sex',norm?sex.value+' → '+norm:sex.value,Math.min(c,96),norm&&c>=85?'VERIFIED':'UNCERTAIN',sex.evidence,'Normalization only occurs for explicit gender evidence.',norm?'':'Value is not an unambiguous supported gender marker.'))}
  else out.push(mk('Gender / Sex','UNKNOWN',0,'UNKNOWN','No explicit gender/sex field detected.','Not validated.','Gender is never inferred from a name.'));
- const dob=labelBlock(ls,['date\\s*of\\s*birth','dob','tarikh\\s*lahir','birth\\s*date'],2);
- if(dob){const ok=/\\b(?:\\d{1,4}[-/.]\\d{1,2}[-/.]\\d{1,4})\\b/.test(dob.value);out.push(mk('Date of Birth',dob.value,Math.min(c,96),ok&&c>=85?'VERIFIED':'UNCERTAIN',dob.evidence,ok?'Date has a recognizable numeric structure.':'Date format is not sufficiently clear.',ok?'':'Verify date visually.'))}
+ const dob=labelBlock(ls,['date\s*of\s*birth','dob','tarikh\s*lahir','birth\s*date'],2);
+ if(dob){const ok=/\b(?:\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4})\b/.test(dob.value);out.push(mk('Date of Birth',dob.value,Math.min(c,96),ok&&c>=85?'VERIFIED':'UNCERTAIN',dob.evidence,ok?'Date has a recognizable numeric structure.':'Date format is not sufficiently clear.',ok?'':'Verify date visually.'))}
  else out.push(mk('Date of Birth','UNKNOWN',0,'UNKNOWN','No explicit DOB field detected.','Not validated.','No date is inferred.'));
- const addr=labelBlock(ls,['address','alamat','alamat\\s*tetap','residential\\s*address','mailing\\s*address','permanent\\s*address'],10);
+ const addr=labelBlock(ls,['address','alamat','alamat\s*tetap','residential\s*address','mailing\s*address','permanent\s*address'],10);
  if(addr){const ac=Math.min(c,96);out.push(mk('Address',addr.value,ac,ac>=85?'VERIFIED':'UNCERTAIN',addr.evidence,'Captured as a multi-line address block; postcode/city/state are preserved.',ac<85?'Some address characters may need visual verification.':''))}
  else out.push(mk('Address','UNKNOWN',0,'UNKNOWN','No explicit address block detected.','Not validated.','The application does not construct an address from isolated postcode or city text.'));
- const postcode=ls.find(x=>/\\b\\d{5}\\b/.test(x));if(postcode)out.push(mk('Postcode',(postcode.match(/\\b\\d{5}\\b/)||[''])[0],Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',postcode,'Five-digit postcode pattern detected.','Verify against the original.'));
- const states=ls.filter(x=>/\\b(Johor|Kedah|Kelantan|Melaka|Malacca|Negeri Sembilan|Pahang|Perak|Perlis|Penang|Pulau Pinang|Sabah|Sarawak|Selangor|Terengganu|Kuala Lumpur|Putrajaya|Labuan)\\b/i.test(x));
- if(states.length)out.push(mk('State / Location',states.join('\\n'),Math.min(c,92),c>=85?'VERIFIED':'UNCERTAIN',states.join('\\n'),'Explicit state/location text retained.','This is not converted into nationality.'));
- const phone=ls.find(x=>/(?:tel|telephone|phone|mobile|telefon)\\b/i.test(x));if(phone)out.push(mk('Telephone / Mobile',phone,Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',phone,'Explicit telephone evidence.','Verify digits visually.'));
- const email=ls.find(x=>/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i.test(x));if(email)out.push(mk('Email',email,Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',email,'Email pattern detected.','Verify characters visually.'));
+ const postcode=ls.find(x=>/\b\d{5}\b/.test(x));if(postcode)out.push(mk('Postcode',(postcode.match(/\b\d{5}\b/)||[''])[0],Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',postcode,'Five-digit postcode pattern detected.','Verify against the original.'));
+ const states=ls.filter(x=>/\b(Johor|Kedah|Kelantan|Melaka|Malacca|Negeri Sembilan|Pahang|Perak|Perlis|Penang|Pulau Pinang|Sabah|Sarawak|Selangor|Terengganu|Kuala Lumpur|Putrajaya|Labuan)\b/i.test(x));
+ if(states.length)out.push(mk('State / Location',states.join('\n'),Math.min(c,92),c>=85?'VERIFIED':'UNCERTAIN',states.join('\n'),'Explicit state/location text retained.','This is not converted into nationality.'));
+ const phone=ls.find(x=>/(?:tel|telephone|phone|mobile|telefon)\b/i.test(x));if(phone)out.push(mk('Telephone / Mobile',phone,Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',phone,'Explicit telephone evidence.','Verify digits visually.'));
+ const email=ls.find(x=>/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(x));if(email)out.push(mk('Email',email,Math.min(c,95),c>=85?'VERIFIED':'UNCERTAIN',email,'Email pattern detected.','Verify characters visually.'));
  const conflicts=rs.filter(r=>r.conflict).length;if(conflicts)out.push(mk('OCR / HD Conflict','REVIEW REQUIRED',Math.min(c,60),'UNCERTAIN',conflicts+' page(s) produced materially different OCR between primary and HD pass.','Conflict detected.','Verify affected fields against the original source.'));
- const known=/^(full name|nric \\/ id number|nationality|gender \\/ sex|date of birth|address|postcode|state \\/ location|telephone \\/ mobile|email|ocr \\/ hd conflict)$/i;
- const other=ls.filter(x=>x.length>1&&!known.test(x));if(other.length)out.push(mk('Other Reliably Read Information',other.join('\\n'),Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',other.slice(0,80).join('\\n'),'Retained directly from OCR evidence; no semantic invention.',c<85?'Some text may need verification.':''));
+ const known=/^(full name|nric \/ id number|nationality|gender \/ sex|date of birth|address|postcode|state \/ location|telephone \/ mobile|email|ocr \/ hd conflict)$/i;
+ const other=ls.filter(x=>x.length>1&&!known.test(x));if(other.length)out.push(mk('Other Reliably Read Information',other.join('\n'),Math.min(c,90),c>=85?'VERIFIED':'UNCERTAIN',other.slice(0,80).join('\n'),'Retained directly from OCR evidence; no semantic invention.',c<85?'Some text may need verification.':''));
  return out
 }
 function renderFields(fs){
  els.fields.innerHTML='';let review=0;
  fs.forEach(f=>{if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';
- d.innerHTML='<div class="field-top"><div class="field-name">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.confidence+'%</span></div><div class="field-value">'+esc(f.value)+'</div><div class="field-meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="evidence"><b>Evidence:</b>\\n'+esc(f.evidence)+(f.reason?'\\n\\n<b>Reason:</b> '+esc(f.reason):'')+'</div>';els.fields.appendChild(d)});
+ d.innerHTML='<div class="field-top"><div class="field-name">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.confidence+'%</span></div><div class="field-value">'+esc(f.value)+'</div><div class="field-meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="evidence"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason):'')+'</div>';els.fields.appendChild(d)});
  els.review.textContent=review?review+' REVIEW ITEM(S)':'COMPLETE';els.review.className='badge '+(review?'warn':'ok')
 }
 
@@ -456,19 +450,19 @@ async function runOCR(manual){
   for(let i=0;i<state.pages.length;i++){
    const p=state.pages[i];state.selected=i;renderPages();progress(5+70*i/state.pages.length,'Processing page '+(i+1)+' of '+state.pages.length+'…');
    if(p.error){state.results.push({page:i+1,text:'',confidence:0,error:p.error});continue}
-   if(p.native){state.results.push({page:i+1,text:p.text||'',confidence:100,native:true});els.raw.textContent+=(els.raw.textContent?'\\n\\n':'')+'--- '+p.label+' ---\\n'+(p.text||'[No readable text]');renderFields(extract(state.results));continue}
+   if(p.native){state.results.push({page:i+1,text:p.text||'',confidence:100,native:true});els.raw.textContent+=(els.raw.textContent?'\n\n':'')+'--- '+p.label+' ---\n'+(p.text||'[No readable text]');renderFields(extract(state.results));continue}
    const base=prepare(p.canvas),fast=await recognize(base),rec={page:i+1,text:fast.text,confidence:fast.confidence,conflict:false,aiText:''};state.results.push(rec);
-   els.raw.textContent+=(els.raw.textContent?'\\n\\n':'')+'--- '+p.label+' · FAST OCR ---\\n'+(fast.text||'[No readable text]')+'\\n[OCR confidence: '+fast.confidence.toFixed(1)+'%]';
+   els.raw.textContent+=(els.raw.textContent?'\n\n':'')+'--- '+p.label+' · FAST OCR ---\n'+(fast.text||'[No readable text]')+'\n[OCR confidence: '+fast.confidence.toFixed(1)+'%]';
    els.ocrBadge.textContent='LIVE · '+fast.confidence.toFixed(1)+'%';els.ocrBadge.className='badge '+(fast.confidence>=85?'ok':fast.confidence>=60?'warn':'bad');renderFields(extract(state.results));
    els.liveDetail.textContent='Fast OCR displayed. HD corroboration follows…';
    /* Internal 4× pass. If it fails, primary OCR remains available. */
    try{
     const hd=upscale4x(base),second=await recognize(prepare(hd));rec.aiText=second.text;rec.aiConfidence=second.confidence;
-    const a=fast.text.toUpperCase().replace(/\\s+/g,' ').trim().split(' ').filter(Boolean),b=second.text.toUpperCase().replace(/\\s+/g,' ').trim().split(' ').filter(Boolean);
+    const a=fast.text.toUpperCase().replace(/\s+/g,' ').trim().split(' ').filter(Boolean),b=second.text.toUpperCase().replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
     const n=Math.max(a.length,b.length),same=a.reduce((s,x,j)=>s+(x===b[j]?1:0),0);rec.agreement=n?same/n:0;rec.conflict=rec.agreement<.62;
-    els.raw.textContent+='\\n\\n--- '+p.label+' · HD CORROBORATION ---\\n'+(second.text||'[No readable text]')+'\\n'+(rec.conflict?'[CONFLICT — verify against original source]':'[Corroboration token agreement: '+Math.round(rec.agreement*100)+'%]');
+    els.raw.textContent+='\n\n--- '+p.label+' · HD CORROBORATION ---\n'+(second.text||'[No readable text]')+'\n'+(rec.conflict?'[CONFLICT — verify against original source]':'[Corroboration token agreement: '+Math.round(rec.agreement*100)+'%]');
     renderFields(extract(state.results))
-   }catch(e){els.raw.textContent+='\\n\\n[HD corroboration unavailable: '+e.message+']'}
+   }catch(e){els.raw.textContent+='\n\n[HD corroboration unavailable: '+e.message+']'}
    await sleep(0)
   }
   const fs=extract(state.results),needs=fs.filter(x=>x.status!=='VERIFIED').length;renderFields(fs);
