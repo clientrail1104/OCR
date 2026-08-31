@@ -192,12 +192,13 @@ window.extractFrontPhotoSideFields = function(lines) {
   for (const r of rows) {
     const m = r.text.match(/\bWarganegara(?:\s+Malaysia)?\b\s*[:=\-]?\s*(.*)$/i);
     if (m) {
-      const value = m[1].trim() || (/Malaysia/i.test(m[0]) ? "Malaysia" : null);
-      if (value) {
-        setEvidence("nationality", value, r.text,
-          "Explicit Warganegara evidence in the below-photo-left region.");
-        break;
-      }
+      // On this card, a standalone Warganegara row is the nationality label.
+      // It is safe to map that explicit label to Malaysia; this is not an
+      // inference from address, ethnicity, name, or photograph.
+      const value = m[1].trim() || "Malaysia";
+      setEvidence("nationality", value, r.text,
+        "Explicit Warganegara evidence in the below-photo-left region; standalone Warganegara maps to Malaysia by the document rule.");
+      break;
     }
   }
 
@@ -618,11 +619,28 @@ function findNameCandidates(text){
   return [...new Set(candidates)];
 }
 function extractAddress(text){
-  // Dedicated front-card address crop: the address occupies exactly five lines.
-  // Preserve OCR spelling; only collapse repeated whitespace and remove empty lines.
-  return String(text||'').split(/\r?\n/)
-    .map(x=>x.replace(/[ \t]+/g,' ').trim())
-    .filter(Boolean).slice(0,5);
+  /*
+    ADDRESS SANITIZER — METADATA IS NOT ADDRESS
+    The dedicated crop can occasionally leak the below-photo metadata rows into
+    OCR, e.g. "... SEBERANG PERAK WARG ISLAM". Those tokens are document
+    metadata, not an address. Remove ONLY explicit metadata tokens/lines; never
+    delete arbitrary words merely because they look like a name or place.
+
+    Warganegara -> Nationality (Malaysia) is handled independently above.
+    Religion values (Islam/Hindu/India/Cina) and gender labels are also not
+    address content when they appear as explicit metadata suffixes/standalone rows.
+  */
+  const source=String(text||'').replace(/\r/g,'').split(/\n/)
+    .map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean);
+  const metadataLine=/^(?:WARGANEGARA(?:\s+MALAYSIA)?|WARG|RELIGION|AGAMA|ISLAM|HINDU|INDIA|CINA|PEREMPUAN|LELAKI|FEMALE|MALE)(?:\s*[:=\-].*)?$/i;
+  const metadataSuffix=/\s+(?:WARGANEGARA(?:\s+MALAYSIA)?|WARG|RELIGION|AGAMA|ISLAM|HINDU|INDIA|CINA|PEREMPUAN|LELAKI|FEMALE|MALE)(?=\s|$).*$/i;
+  const out=[];
+  for(const line of source){
+    if(metadataLine.test(line)) continue;
+    const cleaned=line.replace(metadataSuffix,'').trim();
+    if(cleaned) out.push(cleaned);
+  }
+  return out.slice(0,5);
 }
 function extract(front,back){
  const out=[];const ft=String(front.text||''),bt=String(back.text||'');
@@ -665,8 +683,9 @@ function extract(front,back){
 
  const natText=(front.nationalityText||ft)+'\n'+(front.wholeText||'');
  const natMatch=natText.match(/\bWARGANEGARA\b/i);
+ const natStandalone=natText.match(/(?:^|\n|\s)(?:WARG)(?:\s|$)/i);
  const malaysiaMatch=natText.match(/\bMALAYSIA\b/i);
- if(natMatch){
+ if(natMatch || natStandalone){
   out.push(mk('Nationality','Malaysia',Math.min(front.conf,100),fieldStatus(front.conf),natMatch[0],'Explicit "WARGANEGARA" evidence on the MyKad indicates Malaysian nationality. The displayed value is Malaysia; no state/address is used to infer nationality.','"Warganegara" is evidence, not a character-replacement rule.'));
  }else if(malaysiaMatch){
   out.push(mk('Nationality','Malaysia',Math.min(front.conf,100),fieldStatus(front.conf),malaysiaMatch[0],'Explicit Malaysia evidence retained.',''));
@@ -703,7 +722,7 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
  render(extract(frontData,backData));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = every OCR line above the visible name/address gap; Address = exactly five lines below that gap. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();E.run.disabled=true;
-window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,assessFieldConfidence:window.assessFieldConfidence};
+window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,assessFieldConfidence:window.assessFieldConfidence};
 })();
 </script>
 
@@ -933,5 +952,35 @@ window.NAME_ADDRESS_GAP_TESTS={passed:failures.length===0,failures};
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});else run();
 })();</script>
+<script id="nationality-address-regression-tests">
+(function(){
+ const A=window.OCR_MASTER_API, failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+ const split=A.splitNameAddressByVisibleGap, mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const r=split({lines:[
+   mk("JOHN CITIZEN",0,10),
+   mk("MOHAMED NO 17 P 3 JASE SEBERANG PERAK WARG ISLAM",14,24),
+   mk("KAMPUNG EXAMPLE",28,38),
+   mk("45600 BATANG BERJUNTAI",42,52),
+   mk("SELANGOR",56,66),
+   mk("EXTRA ADDRESS ROW",70,80)
+ ]});
+ assert("MOHAMED retained as final name row",r.nameLines.includes("MOHAMED"));
+ assert("merged line splits at NO 17",r.addressStart==="NO 17 P 3 JASE SEBERANG PERAK WARG ISLAM");
+ assert("MOHAMED is not in address rows",!r.addressLines.some(x=>/\bMOHAMED\b/i.test(x)));
+ const cleaned=A.extractAddress(r.addressLines.join("\n"));
+ assert("WARG removed from address",!cleaned.some(x=>/\bWARG\b/i.test(x)));
+ assert("ISLAM metadata removed from address",!cleaned.some(x=>/^ISLAM$/i.test(x)));
+ assert("address place text retained",cleaned.some(x=>/SEBERANG PERAK/i.test(x)));
+ const five=A.extractAddress("NO 124 BATU\nJALAN RAWANG\nKAMPUNG SUNGAI DARAH\n45600 BATANG BERJUNTAI\nSELANGOR\nWARG ISLAM");
+ assert("five real address lines preserved",five.length===5);
+ assert("five-line address exact spelling preserved",five[3]==="45600 BATANG BERJUNTAI");
+ const photo=window.extractFrontPhotoSideFields([
+   {text:"WARGANEGARA",y:10},{text:"HINDU",y:20},{text:"PEREMPUAN",y:40}
+ ]);
+ assert("Warganegara is explicit nationality evidence",photo.nationality.status==="EVIDENCE");
+ assert("Warganegara value resolves to Malaysia",photo.nationality.value===null || /MALAYSIA/i.test(photo.nationality.value));
+ window.OCR_MASTER_NATIONALITY_ADDRESS_TEST={passed:failures.length===0,failures};
+})();
+</script>
 </body>
 </html>
