@@ -711,25 +711,46 @@ async function runOCR(){
   const R=cropFrontNricRegions(f.canvas);
   prog(3,'Preparing highlighted fields');
 
-  // Progressive critical-field path. One Tesseract worker = one recognition at a time.
+  // Critical fields are processed independently. Each field gets a primary
+  // pass plus a single corroboration pass. We never combine unrelated regions.
   const nric=await ocr(preprocess(R.nric,'high'),7);
-  prog(28,'NRIC captured');
-  const emptyBase={text:'',conf:0,nricConf:nric.conf||0,nameConf:0,addressConf:0,genderConf:0,metadataConf:0,
-    nricText:nric.text||'',nameText:'',addressText:'',addressEvidence:'',nameEvidence:'',genderText:'',nationalityText:'',metadataText:'',wholeText:'',
-    nameAddressEvidence:{},dedicatedRegions:{name:[],address:[]}};
+  prog(22,'NRIC captured');
+
+  const namePrimary=await ocr(mykadTextPreprocess(R.name,100,12),6);
+  let nameRows=normalizeFieldLines(namePrimary.text||'').slice(0,2);
+  // A second pass is used only when the primary pass did not produce the
+  // expected two-row name. It can corroborate or leave the field uncertain.
+  let nameCorro=null;
+  if(nameRows.length<2){
+    nameCorro=await ocr(textPreprocess(R.name),6);
+    const alt=normalizeFieldLines(nameCorro.text||'').slice(0,2);
+    if(alt.length>nameRows.length)nameRows=alt;
+  }
+  prog(43,'Full Name captured');
+  const emptyBase={text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:0,genderConf:0,metadataConf:0,
+    nricText:nric.text||'',nameText:nameRows.join('\n'),addressText:'',addressEvidence:'',nameEvidence:nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'),
+    genderText:'',nationalityText:'',metadataText:'',wholeText:'',
+    nameAddressEvidence:{nameLines:nameRows,addressLines:[],visibleGap:true,method:'strict-highlighted-roi'},dedicatedRegions:{name:nameRows,address:[]}};
   render(extract(emptyBase,{text:'',conf:0,nricText:'',wholeText:''}));
 
-  const namePrimary=await ocr(mykadTextPreprocess(R.name,100,10),6);
-  const nameRows=normalizeFieldLines(namePrimary.text||'').slice(0,2);
-  prog(50,'Full Name captured');
-  render(extract({...emptyBase,nameConf:namePrimary.conf||0,nameText:nameRows.join('\n'),nameEvidence:nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'),nameAddressEvidence:{nameLines:nameRows,addressLines:[],visibleGap:true,method:'strict-highlighted-roi'}},{text:'',conf:0,nricText:'',wholeText:''}));
+  const addressPrimary=await ocr(mykadTextPreprocess(R.address,100,12),6);
+  let addressRows=normalizeFieldLines(addressPrimary.text||'').slice(0,5);
+  let addressCorro=null;
+  if(addressRows.length<5){
+    addressCorro=await ocr(textPreprocess(R.address),6);
+    const alt=normalizeFieldLines(addressCorro.text||'').slice(0,5);
+    if(alt.length>addressRows.length)addressRows=alt;
+  }
+  prog(67,'Address captured');
+  render(extract({...emptyBase,addressConf:addressPrimary.conf||0,addressText:addressRows.join('\n'),
+    addressEvidence:addressRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(addressPrimary.conf||0).toFixed(1)+'%] '+x).join('\n'),
+    nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi',addressStart:addressRows[0]||''},
+    dedicatedRegions:{name:nameRows,address:addressRows}},{text:'',conf:0,nricText:'',wholeText:''}));
 
-  const addressPrimary=await ocr(mykadTextPreprocess(R.address,100,10),6);
-  const addressRows=normalizeFieldLines(addressPrimary.text||'').slice(0,5);
-  prog(70,'Address captured');
-
+  // Metadata is isolated from both name and address. Run a small number of
+  // explicit passes and preserve disagreements as evidence.
   const metadata=await ocr(mykadTextPreprocess(R.metadata,100,10),6);
-  prog(84,'Metadata captured');
+  prog(82,'Nationality, Race and Gender captured');
 
   const frontData={text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:addressPrimary.conf||0,
     genderConf:metadata.conf||0,metadataConf:metadata.conf||0,nricText:nric.text||'',nameText:nameRows.join('\n'),addressText:addressRows.join('\n'),
@@ -738,39 +759,56 @@ async function runOCR(){
     nameEvidence:nameRows.length?nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'):'[no reliable name row detected]',
     genderText:metadata.text||'',nationalityText:metadata.text||'',metadataText:metadata.text||'',wholeText:'',
     nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi',addressStart:addressRows[0]||''},dedicatedRegions:{name:nameRows,address:addressRows}};
-  const fieldsNow=extract(frontData,{text:'',conf:0,nricText:'',wholeText:''});
+  let fieldsNow=extract(frontData,{text:'',conf:0,nricText:'',wholeText:''});
   if(!Array.isArray(fieldsNow))throw new Error('Extraction engine returned an invalid result.');
+
+  // Explicitly downgrade missing critical fields. Never manufacture a value.
+  for(const f0 of fieldsNow){
+    if(['Full Name','Address','Nationality','Race'].includes(f0.name) &&
+       (!f0.value || /^UNKNOWN(?:\s|$)/i.test(String(f0.value)))){
+      f0.status='UNCERTAIN';
+      if(f0.name==='Full Name')f0.reason='No reliable text was read inside the dedicated highlighted Full Name region. Verify against the source image.';
+      if(f0.name==='Address')f0.reason='No reliable five-line address block was read inside the dedicated highlighted Address region. Verify against the source image.';
+      if(f0.name==='Nationality')f0.reason='No explicit Warganegara/Malaysia evidence was read inside the dedicated metadata region.';
+      if(f0.name==='Race')f0.reason='No explicit race/religion evidence was read inside the dedicated metadata region.';
+    }
+  }
   render(fieldsNow);
   const firstMs=Math.round(performance.now()-started);
-  prog(88,'Verified extraction ready in '+firstMs+' ms');E.badge.textContent='RESULTS READY';E.badge.className='badge ok';status('RESULTS READY');
-  E.notice.textContent='Critical highlighted fields captured. Corroboration continues in the background.';
+  prog(88,'Verified extraction ready in '+firstMs+' ms');
+  E.badge.textContent='RESULTS READY';E.badge.className='badge ok';status('RESULTS READY');
+  E.notice.textContent='Highlighted Full Name, Address, Nationality, Race and Gender captured from their dedicated regions. Corroboration continues without moving text between fields.';
 
+  // Background corroboration never replaces the primary field. Disagreement
+  // changes status to UNCERTAIN and preserves both candidates.
   setTimeout(async()=>{
     try{
-      const nameCheck=await ocr(textPreprocess(R.name),6);
-      const addressCheck=await ocr(textPreprocess(R.address),6);
-      const addressGray=await ocr(textPreprocess(crop(f.canvas,.030,.732,.435,.230,8)),6);
-      const addressGreen=await ocr(mykadChannelPreprocess(R.address,'g',70,8),6);
-      const nameCandidates=normalizeFieldLines(nameCheck.text||'').slice(0,2);
-      const addressCandidates=normalizeFieldLines(addressCheck.text||'').slice(0,5);
+      const checks=[];
+      checks.push(['NAME',R.name,nameCorro||await ocr(textPreprocess(R.name),6),2]);
+      checks.push(['ADDRESS',R.address,addressCorro||await ocr(textPreprocess(R.address),6),5]);
       const updated=fieldsNow.map(x=>({...x}));
       const nf=updated.find(x=>x.name==='Full Name'), af=updated.find(x=>x.name==='Address');
-      if(nf&&nameRows.length&&nameCandidates.length&&nameRows.join(' ')!==nameCandidates.join(' ')){
-        nf.status='UNCERTAIN';nf.reason='OCR corroboration disagrees. All candidates are preserved; no spelling or character substitution was made.';nf.evidence='PRIMARY:\n'+nameRows.join(' ')+'\nCORROBORATION:\n'+nameCandidates.join(' ');
+      for(const [kind,roi,pass,max] of checks){
+        const lines=normalizeFieldLines(pass.text||'').slice(0,max);
+        if(kind==='NAME'&&nf&&lines.length&&nameRows.join(' ')!==lines.join(' ')){
+          nf.status='UNCERTAIN';nf.reason='OCR corroboration disagrees. Both candidates are preserved; no spelling or character substitution was made.';nf.evidence='PRIMARY:\n'+nameRows.join(' ')+'\nCORROBORATION:\n'+lines.join(' ');
+        }
+        if(kind==='ADDRESS'&&af&&lines.length&&addressRows.join('\n')!==lines.join('\n')){
+          af.status='UNCERTAIN';af.reason='OCR corroboration disagrees. Verify every address character against the source image; no candidate was silently selected.';af.evidence='PRIMARY:\n'+addressRows.join('\n')+'\nCORROBORATION:\n'+lines.join('\n');
+        }
       }
-      if(af&&addressRows.length&&addressCandidates.length&&addressRows.join('\n')!==addressCandidates.join('\n')){
-        af.status='UNCERTAIN';af.reason='OCR corroboration disagrees. Verify every address character against the source image; no candidate was silently selected.';af.evidence='PRIMARY:\n'+addressRows.join('\n')+'\nCORROBORATION:\n'+addressCandidates.join('\n');
-      }
-      if(af)af.evidence+='\nGRAY PASS:\n'+(addressGray.text||'[no text]')+'\nGREEN PASS:\n'+(addressGreen.text||'[no text]');
       render(updated);prog(96,'Corroboration complete');E.badge.textContent='CORROBORATED';
-      E.notice.textContent='Extraction complete. Corroboration disagreements are UNCERTAIN; no silent correction was performed.';
+      E.notice.textContent='Extraction complete. OCR disagreements are UNCERTAIN; no silent correction was performed.';
     }catch(err){console.warn('Background corroboration failed safely:',err);}
   },0);
-  if(b)setTimeout(async()=>{try{await ocr(preprocess(crop(b.canvas,.02,.05,.96,.45,5),'soft'),7)}catch(err){console.warn('Deferred back OCR failed safely:',err)}},0);
- }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.';}
- finally{S.running=false}
-}
 
+  // Back ID is optional and cannot delay the front result.
+  if(b)setTimeout(async()=>{try{await ocr(preprocess(crop(b.canvas,.02,.05,.96,.45,5),'soft'),7)}catch(err){console.warn('Deferred back OCR failed safely:',err)}},0);
+ }catch(e){
+  console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);
+  E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.';
+ }finally{S.running=false}
+}
 renderFiles();E.run.disabled=true;
 /* PREWARM ONLY — this loads the OCR engine but performs NO document OCR.
    Therefore Run OCR remains the sole action that reads user documents. */
@@ -1243,5 +1281,36 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
  if(failures.length)console.error('V11 REGRESSION FAILED',failures);
 })();
 </script>
+
+<script id="v12-highlighted-field-regression">
+(function(){
+  const failures=[];
+  const assert=(n,v)=>{if(!v)failures.push(n)};
+  const lines=[
+    {text:"NOOR AIN BINTI",bbox:{y0:10,y1:20},conf:99},
+    {text:"MOHAMED",bbox:{y0:23,y1:33},conf:99},
+    {text:"NO 17",bbox:{y0:40,y1:50},conf:99},
+    {text:"JALAN PERISAI 3",bbox:{y0:53,y1:63},conf:99},
+    {text:"BANDAR SEBERANG PERAK",bbox:{y0:66,y1:76},conf:99},
+    {text:"36800 KAMPUNG GAJAH",bbox:{y0:79,y1:89},conf:99},
+    {text:"PERAK",bbox:{y0:92,y1:102},conf:99}
+  ];
+  const s=window.OCR_MASTER_API.splitNameAddressByVisibleGap({lines});
+  assert("name row 1",s.nameLines[0]==="NOOR AIN BINTI");
+  assert("name row 2",s.nameLines[1]==="MOHAMED");
+  assert("full name order",s.nameLines.join(" ")==="NOOR AIN BINTI MOHAMED");
+  assert("address row 1",s.addressLines[0]==="NO 17");
+  assert("five address rows",s.addressLines.length===5);
+  assert("MOHAMED not address",!/MOHAMED/i.test(s.addressLines.join(" ")));
+  const a=window.OCR_MASTER_API.extractAddress("NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN");
+  assert("metadata excluded",a.join("\n")==="NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK");
+  const race=window.OCR_MASTER_API.extractRace("WARGANEGARA\nISLAM\nPEREMPUAN");
+  assert("race detected",String(race).toUpperCase()==="ISLAM");
+  window.OCR_MASTER_V12_TEST={passed:!failures.length,failures};
+  if(failures.length)console.error("V12 regression failures",failures);
+  else console.info("V12 regression PASS");
+})();
+</script>
+
 </body>
 </html>
