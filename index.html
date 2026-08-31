@@ -55,6 +55,48 @@ select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);b
 @media(max-width:1150px){html,body{overflow:auto}.app{height:auto;min-height:100vh}.layout{grid-template-columns:240px 1fr}.right{grid-column:1/-1;min-height:350px}.center{min-height:700px}}
 @media(max-width:700px){.layout{grid-template-columns:1fr}.right{grid-column:auto}.hero{grid-template-columns:1fr}.id-grid{grid-template-columns:1fr}.top{height:auto}.status{display:none}}
 </style>
+
+<style id="safari-upload-fix">
+.native-file-input{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  padding:0!important;
+  margin:-1px!important;
+  overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;
+  white-space:nowrap!important;
+  border:0!important;
+}
+.file-picker{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  min-height:34px;
+  padding:8px 9px;
+  border-radius:10px;
+  background:linear-gradient(135deg,var(--cyan),var(--violet));
+  color:#fff;
+  box-shadow:6px 6px 12px rgba(159,174,187,.35),-6px -6px 12px white;
+  font-size:9px;
+  font-weight:900;
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.file-picker:focus-within{
+  outline:3px solid rgba(18,201,192,.28);
+  outline-offset:2px;
+}
+.file-picker:active{transform:translateY(1px)}
+.upload-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}
+.drop-zone-hit{
+  cursor:pointer;
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -67,12 +109,15 @@ select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);b
 <aside class="card left">
  <div class="section">
   <h2>Upload documents</h2>
-  <div class="drop" id="dropZone" tabindex="0" role="button" aria-label="Upload files">
+  <div class="drop drop-zone-hit" id="dropZone" tabindex="0" role="button" aria-label="Upload files">
    <div class="scan">＋</div><strong>Drop files here</strong>
    <small>PNG · JPG · WEBP · TIFF · PDF · DOCX · XLSX<br>Front + back ID images supported</small>
-   <div class="row" style="margin-top:9px"><button class="btn primary" id="chooseBtn" type="button">Choose files</button><button class="btn" id="clearBtn" type="button">Clear</button></div>
+   <div class="upload-actions">
+  <label class="file-picker" for="fileInput" id="chooseLabel">Choose files</label>
+  <button class="btn" id="clearBtn" type="button">Clear</button>
+</div>
   </div>
-  <input id="fileInput" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.pdf,.docx,.xlsx,image/*">
+  <input id="fileInput" class="native-file-input" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.tif,.tiff,.pdf,.docx,.xlsx,image/*" aria-label="Choose documents">
  </div>
 
  <div class="section">
@@ -148,7 +193,7 @@ select{width:100%;padding:8px;border:0;border-radius:10px;background:var(--bg);b
 const $=s=>document.querySelector(s);
 const state={files:[],pages:[],selected:0,results:[],worker:null,workerLang:null,running:false,front:null,back:null,sr:null};
 const els={
- fileInput:$('#fileInput'),drop:$('#dropZone'),choose:$('#chooseBtn'),clear:$('#clearBtn'),run:$('#runBtn'),lang:$('#lang'),
+ fileInput:$('#fileInput'),drop:$('#dropZone'),clear:$('#clearBtn'),run:$('#runBtn'),lang:$('#lang'),
  autoInstant:$('#autoInstant'),enhance:$('#enhance'),deskew:$('#deskew'),threshold:$('#threshold'),sharpen:$('#sharpen'),
  scale:$('#scale'),aiUpscale:$('#aiUpscale'),upscaleFactor:$('#upscaleFactor'),loadUpscaler:$('#loadUpscaler'),upscaleStatus:$('#upscaleStatus'),scaleValue:$('#scaleValue'),
  fileList:$('#fileList'),front:$('#frontSlot'),back:$('#backSlot'),tabs:$('#pageTabs'),preview:$('#preview'),raw:$('#rawText'),
@@ -163,10 +208,29 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 function retry(fn,n=3){return (async()=>{let e;for(let i=0;i<n;i++){try{return await fn()}catch(x){e=x;if(i<n-1)await sleep(250*(i+1))}}throw e})()}
 
 /* Upload: do not depend on any removed UI control. */
-els.choose.addEventListener('click',e=>{e.stopPropagation();els.fileInput.click()});
-els.drop.addEventListener('click',e=>{if(!e.target.closest('button'))els.fileInput.click()});
-els.drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();els.fileInput.click()}});
-els.fileInput.addEventListener('change',e=>{const f=[...e.target.files];e.target.value='';addFiles(f)});
+/* Safari-safe file picker:
+   The visible "Choose files" control is a <label for="fileInput">.
+   The native input remains present but visually hidden, avoiding display:none
+   and avoiding dependence on a synthetic click for the file chooser. */
+els.drop.addEventListener('click',e=>{
+  if(e.target.closest('label') || e.target.closest('#clearBtn')) return;
+  els.fileInput.focus();
+});
+els.drop.addEventListener('keydown',e=>{
+  if(e.key==='Enter'||e.key===' '){
+    e.preventDefault();
+    els.fileInput.focus();
+    const label=document.getElementById('chooseLabel');
+    if(label) label.click();
+  }
+});
+els.fileInput.addEventListener('change',e=>{
+  const f=[...e.target.files];
+  /* Clear the value only AFTER copying the File objects so the same file
+     can be selected again on the next interaction. */
+  e.target.value='';
+  addFiles(f);
+});
 ['dragenter','dragover'].forEach(x=>els.drop.addEventListener(x,e=>{e.preventDefault();e.stopPropagation();els.drop.classList.add('drag')}));
 ['dragleave','drop'].forEach(x=>els.drop.addEventListener(x,e=>{e.preventDefault();e.stopPropagation();els.drop.classList.remove('drag')}));
 els.drop.addEventListener('drop',e=>addFiles([...e.dataTransfer.files]));
@@ -417,5 +481,16 @@ async function runOCR(manual){
 renderFiles();renderPages();renderSlots();resetOutput();setStatus('Ready');
 })();
 </script>
+
+<script id="upload-runtime-guard">
+window.addEventListener('error', function(e){
+  console.error('OCR MASTER runtime error:', e.error || e.message);
+  const s=document.getElementById('statusText');
+  const d=document.getElementById('liveDetail');
+  if(s) s.textContent='Runtime error — upload remains available';
+  if(d) d.textContent='The document picker is independent of OCR processing.';
+});
+</script>
+
 </body>
 </html>
