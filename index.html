@@ -602,11 +602,10 @@ function findNameCandidates(text){
   return joined.length>=2&&joined.length<=100?[joined]:[];
 }
 function extractAddress(text){
-  /* STRICT ADDRESS EXTRACTION
-     Address is read from the dedicated left-side address ROI. Prefer the first
-     explicit address-start row, then preserve the next four rows. Metadata is
-     removed only when it is a standalone row or an explicit trailing metadata
-     token. Arbitrary words are never removed because they resemble names. */
+  /* STRICT ADDRESS ROI ONLY.
+     The address field is never selected because a token looks like a name.
+     We first locate an explicit address-start pattern, then preserve up to five
+     physical rows. Only explicit metadata labels are removed. */
   const source=String(text||'').replace(/\r/g,'').split(/\n/)
     .map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean);
   const metadataLine=/^(?:WARGANEGARA(?:\s+MALAYSIA)?|WARG|RELIGION|AGAMA|ISLAM|HINDU|INDIA|CINA|PEREMPUAN|LELAKI|FEMALE|MALE)(?:\s*[:=\-].*)?$/i;
@@ -616,12 +615,12 @@ function extractAddress(text){
   for(const line of source){
     if(metadataLine.test(line)) continue;
     const v=line.replace(metadataSuffix,'').trim();
-    if(v) cleaned.push(v);
+    if(v)cleaned.push(v);
   }
   const idx=cleaned.findIndex(x=>start.test(x));
-  if(idx>=0) return cleaned.slice(idx,idx+5);
-  return cleaned.slice(0,5);
+  return idx>=0?cleaned.slice(idx,idx+5):cleaned.slice(0,5);
 }
+
 function extractRace(text){
  const t=String(text||'');
  const explicit=t.match(/\b(?:Race|Bangsa|Kaum)\b\s*[:=\-]?\s*(Hindu|India|Cina|Chinese|Indian|Malay|Melayu|Islam|Buddha|Buddhist|Kristian|Christian)\b/i);
@@ -659,7 +658,7 @@ function extract(front,back){
  if(explicitGender){
   const u=explicitGender.toUpperCase();const explicit=(u==='PEREMPUAN'||u==='FEMALE')?'Perempuan':'Lelaki';
   genderValue=explicit;
-  genderStatus=fieldStatus(front.genderConf||0);
+  genderStatus=fieldStatus(front.genderConf||front.metadataConf||0);
   genderEvidence=explicitGender;
   if(derived){
    if(explicit!==derived.gender){genderStatus='UNCERTAIN';genderReason='Explicit gender text conflicts with the NRIC final-digit parity rule. No value is silently overridden.'}
@@ -670,7 +669,7 @@ function extract(front,back){
  }
  out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,100),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
 
- const natText=(front.nationalityText||'')+'\n'+(front.metadataText||'')+'\n'+(front.wholeText||'');
+ const natText=(front.nationalityText||'')+'\n'+(front.metadataText||'');
  const natMatch=natText.match(/\bWARGANEGARA\b/i);
  const malaysiaMatch=natText.match(/\bMALAYSIA\b/i);
  if(natMatch){
@@ -681,8 +680,9 @@ function extract(front,back){
   out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state, address, race, name, or photograph is never converted into nationality.'));
  }
 
- const raceText=(front.metadataText||'')+'\n'+(front.wholeText||'');
+ const raceText=(front.metadataText||'')+'\n'+(front.genderText||'');
  const race=extractRace(raceText);
+
  out.push(mk('Race',race||'UNKNOWN',race?Math.min(front.metadataConf||front.conf,100):0,race?fieldStatus(front.metadataConf||front.conf):'UNKNOWN',race||'No explicit race/religion value detected.','Only explicitly printed race/religion evidence is accepted; no inference from name, nationality, photograph, or address.','If the printed value is unreadable or competing values are detected, verify against the source image.'));
 
  const address=extractAddress(front.addressText||'');
@@ -1312,5 +1312,33 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 })();
 </script>
 
+
+<!-- V13-STRICT-REGRESSION -->
+<script id="v13-runtime-regression">
+(function(){
+  function run(){
+    const A=window.OCR_MASTER_API;
+    if(!A){window.OCR_MASTER_V13_TEST={passed:false,failures:['API unavailable']};return;}
+    const failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+    const m=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+    const s=A.splitNameAddressByVisibleGap({lines:[
+      m('NOOR AIN BINTI',0,10),m('MOHAMED',13,23),m('NO 17',29,39),
+      m('JALAN PERISAI 3',43,53),m('BANDAR SEBERANG PERAK',57,67),
+      m('36800 KAMPUNG GAJAH',71,81),m('PERAK',85,95)
+    ]});
+    assert('full name rows preserved',s.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+    assert('address has five rows',s.addressLines.length===5);
+    assert('address row 1',s.addressLines[0]==='NO 17');
+    assert('address row 5',s.addressLines[4]==='PERAK');
+    assert('name not in address',!/MOHAMED/i.test(s.addressLines.join(' ')));
+    const a=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+    assert('metadata excluded',a.length===5&&!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(a.join(' ')));
+    assert('race islam',A.extractRace('WARGANEGARA\nISLAM\nPEREMPUAN')==='Islam');
+    window.OCR_MASTER_V13_TEST={passed:!failures.length,failures};
+    console.info('OCR MASTER V13 regression:',window.OCR_MASTER_V13_TEST);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+})();
+</script>
 </body>
 </html>
