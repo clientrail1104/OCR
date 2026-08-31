@@ -234,6 +234,18 @@ window.extractFrontPhotoSideFields = function(lines) {
   return out;
 };
 </script>
+
+<style id="v16-hide-address-race-ui">
+/* V16: Address and Race are intentionally not displayed. OCR internals remain
+   untouched so removing these UI fields cannot corrupt the OCR engine. */
+#addressField,#raceField,#addressCard,#raceCard,
+[data-field="address"],[data-field="race"],
+.field-address,.field-address-card,.field-race,.field-race-card,
+.address-field,.race-field {
+  display:none !important;
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -1391,5 +1403,36 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
  if(failures.length)console.error('V15 AUTO NAME/RACE TEST FAILED',failures); else console.info('V15 AUTO NAME/RACE TEST PASS');
 })();
 </script>
+
+<script id="v16-remove-address-race-ui">
+(function(){
+  function hideUnwantedFields(){
+    const wanted = new Set(["full name","nric number","nationality","gender"]);
+    document.querySelectorAll("body *").forEach(function(el){
+      if(!el.children.length){
+        const t=(el.textContent||"").trim().toLowerCase();
+        if(t==="address" || t==="race"){
+          let p=el;
+          for(let i=0;i<4 && p && p.parentElement;i++,p=p.parentElement){
+            const cls=String(p.className||"").toLowerCase();
+            const id=String(p.id||"").toLowerCase();
+            if(/field|card|row|item/.test(cls+" "+id)){
+              p.style.display="none";
+              break;
+            }
+          }
+        }
+      }
+    });
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",hideUnwantedFields,{once:true});
+  }else{
+    hideUnwantedFields();
+  }
+  window.OCR_MASTER_V16_UI={hideUnwantedFields};
+})();
+</script>
+
 </body>
 </html>
