@@ -23,8 +23,9 @@
 <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose document files"><div class="plus">＋</div><strong>Drop files here</strong><small>Front + back images · JPG · PNG · WEBP · TIFF</small><div class="actions"><label class="pick" for="files">Choose files</label><button class="btn" id="clear" type="button">Clear</button></div></div>
 <input id="files" class="file-input" type="file" multiple accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff">
 <div class="label">OCR language</div><select id="lang"><option value="eng+msa">English + Malay</option><option value="eng">English</option><option value="msa">Malay</option></select>
-<div class="label">Instant processing</div><div class="mini">Automatic MyKad field OCR starts after upload. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
-<div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Waiting for upload.</p></div>
+<div class="label">Instant processing</div><div class="mini">OCR is manual. Upload only prepares the document; OCR starts only when Run OCR is clicked. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
+<div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Upload ready. Click Run OCR to begin.</p></div>
+<button class="btn run" id="runOCR" type="button" style="width:100%;margin-top:7px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff">Run OCR</button>
 <div class="label">Files</div><div class="files" id="fileList"><div class="mini">No files selected.</div></div>
 </aside>
 <section class="center">
@@ -37,10 +38,10 @@
 'use strict';
 (()=>{
 const $=id=>document.getElementById(id);
-const E={files:$('files'),drop:$('drop'),clear:$('clear'),lang:$('lang'),front:$('front'),back:$('back'),list:$('fileList'),bar:$('bar'),progress:$('progress'),raw:$('raw'),fields:$('fields'),badge:$('ocrBadge'),review:$('review'),notice:$('notice'),status:$('status'),dot:$('dot')};
+const E={files:$('files'),drop:$('drop'),clear:$('clear'),run:$('runOCR'),lang:$('lang'),front:$('front'),back:$('back'),list:$('fileList'),bar:$('bar'),progress:$('progress'),raw:$('raw'),fields:$('fields'),badge:$('ocrBadge'),review:$('review'),notice:$('notice'),status:$('status'),dot:$('dot')};
 const S={files:[],pages:[],worker:null,workerLang:null,running:false};
 const ALLOWED=/\.(png|jpe?g|webp|tif|tiff)$/i;
-const FORBIDDEN_TRANSFORMS=['R↔F','P↔F','R↔C','K↔H','D↔O↔0','U↔Y','B↔S','N↔I','|↔I','N↔ea','A/P↔AP','A/L↔AL'];
+const FORBIDDEN_TRANSFORMS=['R↔F','P↔F','R↔C','K↔H','D↔O↔0','U↔Y','B↔S','N↔I','|↔I','N↔ea','A/P↔AP','A/L↔AL','R↔L','J↔I','V↔W','J↔S','VS↔W','BATANG↔BAT TANG','BERJUNTAI↔JUNTAI','9↔2'];
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function status(t,bad=false){E.status.textContent=t;E.dot.style.background=bad?'var(--bad)':'var(--ok)'}
 function prog(p,t){E.bar.style.width=Math.max(0,Math.min(100,p))+'%';E.progress.textContent=t}
@@ -49,13 +50,14 @@ async function retry(fn,times=2){let err;for(let i=0;i<times;i++){try{return awa
 function bytes(n){return n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB'}
 E.files.addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';addFiles(fs)});
 E.clear.addEventListener('click',clearAll);
+E.run.addEventListener('click',runOCR);
 E.drop.addEventListener('dragover',e=>{e.preventDefault();E.drop.style.transform='scale(1.01)'});
 E.drop.addEventListener('dragleave',()=>E.drop.style.transform='');
 E.drop.addEventListener('drop',e=>{e.preventDefault();E.drop.style.transform='';addFiles([...e.dataTransfer.files])});
 E.drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();E.files.click()}});
-async function addFiles(fs){const ok=[],bad=[];for(const f of fs){if(!ALLOWED.test(f.name)||!f.type.startsWith('image/')){bad.push(f.name+' — unsupported');continue}if(!f.size){bad.push(f.name+' — empty');continue}if(f.size>500*1024*1024){bad.push(f.name+' — over 500 MB');continue}if(!S.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))ok.push(f)}if(bad.length)E.notice.textContent=bad.join('\n');S.files.push(...ok);renderFiles();if(!ok.length)return;try{status('PREPARING');await makePages();renderSlots();await runOCR()}catch(e){console.error(e);status('ERROR',true);E.notice.textContent='Document preparation failed safely: '+e.message+' No value was guessed.'}}
+async function addFiles(fs){const ok=[],bad=[];for(const f of fs){if(!ALLOWED.test(f.name)||!f.type.startsWith('image/')){bad.push(f.name+' — unsupported');continue}if(!f.size){bad.push(f.name+' — empty');continue}if(f.size>500*1024*1024){bad.push(f.name+' — over 500 MB');continue}if(!S.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))ok.push(f)}if(bad.length)E.notice.textContent=bad.join('\n');S.files.push(...ok);renderFiles();if(!ok.length)return;try{status('PREPARING');E.run.disabled=true;await makePages();renderSlots();E.run.disabled=false;prog(0,'Upload ready. Click Run OCR to begin.');E.badge.textContent='READY';E.badge.className='badge warn';E.raw.textContent='OCR has not started. Click Run OCR to process the uploaded document.';E.fields.innerHTML='';E.review.textContent='WAITING';E.review.className='badge warn';status('READY');E.notice.textContent='Files loaded. OCR is manual: click Run OCR. No OCR is performed automatically after upload.'}catch(e){console.error(e);E.run.disabled=true;status('ERROR',true);E.notice.textContent='Document preparation failed safely: '+e.message+' No value was guessed.'}}
 function renderFiles(){E.list.innerHTML=S.files.length?S.files.map(f=>'<div class="file"><b>'+esc(f.name)+'</b><span>'+esc(f.type||'image')+' · '+bytes(f.size)+'</span></div>').join(''):'<div class="mini">No files selected.</div>'}
-async function clearAll(){if(S.running)return;try{if(S.worker)await S.worker.terminate()}catch{}S.worker=null;S.workerLang=null;S.files=[];S.pages=[];E.files.value='';E.front.innerHTML='<span>FRONT ID</span>';E.back.innerHTML='<span>BACK ID</span>';E.raw.textContent='OCR evidence will appear here.';E.fields.innerHTML='';E.badge.textContent='WAITING';E.review.textContent='WAITING';E.review.className='badge warn';E.notice.textContent='Only these fields are extracted: Front ID NRIC Number, Full Name, Gender, Nationality, Address; Back ID Extended NRIC Number.';prog(0,'Waiting for upload.');status('READY')}
+async function clearAll(){if(S.running)return;try{if(S.worker)await S.worker.terminate()}catch{}S.worker=null;S.workerLang=null;S.files=[];S.pages=[];E.files.value='';E.run.disabled=true;E.front.innerHTML='<span>FRONT ID</span>';E.back.innerHTML='<span>BACK ID</span>';E.raw.textContent='OCR evidence will appear here.';E.fields.innerHTML='';E.badge.textContent='WAITING';E.review.textContent='WAITING';E.review.className='badge warn';E.notice.textContent='Only these fields are extracted: Front ID NRIC Number, Full Name, Gender, Nationality, Address; Back ID Extended NRIC Number.';prog(0,'Waiting for upload.');status('READY')}
 async function loadImage(f){const u=URL.createObjectURL(f);const im=new Image();im.src=u;await im.decode();return im}
 function canvasFrom(im){const max=5200,r=Math.min(1,max/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round((im.naturalWidth||im.width)*r));c.height=Math.max(1,Math.round((im.naturalHeight||im.height)*r));const x=c.getContext('2d',{alpha:false});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);return c}
 function crop(c,x,y,w,h,scale=5){const sx=Math.max(0,Math.round(c.width*x)),sy=Math.max(0,Math.round(c.height*y)),sw=Math.min(c.width-sx,Math.round(c.width*w)),sh=Math.min(c.height-sy,Math.round(c.height*h));const o=document.createElement('canvas');o.width=Math.max(1,Math.min(7000,sw*scale));o.height=Math.max(1,Math.min(5000,sh*scale));const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);return o}
@@ -92,11 +94,30 @@ function findExplicitGender(text){
  const m=String(text||'').match(/\b(PEREMPUAN|LELAKI|FEMALE|MALE)\b/i);return m?m[1]:null;
 }
 function findNameCandidates(text){
- return String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(x=>{
-  if(!x||x.length<5)return false;
-  if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MALAYSIA|MYKAD/i.test(x))return false;
-  return /\b(?:A\/P|A\/L|BIN|BINTI|AP|AL)\b/i.test(x) || /^[A-Z][A-Z ]{5,}$/i.test(x);
- });
+ const raw=String(text||'').split(/\r?\n/);
+ const out=[];
+ for(let i=0;i<raw.length;i++){
+  const original=raw[i].trim();
+  if(!original||original.length<5) continue;
+  if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MALAYSIA|MYKAD/i.test(original)) continue;
+  // Preserve the OCR spelling exactly. Only surrounding/duplicate whitespace is removed;
+  // no character, token, A/P, A/L, punctuation or alphabet is substituted.
+  const value=original.replace(/[ \t]+/g,' ').trim();
+  const tokens=value.split(' ');
+  const hasRelation=/\b(A\/P|A\/L|BIN|BINTI|AP|AL)\b/i.test(value);
+  const mostlyName=/^[A-Za-z][A-Za-z'\-.]*(?: [A-Za-z][A-Za-z'\-.]*){1,6}$/.test(value);
+  const hasTooManySymbols=/[^A-Za-z0-9 .\/\-']/.test(value);
+  if(hasRelation || (mostlyName && !hasTooManySymbols)){
+   // If a relation token exists, require at least one alphabetic token on each side.
+   const rel=value.match(/\b(A\/P|A\/L|BIN|BINTI|AP|AL)\b/i);
+   if(rel){
+    const left=value.slice(0,rel.index).trim(), right=value.slice((rel.index||0)+rel[0].length).trim();
+    if(!/[A-Za-z]/.test(left)||!/[A-Za-z]/.test(right)) continue;
+   }
+   if(!out.includes(value)) out.push(value);
+  }
+ }
+ return out;
 }
 function extractAddress(text){
  const ls=String(text||'').split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean);
@@ -121,7 +142,7 @@ function extract(front,back){
  const nameCropCandidates=findNameCandidates(front.nameText||'');
  const fallbackNameCandidates=findNameCandidates((front.wholeText||'')+'\n'+ft);
  const name=consensus(nameCropCandidates.length?nameCropCandidates:fallbackNameCandidates);
- out.push(mk('Full Name',name?name.value:'UNKNOWN',name?Math.min(front.conf,96):0,name?fieldStatus(front.conf,name.all.length>1):'UNKNOWN',name?name.value:'No reliable name line detected.','Preserved exactly as OCR evidence. A/P and A/L are never changed to AP or AL, and vice versa.',name&&name.all.length>1?'Competing name candidates detected; verify the source image.':''));
+ out.push(mk('Full Name',name?name.value:'UNKNOWN',name?Math.min(front.conf,96):0,name?fieldStatus(front.conf,name.all.length>1):'UNKNOWN',name?name.value:'No reliable name line detected.','Exact OCR candidate preserved. No alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted.','If OCR passes disagree, the field is UNCERTAIN rather than choosing a plausible spelling.'));
 
  const explicitGender=findExplicitGender(front.genderText||ft);
  const derived=genderFromNric(fnum?.value);
@@ -169,9 +190,9 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
  for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
  for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
  const front={text:Object.values(fr).map(x=>x.text).join('\n'),wholeText:fr.WHOLE?.text||'',nricText:fr.NRIC?.text||'',nameText:fr.NAME?.text||'',addressText:fr.ADDRESS?.text||'',genderText:fr.GENDER?.text||'',nationalityText:fr.WHOLE?.text||'',conf:Object.values(fr).reduce((a,x)=>a+x.conf,0)/Object.values(fr).length};const back={text:Object.values(br).map(x=>x.text).join('\n'),wholeText:br.WHOLE?.text||'',nricText:br['EXTENDED NRIC']?.text||'',conf:Object.values(br).reduce((a,x)=>a+x.conf,0)/Object.values(br).length};
- render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
+ render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
-renderFiles();
+renderFiles();E.run.disabled=true;
 })();
 </script>
 </body>
