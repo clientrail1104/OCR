@@ -253,7 +253,7 @@ window.extractFrontPhotoSideFields = function(lines) {
 <div class="card"><h2>Front ID / Back ID</h2><div class="workspace"><div class="slot" id="front"><span>FRONT ID</span></div><div class="slot" id="back"><span>BACK ID</span></div></div></div>
 <div class="card evidence"><div class="head"><h2>OCR evidence</h2><span class="badge" id="ocrBadge">WAITING</span></div><div class="raw" id="raw">OCR evidence will appear here.</div></div>
 </section>
-<aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div id="fields" class="fields"><div class="mini">Upload Front + Back ID, then click Run OCR.</div></div><div id="notice" class="mini confidence-policy-note">No OCR is performed until Run OCR is clicked.</div></aside>
+<aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div id="fields" class="fields"><div class="mini">Upload Front ID, then click Run OCR. Back ID is optional for front-field extraction.</div></div><div id="notice" class="mini confidence-policy-note">No OCR is performed until Run OCR is clicked.</div></aside>
 </main></div>
 <script>
 'use strict';
@@ -270,6 +270,7 @@ function wait(ms){return new Promise(r=>setTimeout(r,ms))}
 async function retry(fn,times=2){let err;for(let i=0;i<times;i++){try{return await fn()}catch(e){err=e;if(i+1<times)await wait(220)}}throw err}
 function bytes(n){return n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB'}
 E.files.addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';addFiles(fs)});
+E.drop.addEventListener('click',e=>{if(e.target.closest('label')||e.target.closest('button'))return;E.files.click()});
 E.clear.addEventListener('click',clearAll);
 E.run.addEventListener('click',runOCR);
 E.drop.addEventListener('dragover',e=>{e.preventDefault();E.drop.style.transform='scale(1.01)'});
@@ -283,7 +284,7 @@ function clearAll(){
   E.front.innerHTML='<span>FRONT ID</span>';
   E.back.innerHTML='<span>BACK ID</span>';
   E.raw.textContent='OCR evidence will appear here.';
-  E.fields.innerHTML='<div class="mini">Upload Front + Back ID, then click Run OCR.</div>';
+  E.fields.innerHTML='<div class="mini">Upload Front ID, then click Run OCR. Back ID is optional for front-field extraction.</div>';
   E.review.textContent='WAITING'; E.review.className='badge warn';
   E.badge.textContent='WAITING'; E.badge.className='badge';
   E.notice.textContent='No OCR is performed until Run OCR is clicked.';
@@ -346,6 +347,43 @@ function cropFrontNricRegions(c){
     address:crop(c,.030,.732,.435,.230,12),
     metadata:crop(c,.690,.790,.285,.185,10)
   };
+}
+
+function upscaleCanvas(c,scale=12){
+ const o=document.createElement('canvas');
+ o.width=Math.max(1,Math.min(9000,Math.round(c.width*scale)));
+ o.height=Math.max(1,Math.min(7000,Math.round(c.height*scale)));
+ const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';
+ q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,0,0,o.width,o.height);return o;
+}
+function cropRows(c,count,topPad=0.04,bottomPad=0.04){
+ const rows=[],h=c.height;
+ const y0=Math.round(h*topPad), y1=Math.round(h*(1-bottomPad)), step=(y1-y0)/count;
+ for(let i=0;i<count;i++){
+  const a=Math.max(0,Math.round(y0+i*step-step*.10)), b=Math.min(h,Math.round(y0+(i+1)*step+step*.10));
+  const o=document.createElement('canvas');o.width=Math.max(1,c.width);o.height=Math.max(1,b-a);
+  const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,0,a,c.width,b-a,0,0,o.width,o.height);rows.push(o);
+ }
+ return rows;
+}
+async function ocrFixedRows(c,count,threshold=100){
+ const rows=cropRows(c,count),out=[];
+ for(let i=0;i<rows.length;i++){
+  const variants=[
+   upscaleCanvas(rows[i],16),
+   textPreprocess(rows[i]),
+   mykadTextPreprocess(rows[i],threshold,16),
+   mykadTextPreprocess(rows[i],80,16)
+  ];
+  const passes=[];
+  for(const v of variants)passes.push(await ocr(v,7));
+  const candidates=[...new Set(passes.flatMap(x=>normalizeFieldLines(x.text||'')).filter(Boolean))];
+  // OCR disagreement is never silently resolved. A row is a value only when
+  // all non-empty passes agree exactly. Otherwise all candidates are retained.
+  const value=candidates.length===1?candidates[0]:'';
+  out.push({row:i+1,value,conf:value?Math.min(...passes.filter(x=>normalizeFieldLines(x.text||'').length).map(x=>Number(x.conf)||0)):Math.max(...passes.map(x=>Number(x.conf)||0),0),candidates,passes});
+ }
+ return out;
 }
 
 function normalizeFieldLines(text){
@@ -606,29 +644,89 @@ function extract(front,back){
  return out;
 }
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
-async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');try{const f=S.pages.find(p=>p.side==='front'),b=S.pages.find(p=>p.side==='back');if(!f||!b)throw new Error('Both Front ID and Back ID must be available.');
- const R=cropFrontNricRegions(f.canvas);
- const fr={},br={};
- const runPasses=async(c,psms)=>{const a=[];for(const psm of psms)a.push(await ocr(c,psm));return a};
- const selectLines=(passes,n)=>{const vals=passes.map(r=>normalizeFieldLines(r.text||'')).filter(a=>a.length);vals.sort((a,b)=>(b.length===n)-(a.length===n)||b.length-a.length);return vals[0]?vals[0].slice(0,n):[]};
- fr.NRIC=await ocr(preprocess(R.nric,'high'),7); prog(12,'Front: NRIC');
- fr.NAME_PASSES=await runPasses(mykadTextPreprocess(R.name,80,12),[6,11]);
- const nameLines=selectLines(fr.NAME_PASSES,2);
- fr.NAME={text:nameLines.join('\n'),conf:Math.max(...fr.NAME_PASSES.map(x=>Number(x.conf)||0),0),lines:fr.NAME_PASSES.flatMap(x=>x.lines||[])}; prog(28,'Front: Full Name');
- fr.ADDRESS_PASSES=await runPasses(mykadTextPreprocess(R.address,80,12),[6,11,4]);
- const addressLines=selectLines(fr.ADDRESS_PASSES,5);
- fr.ADDRESS={text:addressLines.join('\n'),conf:Math.max(...fr.ADDRESS_PASSES.map(x=>Number(x.conf)||0),0),lines:fr.ADDRESS_PASSES.flatMap(x=>x.lines||[])};
- fr.ADDRESS_GRAY=await ocr(textPreprocess(crop(f.canvas,.030,.732,.435,.230,12)),6);
- fr.ADDRESS_GREEN=await ocr(mykadChannelPreprocess(R.address,'g',70,12),6); prog(48,'Front: Address');
- fr.METADATA=await ocr(mykadTextPreprocess(R.metadata,95,10),6); fr.GENDER=fr.METADATA; fr.WHOLE=await ocr(maskGold(crop(f.canvas,0,0,1,1,2)),6); prog(62,'Front: Nationality / Race / Gender');
- const backJobs=[['NRIC',crop(b.canvas,.02,.05,.96,.45,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
- for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;prog(70+i*12,'Back OCR: '+label)}
- const nameAddress={nameLines:nameLines,addressLines:addressLines,visibleGap:true,method:'dedicated-red-rois',addressStart:addressLines[0]||'',lineCount:nameLines.length+addressLines.length,gapPx:null};
- const addressEvidence=fr.ADDRESS_PASSES.map((r,i)=>'PSM '+[6,11,4][i]+' ['+Number(r.conf||0).toFixed(1)+'%]\n'+(r.text||'[no text]')).join('\n\n');
- const frontData={text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,nameConf:fr.NAME?.conf||0,addressConf:fr.ADDRESS?.conf||0,genderConf:fr.METADATA?.conf||0,metadataConf:fr.METADATA?.conf||0,nricText:fr.NRIC?.text||'',nameText:nameLines.join('\n'),addressText:addressLines.join('\n'),addressEvidence,genderText:fr.METADATA?.text||'',nationalityText:fr.METADATA?.text||'',metadataText:fr.METADATA?.text||'',wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress,dedicatedRegions:{name:nameLines,address:addressLines}};
- const backData={text:br.WHOLE?.text||'',conf:br.WHOLE?.conf||0,nricText:br.NRIC?.text||'',wholeText:br.WHOLE?.text||''};
-E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Fixed spatial extraction: NRIC = upper-left below header and above microchip; Full Name = dedicated left-side name crop ending at the visible name/address gap; Address = dedicated left-side five-line crop beginning immediately below that gap. Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
- }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
+async function runOCR(){
+ if(S.running)return;
+ S.running=true;E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');
+ try{
+  const f=S.pages.find(p=>p.side==='front');
+  const b=S.pages.find(p=>p.side==='back')||null;
+  if(!f)throw new Error('A Front ID image is required. Upload the front document, then click Run OCR.');
+
+  const R=cropFrontNricRegions(f.canvas), fr={}, br={};
+
+  fr.NRIC=await ocr(preprocess(R.nric,'high'),7); prog(10,'Front: NRIC Number');
+
+  // STRICT RED-RECTANGLE NAME EXTRACTION: two independent physical rows.
+  fr.NAME_ROWS=await ocrFixedRows(R.name,2,100);
+  const nameRows=fr.NAME_ROWS.map(x=>x.value).filter(Boolean);
+  fr.NAME={
+    text:nameRows.join('\n'),
+    conf:nameRows.length?Math.min(...fr.NAME_ROWS.filter(x=>x.value).map(x=>x.conf)):0,
+    lines:fr.NAME_ROWS.map(x=>({text:x.value,conf:x.conf,bbox:null}))
+  };
+  prog(28,'Front: Full Name');
+
+  // STRICT RED-RECTANGLE ADDRESS EXTRACTION: five independent physical rows.
+  fr.ADDRESS_ROWS=await ocrFixedRows(R.address,5,100);
+  const addressRows=fr.ADDRESS_ROWS.map(x=>x.value).filter(Boolean);
+  fr.ADDRESS={
+    text:addressRows.join('\n'),
+    conf:addressRows.length?Math.min(...fr.ADDRESS_ROWS.filter(x=>x.value).map(x=>x.conf)):0,
+    lines:fr.ADDRESS_ROWS.map(x=>({text:x.value,conf:x.conf,bbox:null}))
+  };
+  // Corroboration is retained for evidence only; it cannot move text between fields.
+  fr.ADDRESS_GRAY=await ocr(textPreprocess(crop(f.canvas,.030,.732,.435,.230,12)),6);
+  fr.ADDRESS_GREEN=await ocr(mykadChannelPreprocess(R.address,'g',70,12),6);
+  prog(48,'Front: Address');
+
+  fr.METADATA=await ocr(mykadTextPreprocess(R.metadata,100,12),6);
+  fr.GENDER=fr.METADATA;
+  fr.WHOLE=await ocr(maskGold(crop(f.canvas,0,0,1,1,2)),6);
+  prog(62,'Front: Nationality / Race / Gender');
+
+  if(b){
+    const backJobs=[['NRIC',crop(b.canvas,.02,.05,.96,.45,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
+    for(let i=0;i<backJobs.length;i++){
+      const [label,c,psm]=backJobs[i];
+      const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);
+      br[label]=r;prog(70+i*10,'Back OCR: '+label);
+    }
+  }
+
+  const addressEvidence=fr.ADDRESS_ROWS.map(x=>'ROW '+x.row+' ['+Number(x.conf||0).toFixed(1)+'%] '+(x.candidates.length?x.candidates.join(' / '):'[no text]')).join('\n');
+  const nameEvidence=fr.NAME_ROWS.map(x=>'ROW '+x.row+' ['+Number(x.conf||0).toFixed(1)+'%] '+(x.candidates.length?x.candidates.join(' / '):'[no text]')).join('\n');
+  E.raw.textContent+='--- FRONT · HIGHLIGHTED NAME ROWS ---\n'+nameEvidence+'\n\n--- FRONT · HIGHLIGHTED ADDRESS ROWS ---\n'+addressEvidence+'\n\n';
+
+  const nameAddress={nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-red-roi-fixed-rows',addressStart:addressRows[0]||'',lineCount:nameRows.length+addressRows.length,gapPx:null};
+  const frontData={
+    text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,
+    nameConf:fr.NAME?.conf||0,addressConf:fr.ADDRESS?.conf||0,
+    genderConf:fr.METADATA?.conf||0,metadataConf:fr.METADATA?.conf||0,
+    nricText:fr.NRIC?.text||'',nameText:nameRows.join('\n'),addressText:addressRows.join('\n'),
+    addressEvidence,addressRowCandidates:fr.ADDRESS_ROWS, nameEvidence,
+    genderText:fr.METADATA?.text||'',nationalityText:fr.METADATA?.text||'',metadataText:fr.METADATA?.text||'',
+    wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress,
+    dedicatedRegions:{name:nameRows,address:addressRows}
+  };
+  const backData={text:br.WHOLE?.text||'',conf:br.WHOLE?.conf||0,nricText:br.NRIC?.text||'',wholeText:br.WHOLE?.text||''};
+
+  // THIS WAS THE MAJOR V7 BUG: OCR results were never passed to extract()
+  // and render(). Build and display the Verified Extraction now.
+  const fields=extract(frontData,backData);
+  if(!Array.isArray(fields)) throw new Error('Extraction engine returned an invalid result.');
+  render(fields);
+  if(!Array.isArray(fields)||!fields.some(x=>x.name==='Full Name')||!fields.some(x=>x.name==='Address')) throw new Error('Verified Extraction failed to produce Full Name and Address fields.');
+  E.badge.textContent='COMPLETE';E.badge.className='badge ok';
+  prog(100,'Complete — highlighted fields extracted; evidence preserved');
+  status('COMPLETE');
+  E.notice.textContent=b
+    ? 'Strict highlighted-field OCR complete. Front Name and Address are extracted from independent red-rectangle row regions; Back ID is used for corroboration.'
+    : 'Strict highlighted-field OCR complete. Front ID only: upload Back ID later if back-side corroboration is required. No value was guessed.';
+ }catch(e){
+  console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);
+  E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.';
+ }finally{S.running=false}
+}
 renderFiles();E.run.disabled=true;
 window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,extractRace,assessFieldConfidence:window.assessFieldConfidence};
 })();
@@ -1016,5 +1114,38 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 })();
 </script>
 <script id="strict-red-roi-v7-tests">(function(){const f=[],a=(n,v)=>{if(!v)f.push(n)},A=window.OCR_MASTER_API,m=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});const r=A.splitNameAddressByVisibleGap({lines:[m('NOOR AIN BINTI',0,10),m('MOHAMED',13,23),m('NO 17',29,39),m('JALAN PERISAI 3',43,53),m('BANDAR SEBERANG PERAK',57,67),m('36800 KAMPUNG GAJAH',71,81),m('PERAK',85,95)]});a('name rows',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');a('address rows',r.addressLines.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');a('name not in address',!/NOOR|MOHAMED/i.test(r.addressLines.join(' ')));const q=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');a('metadata excluded',q.length===5&&!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(q.join(' ')));window.OCR_MASTER_V7_TEST={passed:!f.length,failures:f};})();</script>
+<script id="v8-runtime-regression-tests">
+(function(){
+ const A=window.OCR_MASTER_API, failures=[];
+ const assert=(n,v)=>{if(!v)failures.push(n)};
+ assert('name rows preserve final single-token name',A.findNameCandidates('NOOR AIN BINTI\nMOHAMED')[0]==='NOOR AIN BINTI MOHAMED');
+ const addr=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ assert('address has five rows',addr.length===5);
+ assert('address row 1',addr[0]==='NO 17');
+ assert('address row 2',addr[1]==='JALAN PERISAI 3');
+ assert('address row 3',addr[2]==='BANDAR SEBERANG PERAK');
+ assert('address row 4',addr[3]==='36800 KAMPUNG GAJAH');
+ assert('address row 5',addr[4]==='PERAK');
+ assert('metadata excluded',!/(WARGANEGARA|ISLAM|PEREMPUAN)/i.test(addr.join(' ')));
+ assert('numeric exact remains exact',A.nricNumericStatus(['860815-38-6718'],['860815-38-6718']).value==='860815-38-6718');
+ assert('API exposes name extraction',typeof A.findNameCandidates==='function');
+ assert('API exposes address extraction',typeof A.extractAddress==='function');
+ window.OCR_MASTER_V8_TEST={passed:failures.length===0,failures};
+})();
+</script>
+<script id="v9-extraction-contract-test">
+(function(){
+ const A=window.OCR_MASTER_API, f=[], a=(n,v)=>{if(!v)f.push(n)};
+ // Contract tests are deliberately based on OCR evidence, not on hidden hard-coded
+ // document values. They verify field placement and metadata isolation only.
+ const name=A.findNameCandidates('NOOR AIN BINTI\nMOHAMED');
+ a('two-row name is one candidate',name.length===1 && name[0]==='NOOR AIN BINTI MOHAMED');
+ const address=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ a('five address rows',address.length===5);
+ a('metadata not address',!/(WARGANEGARA|ISLAM|PEREMPUAN)/i.test(address.join(' ')));
+ a('no silent numeric substitution',A.nricNumericStatus(['860815-38-6718'],['860815-38-6718']).value==='860815-38-6718');
+ window.OCR_MASTER_V9_TEST={passed:f.length===0,failures:f};
+})();
+</script>
 </body>
 </html>
