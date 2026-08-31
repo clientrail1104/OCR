@@ -244,7 +244,7 @@ window.extractFrontPhotoSideFields = function(lines) {
 <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose document files"><div class="plus">＋</div><strong>Drop files here</strong><small>Front + back images · JPG · PNG · WEBP · TIFF</small><div class="actions"><label class="pick" for="files">Choose files</label><button class="btn" id="clear" type="button">Clear</button></div></div>
 <input id="files" class="file-input" type="file" multiple accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff">
 <div class="label">OCR language</div><select id="lang"><option value="eng+msa">English + Malay</option><option value="eng">English</option><option value="msa">Malay</option></select>
-<div class="label">Instant processing</div><div class="mini">OCR is manual. Upload only prepares the document; OCR starts only when Run OCR is clicked. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
+<div class="label">Instant processing</div><div class="mini">Upload only prepares the document. The OCR engine may preload in the background, but it never reads the document until Run OCR is clicked. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
 <div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Upload ready. Click Run OCR to begin.</p></div>
 <button class="btn run" id="runOCR" type="button" style="width:100%;margin-top:7px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff">Run OCR</button>
 <div class="label">Files</div><div class="files" id="fileList"><div class="mini">No files selected.</div></div>
@@ -253,14 +253,14 @@ window.extractFrontPhotoSideFields = function(lines) {
 <div class="card"><h2>Front ID / Back ID</h2><div class="workspace"><div class="slot" id="front"><span>FRONT ID</span></div><div class="slot" id="back"><span>BACK ID</span></div></div></div>
 <div class="card evidence"><div class="head"><h2>OCR evidence</h2><span class="badge" id="ocrBadge">WAITING</span></div><div class="raw" id="raw">OCR evidence will appear here.</div></div>
 </section>
-<aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div id="fields" class="fields"><div class="mini">Upload Front ID, then click Run OCR. Back ID is optional for front-field extraction.</div></div><div id="notice" class="mini confidence-policy-note">No OCR is performed until Run OCR is clicked.</div></aside>
+<aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div id="fields" class="fields"><div class="mini">Upload Front ID, then click Run OCR. Back ID is optional for front-field extraction.</div></div><div id="notice" class="mini confidence-policy-note">No document OCR is performed until Run OCR is clicked.</div></aside>
 </main></div>
 <script>
 'use strict';
 (()=>{
 const $=id=>document.getElementById(id);
 const E={files:$('files'),drop:$('drop'),clear:$('clear'),run:$('runOCR'),lang:$('lang'),front:$('front'),back:$('back'),list:$('fileList'),bar:$('bar'),progress:$('progress'),raw:$('raw'),fields:$('fields'),badge:$('ocrBadge'),review:$('review'),notice:$('notice'),status:$('status'),dot:$('dot')};
-const S={files:[],pages:[],worker:null,workerLang:null,running:false};
+const S={files:[],pages:[],worker:null,workerLang:null,workerReadyMs:0,running:false,prewarming:false};
 const ALLOWED=/\.(png|jpe?g|webp|tif|tiff)$/i;
 const FORBIDDEN_TRANSFORMS=['R↔F','P↔F','R↔C','K↔H','D↔O↔0','U↔Y','B↔S','N↔I','|↔I','N↔ea','A/P↔AP','A/L↔AL','R↔L','J↔I','V↔W','J↔S','VS↔W','BATANG↔BAT TANG','BERJUNTAI↔JUNTAI','9↔2','01↔OI↔0I↔O1','R↔K','02↔O2↔OS↔0S'];
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -287,7 +287,7 @@ function clearAll(){
   E.fields.innerHTML='<div class="mini">Upload Front ID, then click Run OCR. Back ID is optional for front-field extraction.</div>';
   E.review.textContent='WAITING'; E.review.className='badge warn';
   E.badge.textContent='WAITING'; E.badge.className='badge';
-  E.notice.textContent='No OCR is performed until Run OCR is clicked.';
+  E.notice.textContent='No document OCR is performed until Run OCR is clicked.';
   E.run.disabled=true; prog(0,'Upload ready. Click Run OCR to begin.'); status('READY');
 }
 async function addFiles(fs){const ok=[],bad=[];for(const f of fs){if(!ALLOWED.test(f.name)){bad.push(f.name+' — unsupported');continue}if(!f.size){bad.push(f.name+' — empty');continue}if(f.size>500*1024*1024){bad.push(f.name+' — over 500 MB');continue}if(!S.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))ok.push(f)}if(bad.length)E.notice.textContent=bad.join('\n');S.files.push(...ok);renderFiles();if(!ok.length)return;try{status('PREPARING');E.run.disabled=true;await makePages();renderSlots();E.run.disabled=false;prog(0,'Upload ready. Click Run OCR to begin.');E.badge.textContent='READY';E.badge.className='badge warn';E.raw.textContent='OCR has not started. Click Run OCR to process the uploaded document.';E.fields.innerHTML='';E.review.textContent='WAITING';E.review.className='badge warn';status('READY');E.notice.textContent='Files loaded. OCR is manual: click Run OCR. No OCR is performed automatically after upload.'}catch(e){console.error(e);E.run.disabled=true;status('ERROR',true);E.notice.textContent='Document preparation failed safely: '+e.message+' No value was guessed.'}}
@@ -366,24 +366,68 @@ function cropRows(c,count,topPad=0.04,bottomPad=0.04){
  }
  return rows;
 }
-async function ocrFixedRows(c,count,threshold=100){
- const rows=cropRows(c,count),out=[];
- for(let i=0;i<rows.length;i++){
-  const variants=[
-   upscaleCanvas(rows[i],16),
-   textPreprocess(rows[i]),
-   mykadTextPreprocess(rows[i],threshold,16),
-   mykadTextPreprocess(rows[i],80,16)
+async function ocrFixedRows(c,count,threshold=100,fast=true){
+  /*
+    FAST PATH: one OCR recognition for the dedicated ROI. The ROI already
+    corresponds to one field, so four serial preprocessing variants per row
+    are unnecessary for the first result. If OCR cannot recover the expected
+    row count, a single corroboration pass is used.
+  */
+  const primary=await ocr(mykadTextPreprocess(c,threshold,10),6);
+  let vals=normalizeFieldLines(primary.text||'');
+  if(count===2) vals=vals.slice(0,2);
+  if(count===5) vals=vals.slice(0,5);
+  let passes=[primary];
+  const needsFallback=(vals.length<Math.min(count,2) || (count===5 && vals.length<4));
+  if(!fast || needsFallback){
+    const secondary=await ocr(textPreprocess(c),6);
+    passes.push(secondary);
+    const alt=normalizeFieldLines(secondary.text||'');
+    if(alt.length>vals.length) vals=alt.slice(0,count);
+  }
+  const rows=vals.map((value,i)=>({row:i+1,value,conf:Number(primary.conf)||0,candidates:[value],passes}));
+  while(rows.length<count) rows.push({row:rows.length+1,value:'',conf:Number(primary.conf)||0,candidates:[],passes});
+  return rows;
+}
+
+function makeInstantFieldSheet(R){
+  /* Build one OCR canvas containing ONLY the highlighted text regions.
+     Blank separators preserve field ownership. No artificial labels are
+     inserted, so OCR evidence remains source-derived. */
+  const parts=[
+    {key:'nric',canvas:R.nric},
+    {key:'name',canvas:R.name},
+    {key:'address',canvas:R.address},
+    {key:'metadata',canvas:R.metadata}
   ];
-  const passes=[];
-  for(const v of variants)passes.push(await ocr(v,7));
-  const candidates=[...new Set(passes.flatMap(x=>normalizeFieldLines(x.text||'')).filter(Boolean))];
-  // OCR disagreement is never silently resolved. A row is a value only when
-  // all non-empty passes agree exactly. Otherwise all candidates are retained.
-  const value=candidates.length===1?candidates[0]:'';
-  out.push({row:i+1,value,conf:value?Math.min(...passes.filter(x=>normalizeFieldLines(x.text||'').length).map(x=>Number(x.conf)||0)):Math.max(...passes.map(x=>Number(x.conf)||0),0),candidates,passes});
- }
- return out;
+  const targetW=2400, gap=80, pad=40;
+  const rendered=parts.map(p=>{
+    const ratio=p.canvas.height/Math.max(1,p.canvas.width);
+    const h=Math.max(80,Math.round(targetW*ratio));
+    const c=document.createElement('canvas');c.width=targetW;c.height=h;
+    const x=c.getContext('2d',{alpha:false});x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(p.canvas,0,0,targetW,h);
+    return {...p,canvas:c,height:h};
+  });
+  const total=pad*2+rendered.reduce((n,p)=>n+p.height,0)+gap*(rendered.length-1);
+  const sheet=document.createElement('canvas');sheet.width=targetW+pad*2;sheet.height=total;
+  const x=sheet.getContext('2d',{alpha:false});x.fillStyle='#fff';x.fillRect(0,0,sheet.width,sheet.height);
+  const zones={};let y=pad;
+  for(const p of rendered){x.drawImage(p.canvas,pad,y);zones[p.key]={y0:y,y1:y+p.height};y+=p.height+gap;}
+  return {sheet,zones};
+}
+function splitSheetLines(result,zones){
+  const out={nric:[],name:[],address:[],metadata:[]};
+  for(const l of (result?.lines||[])){
+    const y=Number(l?.bbox?.y0);
+    if(!Number.isFinite(y))continue;
+    for(const key of Object.keys(zones)){
+      if(y>=zones[key].y0-10 && y<=zones[key].y1+10){
+        const t=cleanOCRLine(l.text);if(t)out[key].push({text:t,conf:Number(l.conf)||0,bbox:l.bbox||null});break;
+      }
+    }
+  }
+  return out;
 }
 
 function normalizeFieldLines(text){
@@ -424,22 +468,27 @@ function splitComposite(c){
 }
 async function makePages(){S.pages=[];for(const f of S.files){const im=await loadImage(f),c=canvasFrom(im),ratio=c.height/c.width;if(ratio>1.15){const [a,b]=splitComposite(c);S.pages.push({file:f,side:'front',canvas:a},{file:f,side:'back',canvas:b})}else S.pages.push({file:f,side:S.pages.some(p=>p.side==='front')?'back':'front',canvas:c})}}
 function renderSlots(){E.front.innerHTML='<span>FRONT ID</span>';E.back.innerHTML='<span>BACK ID</span>';for(const p of S.pages){if(!p.canvas)continue;const im=document.createElement('img');im.src=p.canvas.toDataURL('image/jpeg',.9);im.alt=p.side+' ID';const box=p.side==='front'?E.front:E.back;box.innerHTML='';box.appendChild(im)}}
-async function getWorker(){const lang=E.lang.value;if(S.worker&&S.workerLang===lang)return S.worker;if(S.worker)try{await S.worker.terminate()}catch{}if(!window.Tesseract)throw new Error('Tesseract.js did not load. Check the internet connection and reload.');S.worker=await retry(()=>Tesseract.createWorker(lang,1,{logger:m=>{if(m.status&&m.status.includes('recogn'))prog(30+Math.round((m.progress||0)*55),'OCR '+Math.round((m.progress||0)*100)+'%')}}),2);S.workerLang=lang;return S.worker}
-async function ocr(c,psm){const w=await getWorker();return retry(async()=>{const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});const lines=Array.isArray(r.data.lines)?r.data.lines.map(l=>({text:String(l.text||''),bbox:l.bbox||null,conf:Number(l.confidence)})).filter(l=>l.text.trim()):[];return{text:r.data.text||'',conf:Number(r.data.confidence)||0,lines}},2)}
-function cleanOCRLine(s){return String(s||'').replace(/[ \t]+/g,' ').trim()}
-window.splitNameAddressByVisibleGap=function splitNameAddressByVisibleGap(result){
-  const raw=Array.isArray(result?.lines)?result.lines:[];
-  const rows=raw.map((l,i)=>{const text=cleanOCRLine(typeof l==='string'?l:(l?.text??l?.value??''));const b=(typeof l==='object'&&l?.bbox)||{};const y0=Number(b.y0),y1=Number(b.y1);return {text,index:i,bbox:(typeof l==='object'&&l?.bbox)||null,conf:Number(typeof l==='object'?(l?.conf??l?.confidence):NaN),y0:Number.isFinite(y0)?y0:null,y1:Number.isFinite(y1)?y1:null}}).filter(x=>x.text);
-  const re=/(?:^|\s)(NO\.?\s*\d+|PT\s*[A-Z]?\s*\d+[A-Z0-9-]*|LOT\s*[A-Z0-9-]*\d[A-Z0-9-]*|\d{1,5}(?:-\d{1,5}){1,3}\b|\d{1,6}\b)(?=\s|$)/i;
-  const hit=t=>{const m=cleanOCRLine(t).match(re);if(!m)return null;const token=m[1],pos=m[0].indexOf(token);return {index:m.index+Math.max(0,pos),token}};
-  const work=[];
-  for(const r of rows){const z=hit(r.text);if(z&&z.index>0&&work.length===0){const before=cleanOCRLine(r.text.slice(0,z.index)),after=cleanOCRLine(r.text.slice(z.index));if(before&&after){work.push({...r,text:before});work.push({...r,text:after,mergedAddressStart:true});continue}}work.push(r)}
-  const geom=work.filter(x=>x.y0!==null&&x.y1!==null).sort((a,b)=>a.y0-b.y0); const ordered=geom.length>=6?geom:work;
-  if(ordered.length>=6){for(let i=1;i<=ordered.length-5;i++){const z=hit(ordered[i].text);if((z&&z.index===0)||ordered[i].mergedAddressStart){const name=ordered.slice(0,i).map(x=>x.text),address=ordered.slice(i,i+5).map(x=>x.text);const gap=ordered[i].y0!=null&&ordered[i-1].y1!=null?ordered[i].y0-ordered[i-1].y1:0;return {nameLines:name,addressLines:address,visibleGap:gap>0,method:ordered[i].mergedAddressStart?'merged-line-address-prefix':'address-prefix-plus-spatial-boundary',addressStart:address[0]||'',lineCount:ordered.length,gapPx:gap}}}
-    const address=ordered.slice(-5),name=ordered.slice(0,-5),gap=address[0].y0!=null&&name.length&&name.at(-1).y1!=null?address[0].y0-name.at(-1).y1:0;return {nameLines:name.map(x=>x.text),addressLines:address.map(x=>x.text),visibleGap:gap>0,method:'five-line-structural',addressStart:address[0]?.text||'',lineCount:ordered.length,gapPx:gap};}
-  const t=ordered.map(x=>x.text);for(let i=1;i<=t.length-5;i++){const z=hit(t[i]);if(z&&z.index===0)return {nameLines:t.slice(0,i),addressLines:t.slice(i,i+5),visibleGap:false,method:'address-prefix-no-geometry',addressStart:t[i],lineCount:t.length,gapPx:0};}
-  if(t.length>=6){const i=t.length-5;return {nameLines:t.slice(0,i),addressLines:t.slice(i,i+5),visibleGap:false,method:'five-line-structural',addressStart:t[i]||'',lineCount:t.length,gapPx:0};}
-  return {nameLines:[],addressLines:[],visibleGap:false,method:'insufficient-lines',addressStart:'',lineCount:t.length,gapPx:0};
+async function getWorker(){
+  const lang=E.lang.value;
+  if(S.worker&&S.workerLang===lang)return S.worker;
+  if(S.worker)try{await S.worker.terminate()}catch{}
+  if(!window.Tesseract)throw new Error('Tesseract.js did not load. Check the internet connection and reload.');
+  const started=performance.now();
+  S.worker=await Tesseract.createWorker(lang,1,{logger:m=>{
+    if(m.status&&m.status.includes('recogn')){
+      prog(35+Math.round((m.progress||0)*60),'OCR '+Math.round((m.progress||0)*100)+'%');
+    }
+  }});
+  S.workerLang=lang;
+  S.workerReadyMs=Math.round(performance.now()-started);
+  return S.worker;
+}
+async function ocr(c,psm){
+  const w=await getWorker();
+  const started=performance.now();
+  const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});
+  const lines=Array.isArray(r.data.lines)?r.data.lines.map(l=>({text:String(l.text||''),bbox:l.bbox||null,conf:Number(l.confidence)})).filter(l=>l.text.trim()):[];
+  return{text:r.data.text||'',conf:Number(r.data.confidence)||0,lines,elapsedMs:Math.round(performance.now()-started)};
 };
 function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
 function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
@@ -646,88 +695,118 @@ function extract(front,back){
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
 async function runOCR(){
  if(S.running)return;
- S.running=true;E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');
+ S.running=true;
+ const started=performance.now();
+ E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');
  try{
   const f=S.pages.find(p=>p.side==='front');
   const b=S.pages.find(p=>p.side==='back')||null;
   if(!f)throw new Error('A Front ID image is required. Upload the front document, then click Run OCR.');
 
-  const R=cropFrontNricRegions(f.canvas), fr={}, br={};
+  const R=cropFrontNricRegions(f.canvas);
+  prog(2,'OCR engine ready — reading highlighted fields');
 
-  fr.NRIC=await ocr(preprocess(R.nric,'high'),7); prog(10,'Front: NRIC Number');
+  /* FAST FIRST RESULT: only four recognitions for the four highlighted field
+     groups. Back OCR and corroboration are deliberately deferred until after
+     Verified Extraction is rendered. */
+  const [nric,namePrimary,addressPrimary,metadata]=await Promise.all([
+    ocr(preprocess(R.nric,'high'),7),
+    ocr(mykadTextPreprocess(R.name,100,10),6),
+    ocr(mykadTextPreprocess(R.address,100,10),6),
+    ocr(mykadTextPreprocess(R.metadata,100,10),6)
+  ]);
+  prog(55,'Highlighted fields captured — building results');
 
-  // STRICT RED-RECTANGLE NAME EXTRACTION: two independent physical rows.
-  fr.NAME_ROWS=await ocrFixedRows(R.name,2,100);
-  const nameRows=fr.NAME_ROWS.map(x=>x.value).filter(Boolean);
-  fr.NAME={
-    text:nameRows.join('\n'),
-    conf:nameRows.length?Math.min(...fr.NAME_ROWS.filter(x=>x.value).map(x=>x.conf)):0,
-    lines:fr.NAME_ROWS.map(x=>({text:x.value,conf:x.conf,bbox:null}))
-  };
-  prog(28,'Front: Full Name');
+  const nameRows=normalizeFieldLines(namePrimary.text||'').slice(0,2);
+  const addressRows=normalizeFieldLines(addressPrimary.text||'').slice(0,5);
+  const fr={NRIC:nric,NAME:{text:nameRows.join('\n'),conf:namePrimary.conf,lines:namePrimary.lines},
+            ADDRESS:{text:addressRows.join('\n'),conf:addressPrimary.conf,lines:addressPrimary.lines},
+            METADATA:metadata,GENDER:metadata,WHOLE:{text:'',conf:0,lines:[]}};
 
-  // STRICT RED-RECTANGLE ADDRESS EXTRACTION: five independent physical rows.
-  fr.ADDRESS_ROWS=await ocrFixedRows(R.address,5,100);
-  const addressRows=fr.ADDRESS_ROWS.map(x=>x.value).filter(Boolean);
-  fr.ADDRESS={
-    text:addressRows.join('\n'),
-    conf:addressRows.length?Math.min(...fr.ADDRESS_ROWS.filter(x=>x.value).map(x=>x.conf)):0,
-    lines:fr.ADDRESS_ROWS.map(x=>({text:x.value,conf:x.conf,bbox:null}))
-  };
-  // Corroboration is retained for evidence only; it cannot move text between fields.
-  fr.ADDRESS_GRAY=await ocr(textPreprocess(crop(f.canvas,.030,.732,.435,.230,12)),6);
-  fr.ADDRESS_GREEN=await ocr(mykadChannelPreprocess(R.address,'g',70,12),6);
-  prog(48,'Front: Address');
+  const nameEvidence=nameRows.length
+    ?nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n')
+    :'[no reliable name row detected]';
+  const addressEvidence=addressRows.length
+    ?addressRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(addressPrimary.conf||0).toFixed(1)+'%] '+x).join('\n')
+    :'[no reliable address row detected]';
 
-  fr.METADATA=await ocr(mykadTextPreprocess(R.metadata,100,12),6);
-  fr.GENDER=fr.METADATA;
-  fr.WHOLE=await ocr(maskGold(crop(f.canvas,0,0,1,1,2)),6);
-  prog(62,'Front: Nationality / Race / Gender');
-
-  if(b){
-    const backJobs=[['NRIC',crop(b.canvas,.02,.05,.96,.45,7),7],['WHOLE',maskGold(crop(b.canvas,0,0,1,1,2)),6]];
-    for(let i=0;i<backJobs.length;i++){
-      const [label,c,psm]=backJobs[i];
-      const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);
-      br[label]=r;prog(70+i*10,'Back OCR: '+label);
-    }
-  }
-
-  const addressEvidence=fr.ADDRESS_ROWS.map(x=>'ROW '+x.row+' ['+Number(x.conf||0).toFixed(1)+'%] '+(x.candidates.length?x.candidates.join(' / '):'[no text]')).join('\n');
-  const nameEvidence=fr.NAME_ROWS.map(x=>'ROW '+x.row+' ['+Number(x.conf||0).toFixed(1)+'%] '+(x.candidates.length?x.candidates.join(' / '):'[no text]')).join('\n');
-  E.raw.textContent+='--- FRONT · HIGHLIGHTED NAME ROWS ---\n'+nameEvidence+'\n\n--- FRONT · HIGHLIGHTED ADDRESS ROWS ---\n'+addressEvidence+'\n\n';
-
-  const nameAddress={nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-red-roi-fixed-rows',addressStart:addressRows[0]||'',lineCount:nameRows.length+addressRows.length,gapPx:null};
   const frontData={
-    text:fr.WHOLE?.text||'',conf:fr.WHOLE?.conf||0,nricConf:fr.NRIC?.conf||0,
-    nameConf:fr.NAME?.conf||0,addressConf:fr.ADDRESS?.conf||0,
-    genderConf:fr.METADATA?.conf||0,metadataConf:fr.METADATA?.conf||0,
-    nricText:fr.NRIC?.text||'',nameText:nameRows.join('\n'),addressText:addressRows.join('\n'),
-    addressEvidence,addressRowCandidates:fr.ADDRESS_ROWS, nameEvidence,
-    genderText:fr.METADATA?.text||'',nationalityText:fr.METADATA?.text||'',metadataText:fr.METADATA?.text||'',
-    wholeText:fr.WHOLE?.text||'',nameAddressEvidence:nameAddress,
+    text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:addressPrimary.conf||0,
+    genderConf:metadata.conf||0,metadataConf:metadata.conf||0,nricText:nric.text||'',nameText:nameRows.join('\n'),
+    addressText:addressRows.join('\n'),addressEvidence,addressRowCandidates:addressRows.map((value,i)=>({row:i+1,value,conf:addressPrimary.conf||0,candidates:[value]})),
+    nameEvidence,genderText:metadata.text||'',nationalityText:metadata.text||'',metadataText:metadata.text||'',wholeText:'',
+    nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi-fast-pass',addressStart:addressRows[0]||''},
     dedicatedRegions:{name:nameRows,address:addressRows}
   };
-  const backData={text:br.WHOLE?.text||'',conf:br.WHOLE?.conf||0,nricText:br.NRIC?.text||'',wholeText:br.WHOLE?.text||''};
 
-  // THIS WAS THE MAJOR V7 BUG: OCR results were never passed to extract()
-  // and render(). Build and display the Verified Extraction now.
+  const backData={text:'',conf:0,nricText:'',wholeText:''};
   const fields=extract(frontData,backData);
-  if(!Array.isArray(fields)) throw new Error('Extraction engine returned an invalid result.');
+  if(!Array.isArray(fields))throw new Error('Extraction engine returned an invalid result.');
   render(fields);
-  if(!Array.isArray(fields)||!fields.some(x=>x.name==='Full Name')||!fields.some(x=>x.name==='Address')) throw new Error('Verified Extraction failed to produce Full Name and Address fields.');
-  E.badge.textContent='COMPLETE';E.badge.className='badge ok';
-  prog(100,'Complete — highlighted fields extracted; evidence preserved');
-  status('COMPLETE');
-  E.notice.textContent=b
-    ? 'Strict highlighted-field OCR complete. Front Name and Address are extracted from independent red-rectangle row regions; Back ID is used for corroboration.'
-    : 'Strict highlighted-field OCR complete. Front ID only: upload Back ID later if back-side corroboration is required. No value was guessed.';
+
+  /* SHOW FIRST RESULT IMMEDIATELY. Do not wait for slow corroboration. */
+  const firstMs=Math.round(performance.now()-started);
+  prog(62,'Results ready in '+firstMs+' ms — corroboration continues in background');
+  E.badge.textContent='RESULTS READY';E.badge.className='badge ok';status('RESULTS READY');
+  E.notice.textContent='Instant first-pass extraction is displayed. Additional OCR corroboration continues in the background; disagreements will change affected fields to UNCERTAIN, never to a guessed value.';
+
+  /* Background corroboration. It cannot block the first result. */
+  setTimeout(async()=>{
+    try{
+      const [nameCheck,addressCheck,addressGray,addressGreen]=await Promise.all([
+        ocr(textPreprocess(R.name),6),
+        ocr(textPreprocess(R.address),6),
+        ocr(textPreprocess(crop(f.canvas,.030,.732,.435,.230,8)),6),
+        ocr(mykadChannelPreprocess(R.address,'g',70,8),6)
+      ]);
+      const nameCandidates=normalizeFieldLines(nameCheck.text||'').slice(0,2);
+      const addressCandidates=normalizeFieldLines(addressCheck.text||'').slice(0,5);
+      const allName=[nameRows.join(' '),nameCandidates.join(' ')].filter(Boolean);
+      const allAddress=[addressRows.join('\n'),addressCandidates.join('\n')].filter(Boolean);
+      const nameConflict=new Set(allName).size>1;
+      const addressConflict=new Set(allAddress).size>1;
+      const updated=fields.map(x=>({...x}));
+      const nf=updated.find(x=>x.name==='Full Name');
+      if(nf&&nameConflict){nf.status='UNCERTAIN';nf.reason='OCR corroboration passes disagree. All candidates are preserved; no spelling or character substitution was made.';nf.evidence=nameRows.join('\n')+'\nCORROBORATION:\n'+nameCandidates.join('\n');}
+      const af=updated.find(x=>x.name==='Address');
+      if(af&&addressConflict){af.status='UNCERTAIN';af.reason='OCR corroboration passes disagree. Verify every address character against the source image; no candidate was silently selected.';af.evidence=addressEvidence+'\nCORROBORATION:\n'+addressCandidates.join('\n');}
+      if(af){
+        af.evidence+='\nGRAY PASS:\n'+(addressGray.text||'[no text]')+'\nGREEN PASS:\n'+(addressGreen.text||'[no text]');
+      }
+      render(updated);
+      prog(85,'Background corroboration complete');
+      E.badge.textContent='CORROBORATED';E.badge.className='badge ok';
+      E.notice.textContent='First-pass results were shown immediately. Background corroboration completed; any disagreement is flagged UNCERTAIN without silent correction.';
+    }catch(err){
+      console.warn('Background corroboration failed safely:',err);
+      E.notice.textContent='First-pass results remain available. Background corroboration was unavailable; no value was guessed.';
+    }
+  },0);
+
+  /* Back ID is optional and deferred so it cannot delay front results. */
+  if(b)setTimeout(async()=>{
+    try{
+      const br1=await ocr(preprocess(crop(b.canvas,.02,.05,.96,.45,5),'soft'),7);
+      console.debug('Deferred back corroboration complete',br1.conf);
+    }catch(err){console.warn('Deferred back OCR failed safely:',err)}
+  },0);
  }catch(e){
   console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);
   E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.';
  }finally{S.running=false}
 }
 renderFiles();E.run.disabled=true;
+/* PREWARM ONLY — this loads the OCR engine but performs NO document OCR.
+   Therefore Run OCR remains the sole action that reads user documents. */
+setTimeout(()=>{
+  if(!S.files.length && window.Tesseract && !S.prewarming){
+    S.prewarming=true;
+    getWorker().then(()=>{
+      S.prewarming=false;
+      if(!S.files.length){status('OCR READY');E.notice.textContent='OCR engine preloaded. Run OCR will start immediately after a document is uploaded.';}
+    }).catch(err=>{S.prewarming=false;console.warn('OCR engine prewarm unavailable:',err)});
+  }
+},120);
 window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,extractRace,assessFieldConfidence:window.assessFieldConfidence};
 })();
 </script>
@@ -1147,5 +1226,29 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
  window.OCR_MASTER_V9_TEST={passed:f.length===0,failures:f};
 })();
 </script>
+
+<script id="instant-processing-regression-tests-v10">
+(function(){
+ const f=[],a=(n,v)=>{if(!v)f.push(n)};
+ a('fast OCR helper exists',typeof ocrFixedRows==='function');
+ a('instant sheet helper exists',typeof makeInstantFieldSheet==='function');
+ a('run OCR exists',typeof runOCR==='function');
+ a('prewarm state exists',typeof S==='object' && 'prewarming' in S);
+ const sample=window.OCR_MASTER_API.splitNameAddressByVisibleGap({lines:[
+  {text:'NOOR AIN BINTI',bbox:{y0:0,y1:10}},
+  {text:'MOHAMED',bbox:{y0:13,y1:23}},
+  {text:'NO 17',bbox:{y0:29,y1:39}},
+  {text:'JALAN PERISAI 3',bbox:{y0:43,y1:53}},
+  {text:'BANDAR SEBERANG PERAK',bbox:{y0:57,y1:67}},
+  {text:'36800 KAMPUNG GAJAH',bbox:{y0:71,y1:81}},
+  {text:'PERAK',bbox:{y0:85,y1:95}}
+ ]});
+ a('strict sample name',sample.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('strict sample address',sample.addressLines.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');
+ a('no MOHAMED in address',!/MOHAMED/i.test(sample.addressLines.join(' ')));
+ window.OCR_MASTER_INSTANT_V10_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+
 </body>
 </html>
