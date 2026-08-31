@@ -41,7 +41,7 @@ const $=id=>document.getElementById(id);
 const E={files:$('files'),drop:$('drop'),clear:$('clear'),run:$('runOCR'),lang:$('lang'),front:$('front'),back:$('back'),list:$('fileList'),bar:$('bar'),progress:$('progress'),raw:$('raw'),fields:$('fields'),badge:$('ocrBadge'),review:$('review'),notice:$('notice'),status:$('status'),dot:$('dot')};
 const S={files:[],pages:[],worker:null,workerLang:null,running:false};
 const ALLOWED=/\.(png|jpe?g|webp|tif|tiff)$/i;
-const FORBIDDEN_TRANSFORMS=['R↔F','P↔F','R↔C','K↔H','D↔O↔0','U↔Y','B↔S','N↔I','|↔I','N↔ea','A/P↔AP','A/L↔AL','R↔L','J↔I','V↔W','J↔S','VS↔W','BATANG↔BAT TANG','BERJUNTAI↔JUNTAI','9↔2'];
+const FORBIDDEN_TRANSFORMS=['R↔F','P↔F','R↔C','K↔H','D↔O↔0','U↔Y','B↔S','N↔I','|↔I','N↔ea','A/P↔AP','A/L↔AL','R↔L','J↔I','V↔W','J↔S','VS↔W','BATANG↔BAT TANG','BERJUNTAI↔JUNTAI','9↔2','01↔OI↔0I↔O1','R↔K','02↔O2↔OS↔0S'];
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function status(t,bad=false){E.status.textContent=t;E.dot.style.background=bad?'var(--bad)':'var(--ok)'}
 function prog(p,t){E.bar.style.width=Math.max(0,Math.min(100,p))+'%';E.progress.textContent=t}
@@ -78,12 +78,31 @@ function normalizeEvidenceText(text){
 }
 function exactMatches(text,re){return [...String(text||'').matchAll(re)].map(m=>m[0]);}
 function consensus(candidates){
- const clean=candidates.map(x=>String(x||'').trim()).filter(Boolean);if(!clean.length)return null;
+ const clean=candidates.map(x=>String(x??'')).filter(x=>x.length>0);if(!clean.length)return null;
  const map=new Map();for(const v of clean)map.set(v,(map.get(v)||0)+1);
+ const all=[...map.keys()];
  const sorted=[...map.entries()].sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length);
- return {value:sorted[0][0],votes:sorted[0][1],all:[...map.keys()]};
+ /* Never select one spelling when competing OCR strings exist. The caller must
+    display UNCERTAIN and preserve every candidate instead of silently choosing. */
+ if(all.length>1)return {value:null,votes:sorted[0][1],all};
+ return {value:all[0],votes:sorted[0][1],all};
 }
 function fieldStatus(conf,ambiguous=false){return ambiguous?'UNCERTAIN':conf>=75?'VERIFIED':'UNCERTAIN'}
+function candidateDisplay(c){return c&&c.all&&c.all.length>1?'UNCERTAIN — competing OCR candidates:\n'+c.all.join('\n'):c?.value||null}
+function numericConfusionEvidence(text){
+ const t=String(text||'');
+ const hits=[];
+ /* Only inspect OCR strings that look like numeric-ID candidates. Do not flag
+    ordinary words containing R/K or 9 elsewhere in the document. */
+ const chunks=t.match(/[A-Z0-9|]+(?:[- ][A-Z0-9|]+){1,5}/gi)||[];
+ for(const c of chunks){
+  if(/(?:01|OI|0I|O1)/i.test(c))hits.push('01↔OI↔0I↔O1');
+  if(/(?:02|O2|OS|0S)/i.test(c))hits.push('02↔O2↔OS↔0S');
+  if(/[RK]/i.test(c)&&/[0-9]/.test(c)&&/-/.test(c))hits.push('R↔K');
+  if(/9/.test(c)&&/[0-9]/.test(c)&&/-/.test(c))hits.push('9↔2');
+ }
+ return [...new Set(hits)];
+}
 function genderFromNric(nric){
  const m=String(nric||'').match(/^(\d{6})-(\d{2})-(\d{4})$/);if(!m)return null;
  const last=Number(m[3].slice(-1));
@@ -136,13 +155,18 @@ function extract(front,back){
  const bCandidates=backNumericSources.flatMap(t=>exactMatches(t,/\b\d{6}-\d{2}-\d{4}-\d{2}-\d{2}\b/g));
  const fnum=consensus(fCandidates),bnum=consensus(bCandidates);
  const fAmb=!!fnum&&fnum.all.length>1; const bAmb=!!bnum&&bnum.all.length>1;
- out.push(mk('NRIC Number',fnum?fnum.value:'UNKNOWN',fnum?Math.min(front.conf,98):0,fnum?fieldStatus(front.conf,fAmb):'UNKNOWN',fnum?fnum.value:'No exact 6-2-4 numeric candidate was read.','Exact 6-2-4 numeric pattern only. No silent substitutions: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fAmb?'Competing NRIC candidates detected; visual verification required.':'An unreadable digit is never repaired.'));
- out.push(mk('Extended NRIC Number',bnum?bnum.value:'UNKNOWN',bnum?Math.min(back.conf,98):0,bnum?fieldStatus(back.conf,bAmb):'UNKNOWN',bnum?bnum.value:'No exact 6-2-4-2-2 numeric candidate was read.','Exact 6-2-4-2-2 numeric pattern only; no character correction.',bAmb?'Competing extended NRIC candidates detected; visual verification required.':'An unreadable digit is never repaired.'));
+ const fNumEvidence=fnum?(fnum.value||fnum.all.join('\n')):'No exact 6-2-4 numeric candidate was read.';
+ const bNumEvidence=bnum?(bnum.value||bnum.all.join('\n')):'No exact 6-2-4-2-2 numeric candidate was read.';
+ const fNumericFlags=numericConfusionEvidence(front.nricText+'\n'+front.wholeText);
+ const bNumericFlags=numericConfusionEvidence(back.nricText+'\n'+back.wholeText);
+ out.push(mk('NRIC Number',fnum?(fnum.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN',fnum?Math.min(front.conf,98):0,fnum?fieldStatus(front.conf,fAmb):'UNKNOWN',fNumEvidence,'Exact 6-2-4 numeric pattern only. Never transform: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',fAmb?'Competing NRIC candidates detected; candidates are preserved and no winner is selected.':fNumericFlags.length?'Potentially confusable OCR evidence detected: '+fNumericFlags.join(', ')+'. No substitution was made.':'An unreadable digit is never repaired.'));
+ out.push(mk('Extended NRIC Number',bnum?(bnum.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN',bnum?Math.min(back.conf,98):0,bnum?fieldStatus(back.conf,bAmb):'UNKNOWN',bNumEvidence,'Exact 6-2-4-2-2 numeric pattern only. Never transform: '+FORBIDDEN_TRANSFORMS.join(', ')+'.',bAmb?'Competing extended-NRIC candidates detected; candidates are preserved and no winner is selected.':bNumericFlags.length?'Potentially confusable OCR evidence detected: '+bNumericFlags.join(', ')+'. No substitution was made.':'An unreadable digit is never repaired.'));
 
  const nameCropCandidates=findNameCandidates(front.nameText||'');
  const fallbackNameCandidates=findNameCandidates((front.wholeText||'')+'\n'+ft);
  const name=consensus(nameCropCandidates.length?nameCropCandidates:fallbackNameCandidates);
- out.push(mk('Full Name',name?name.value:'UNKNOWN',name?Math.min(front.conf,96):0,name?fieldStatus(front.conf,name.all.length>1):'UNKNOWN',name?name.value:'No reliable name line detected.','Exact OCR candidate preserved. No alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted.','If OCR passes disagree, the field is UNCERTAIN rather than choosing a plausible spelling.'));
+ const nameValue=name?(name.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN';
+ out.push(mk('Full Name',nameValue,name?Math.min(front.conf,96):0,name?fieldStatus(front.conf,name.all.length>1):'UNKNOWN',name?(name.value?name.value:name.all.join('\n')):'No reliable name line detected.','Exact OCR candidate preserved. No alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted. Never transform R↔L, J↔I, V↔W, J↔S, VS↔W or any other protected pair.','If OCR passes disagree, all candidates are preserved and the field is UNCERTAIN; no plausible spelling is selected.'));
 
  const explicitGender=findExplicitGender(front.genderText||ft);
  const derived=genderFromNric(fnum?.value);
@@ -190,7 +214,7 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
  for(let i=0;i<frontJobs.length;i++){const [label,c,psm]=frontJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);fr[label]=r;E.raw.textContent+='--- FRONT · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(10+i*12,'Front OCR: '+label)}
  for(let i=0;i<backJobs.length;i++){const [label,c,psm]=backJobs[i];const r=await ocr(preprocess(c,i===0?'high':'soft'),psm);br[label]=r;E.raw.textContent+='--- BACK · '+label+' ---\n'+(r.text||'[no text]')+'\n[OCR '+r.conf.toFixed(1)+'%]\n\n';prog(70+i*12,'Back OCR: '+label)}
  const front={text:Object.values(fr).map(x=>x.text).join('\n'),wholeText:fr.WHOLE?.text||'',nricText:fr.NRIC?.text||'',nameText:fr.NAME?.text||'',addressText:fr.ADDRESS?.text||'',genderText:fr.GENDER?.text||'',nationalityText:fr.WHOLE?.text||'',conf:Object.values(fr).reduce((a,x)=>a+x.conf,0)/Object.values(fr).length};const back={text:Object.values(br).map(x=>x.text).join('\n'),wholeText:br.WHOLE?.text||'',nricText:br['EXTENDED NRIC']?.text||'',conf:Object.values(br).reduce((a,x)=>a+x.conf,0)/Object.values(br).length};
- render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
+ render(extract(front,back));E.badge.textContent='COMPLETE';E.badge.className='badge ok';prog(100,'Complete — exact evidence preserved');status('COMPLETE');E.notice.textContent='Gold/yellow microchip pixels are excluded before OCR. NRIC final digit derives gender only when the complete 6-2-4 number is exact: odd = Lelaki/Male; even = Perempuan/Female. No R/L, J/I, V/W, J/S, VS/W, BATANG/BAT TANG, BERJUNTAI/JUNTAI, 9/2, 01/OI/0I/O1, R/K, 02/O2/OS/0S, R/F, P/F, R/C, K/H, D/O/0, U/Y, B/S, N/I, |/I, N/ea, A/P/AP or A/L/AL substitution is performed.'
  }catch(e){console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.'}finally{S.running=false}}
 renderFiles();E.run.disabled=true;
 })();
