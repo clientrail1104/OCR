@@ -148,6 +148,91 @@ window.assessFieldConfidence = function(field, confidence, candidates=[], opts={
 .grid{display:grid;grid-template-columns:300px minmax(0,1fr) 360px;gap:10px;min-height:0}
 .right{min-width:0;overflow:auto}.fields{display:grid;gap:7px}.field{padding:8px;border-radius:11px;background:rgba(255,255,255,.42);box-shadow:var(--in)}.ftop{display:flex;align-items:center;justify-content:space-between;gap:6px}.fname{font-size:10px;font-weight:900}.fval{margin-top:4px;font-size:11px;font-weight:800;white-space:pre-wrap;overflow-wrap:anywhere}.meta,.ev{font-size:8px;line-height:1.35;margin-top:4px;white-space:pre-wrap}.badge{white-space:nowrap}@media(max-width:1100px){.grid{grid-template-columns:260px minmax(0,1fr)}.right{grid-column:1/-1}}@media(max-width:760px){.grid{grid-template-columns:1fr}.right{grid-column:auto}}
 </style>
+<script id="front-photo-field-rules">
+/*
+FRONT NRIC SPATIAL RULE
+Below the passport-size photo on the left:
+  Group 1, line 1: Warganegara = Nationality
+  Group 1, line 2: Religion = Hindu / India / Cina / Islam
+  Group 2, line 2: Gender = Perempuan / Lelaki
+Evidence only. Never infer from photo, name, ethnicity, or common document patterns.
+*/
+window.FRONT_NRIC_PHOTO_RULES = Object.freeze({
+  region: "below-photo-left",
+  group1: {
+    line1: { field: "Nationality", label: "Warganegara" },
+    line2: { field: "Religion", allowed: ["Hindu","India","Cina","Islam"] }
+  },
+  group2: {
+    line2: { field: "Gender", allowed: ["Perempuan","Lelaki"] }
+  },
+  noPhotoInference: true,
+  noSilentCorrection: true
+});
+
+window.extractFrontPhotoSideFields = function(lines) {
+  const out = {
+    nationality: {value:null,status:"UNKNOWN",evidence:null,reason:null},
+    religion: {value:null,status:"UNKNOWN",evidence:null,reason:null},
+    gender: {value:null,status:"UNKNOWN",evidence:null,reason:null}
+  };
+  if (!Array.isArray(lines)) return out;
+
+  const rows = lines.map((v,i) => {
+    const text = String(typeof v === "string" ? v : (v.text ?? v.value ?? ""))
+      .replace(/\s+/g," ").trim();
+    return {text, y:Number(v?.y ?? v?.top ?? i)};
+  }).filter(x => x.text);
+
+  const setEvidence = (key,value,evidence,reason) => {
+    out[key] = {value,status:"EVIDENCE",evidence,reason};
+  };
+
+  // Explicit Warganegara only. Do not turn ethnicity or place names into nationality.
+  for (const r of rows) {
+    const m = r.text.match(/\bWarganegara(?:\s+Malaysia)?\b\s*[:=\-]?\s*(.*)$/i);
+    if (m) {
+      const value = m[1].trim() || (/Malaysia/i.test(m[0]) ? "Malaysia" : null);
+      if (value) {
+        setEvidence("nationality", value, r.text,
+          "Explicit Warganegara evidence in the below-photo-left region.");
+        break;
+      }
+    }
+  }
+
+  // Religion: explicit label or one of the explicitly allowed values.
+  for (const r of rows) {
+    const m = r.text.match(/\b(?:Agama|Religion)\b\s*[:=\-]?\s*(.*)$/i);
+    if (m && m[1].trim()) {
+      setEvidence("religion", m[1].trim(), r.text, "Explicit religion label detected.");
+      break;
+    }
+    const hit = ["Hindu","India","Cina","Islam"].find(v => new RegExp("^"+v+"$","i").test(r.text));
+    if (hit) {
+      setEvidence("religion", r.text, r.text,
+        "Explicit allowed religion value detected; no inference used.");
+      break;
+    }
+  }
+
+  // Gender: explicit text only. Never inspect the portrait.
+  for (const r of rows) {
+    const m = r.text.match(/\b(?:Jantina|Gender|Sex)\b\s*[:=\-]?\s*(.*)$/i);
+    let value = m ? m[1].trim() : null;
+    if (!value && /\bPerempuan\b/i.test(r.text)) value = "Perempuan";
+    if (!value && /\bLelaki\b/i.test(r.text)) value = "Lelaki";
+    if (value) {
+      value = /\bPerempuan\b/i.test(value) ? "Perempuan" :
+              (/\bLelaki\b/i.test(value) ? "Lelaki" : value);
+      setEvidence("gender", value, r.text,
+        "Explicit gender text detected; photograph was not used.");
+      break;
+    }
+  }
+  return out;
+};
+</script>
 </head>
 <body>
 <div class="app">
@@ -634,6 +719,35 @@ window.applyStrictUncertaintyPolicy = function(result){
  const exact=A.findNameCandidates('RAJESWARY A/P VASU');
  assert('no suffix appended',exact[0]==='RAJESWARY A/P VASU'&&!/[^A-Za-z0-9]$/.test(exact[0]));
  window.OCR_MASTER_NAME_SYMBOL_TEST={passed:failures.length===0,failures};
+})();
+</script>
+<script id="front-photo-field-tests">
+(function(){
+  function run(){
+    const f=[];
+    const a=(n,v)=>{if(!v)f.push(n);};
+
+    const x=window.extractFrontPhotoSideFields([
+      {text:"WARGANEGARA MALAYSIA",y:10},
+      {text:"HINDU",y:20},
+      {text:"PEREMPUAN",y:40}
+    ]);
+    a("Nationality",x.nationality.value==="MALAYSIA");
+    a("Religion",x.religion.value==="HINDU");
+    a("Gender",x.gender.value==="Perempuan");
+
+    const y=window.extractFrontPhotoSideFields([
+      {text:"RAJESHWARY A/P VASU",y:10},
+      {text:"INDIAN",y:20}
+    ]);
+    a("No unsupported nationality inference",y.nationality.status==="UNKNOWN");
+    a("No unsupported religion inference",y.religion.status==="UNKNOWN");
+    a("No gender-from-photo inference",y.gender.status==="UNKNOWN");
+
+    window.FRONT_PHOTO_RULE_TESTS={passed:f.length===0,failures:f};
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",run,{once:true});
+  else run();
 })();
 </script>
 </body>
