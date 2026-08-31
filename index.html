@@ -416,6 +416,16 @@ function makeInstantFieldSheet(R){
   for(const p of rendered){x.drawImage(p.canvas,pad,y);zones[p.key]={y0:y,y1:y+p.height};y+=p.height+gap;}
   return {sheet,zones};
 }
+function cleanOCRLine(value){
+  // Single canonical OCR-line sanitizer used by all field parsers.
+  // It only removes surrounding whitespace/control spacing; it NEVER
+  // substitutes characters or changes the OCR spelling.
+  return String(value == null ? '' : value)
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/[ \t\f\v]+/g, ' ')
+    .trim();
+}
+
 function splitSheetLines(result,zones){
   const out={nric:[],name:[],address:[],metadata:[]};
   for(const l of (result?.lines||[])){
