@@ -13,6 +13,126 @@
 .workspace{display:grid;grid-template-columns:1fr 1fr;gap:8px}.slot{height:125px;border-radius:13px;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;overflow:hidden}.slot img{max-width:100%;max-height:100%;object-fit:contain}.slot span{font-size:9px;color:var(--muted);font-weight:900}.process{margin-top:8px;padding:8px;border-radius:11px;box-shadow:var(--in)}.bar{height:7px;border-radius:99px;background:#dbe3e8;overflow:hidden}.bar i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .2s}.process p{font-size:8px;color:var(--muted);margin:5px 0 0}.evidence{min-height:0;display:flex;flex-direction:column}.head{display:flex;align-items:center;justify-content:space-between;gap:8px}.badge{padding:4px 6px;border-radius:99px;box-shadow:var(--in);font-size:7px;font-weight:950}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.raw{flex:1;min-height:0;overflow:auto;margin-top:6px;padding:9px;border-radius:12px;box-shadow:var(--in);font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.notice{font-size:8px;line-height:1.4;padding:7px;border-radius:10px;box-shadow:var(--in);margin:0 0 7px}.fields{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px}.field{padding:8px;border-radius:11px;box-shadow:var(--in)}.ftop{display:flex;justify-content:space-between;align-items:center;gap:6px}.fname{font-size:8px;font-weight:950}.fval{font-size:10px;font-weight:750;line-height:1.4;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.meta{font-size:7px;color:var(--muted);line-height:1.45;margin-top:4px}.ev{font:7px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px;padding:5px;border-radius:7px;background:rgba(255,255,255,.25);white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:1100px){body{overflow:auto}.app{height:auto;min-height:100vh}.grid{grid-template-columns:230px 1fr}.right{grid-column:1/-1;min-height:350px}.center{min-height:520px}}@media(max-width:700px){.grid{grid-template-columns:1fr}.right{grid-column:auto}.workspace{grid-template-columns:1fr}}
 </style>
+
+<script id="uncertainty-policy-v95">
+/*
+ OCR MASTER — High-confidence uncertainty policy
+ IMPORTANT:
+ OCR confidence >= 95% is NOT treated as proof of correctness.
+ A field can be UNCERTAIN at 95%, 97%, 99%, or even 100% when:
+   1) competing OCR candidates disagree,
+   2) protected character-confusion pairs are implicated,
+   3) critical numeric characters are ambiguous,
+   4) the field is incomplete/truncated,
+   5) visual evidence cannot independently support the candidate.
+*/
+window.OCR_MASTER_UNCERTAINTY = Object.freeze({
+  threshold: 0.95,
+  thresholdPercent: 95,
+  protectedPairs: [
+    ["01","OI","0I","O1"],
+    ["02","O2","OS","0S"],
+    ["R","K"], ["R","L"], ["J","I"], ["V","W"], ["J","S"], ["VS","W"],
+    ["R","F"], ["P","F"], ["R","C"], ["K","H"], ["D","O","0"],
+    ["U","Y"], ["B","S"], ["N","I"], ["|","I"], ["N","ea"],
+    ["A/P","AP"], ["A/L","AL"], ["BATANG","BAT TANG"],
+    ["BERJUNTAI","JUNTAI"], ["9","2"]
+  ]
+});
+
+window.normalizeOCRConfidence = function(v){
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return n > 1 ? n / 100 : n;
+};
+
+window.hasProtectedAmbiguity = function(value, candidates=[]){
+  const s = String(value ?? "").toUpperCase();
+  const pool = [s, ...candidates.map(x => String(x ?? "").toUpperCase())];
+  const rules = window.OCR_MASTER_UNCERTAINTY.protectedPairs;
+
+  // Direct competing candidates: never choose silently.
+  const unique = [...new Set(pool.filter(Boolean))];
+  if (unique.length > 1) {
+    for (let i=0;i<unique.length;i++){
+      for (let j=i+1;j<unique.length;j++){
+        if (window.protectedOCRConflict(unique[i], unique[j])) return true;
+      }
+    }
+  }
+
+  // Any explicit protected pair present in a critical field is evidence
+  // requiring verification; this remains true even at >=95% OCR confidence.
+  for (const group of rules){
+    const hits = group.filter(token => s.includes(token));
+    if (hits.length >= 1) {
+      // Only mark a value when there is a plausible paired ambiguity.
+      // Single normal tokens such as "W" should not make every field uncertain.
+      if (group.some(token => token.length <= 2)) {
+        if (unique.some(u => group.some(t => u !== s && u.includes(t)))) return true;
+      }
+    }
+  }
+  return false;
+};
+
+window.assessFieldConfidence = function(field, confidence, candidates=[], opts={}){
+  const c = window.normalizeOCRConfidence(confidence);
+  const critical = opts.critical !== false;
+  const incomplete = !!opts.incomplete;
+  const conflict = !!opts.conflict || window.hasProtectedAmbiguity(field, candidates);
+
+  if (!String(field ?? "").trim()) {
+    return {
+      confidence: c,
+      status: "UNKNOWN",
+      reason: "No reliably readable value was obtained."
+    };
+  }
+
+  if (conflict) {
+    return {
+      confidence: c,
+      status: "UNCERTAIN",
+      reason: c !== null && c >= 0.95
+        ? "OCR confidence is 95% or higher, but protected character ambiguity or conflicting evidence remains."
+        : "Conflicting or protected character ambiguity detected."
+    };
+  }
+
+  if (incomplete) {
+    return {
+      confidence: c,
+      status: "UNCERTAIN",
+      reason: "The field appears incomplete or truncated."
+    };
+  }
+
+  if (c !== null && c >= 0.95) {
+    return {
+      confidence: c,
+      status: "VERIFIED",
+      reason: "No unresolved conflict detected and OCR confidence is at least 95%."
+    };
+  }
+
+  return {
+    confidence: c,
+    status: critical ? "UNCERTAIN" : "REVIEW",
+    reason: "OCR confidence is below the 95% threshold."
+  };
+};
+</script>
+
+
+<style id="uncertainty-v95-style">
+.confidence-policy-note{
+  font-size:9px; line-height:1.35; margin-top:6px; padding:7px 9px;
+  border-radius:10px; opacity:.82;
+}
+.status-uncertain{font-weight:900}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -219,5 +339,98 @@ async function runOCR(){if(S.running)return;S.running=true;E.raw.textContent='';
 renderFiles();E.run.disabled=true;
 })();
 </script>
+
+<script id="uncertainty-postprocessor">
+window.applyStrictUncertaintyPolicy = function(result){
+  if (!result || typeof result !== "object") return result;
+  const out = Array.isArray(result) ? result : {...result};
+
+  const visit = (obj) => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) { obj.forEach(visit); return; }
+
+    const value = obj.value ?? obj.text ?? obj.result ?? "";
+    const confidence = obj.confidence ?? obj.ocrConfidence ?? obj.score;
+    const candidates = Array.isArray(obj.candidates) ? obj.candidates : [];
+    const fieldName = String(obj.field || obj.name || "").toLowerCase();
+
+    const critical = /nric|id|name|gender|sex|nationality|address|postcode|date|number/.test(fieldName);
+    const incomplete = !!obj.incomplete;
+    const conflict = !!obj.conflict || !!obj.hasConflict;
+
+    if (value !== "" || confidence != null || candidates.length) {
+      const assessment = window.assessFieldConfidence(
+        value, confidence, candidates, {critical, incomplete, conflict}
+      );
+      obj.confidence = assessment.confidence;
+      obj.status = assessment.status;
+      obj.warning = assessment.reason;
+    }
+
+    Object.keys(obj).forEach(k => {
+      if (!["value","text","result","confidence","ocrConfidence","score",
+             "candidates","field","name","status","warning","reason",
+             "incomplete","conflict","hasConflict"].includes(k)) {
+        if (obj[k] && typeof obj[k] === "object") visit(obj[k]);
+      }
+    });
+  };
+
+  visit(out);
+  return out;
+};
+</script>
+
+
+<script id="uncertainty-tests">
+(function(){
+  function run(){
+    const failures = [];
+    const assert = (name, condition) => { if(!condition) failures.push(name); };
+
+    const a = window.assessFieldConfidence("940202-10-6330", 0.99, [], {critical:true});
+    assert("95+ clean confidence => VERIFIED", a.status === "VERIFIED");
+
+    const b = window.assessFieldConfidence("01", 0.99, ["O1"], {critical:true});
+    assert("95+ protected numeric ambiguity => UNCERTAIN", b.status === "UNCERTAIN");
+
+    const c = window.assessFieldConfidence("940202-10-6339", 0.98, ["940202-10-6332"], {critical:true});
+    assert("95+ 9/2 conflict => UNCERTAIN", c.status === "UNCERTAIN");
+
+    const d = window.assessFieldConfidence("RAJESWARY A/P VASU", 0.97,
+      ["RAJESWARY A/P VASW"], {critical:true});
+    assert("95+ conflicting name => UNCERTAIN", d.status === "UNCERTAIN");
+
+    const e = window.assessFieldConfidence("940202-10-6330", 0.94, [], {critical:true});
+    assert("<95 critical confidence => UNCERTAIN", e.status === "UNCERTAIN");
+
+    window.OCR_MASTER_UNCERTAINTY_TEST = {
+      passed: failures.length === 0,
+      failures
+    };
+
+    if (new URLSearchParams(location.search).get("ocrdebug") === "1") {
+      console.table({
+        "95+ clean": a.status,
+        "01 vs O1": b.status,
+        "9 vs 2": c.status,
+        "name conflict": d.status,
+        "<95 critical": e.status
+      });
+      console.log(
+        failures.length ? "OCR MASTER uncertainty tests FAILED" :
+        "OCR MASTER uncertainty tests PASSED"
+      );
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run, {once:true});
+  } else {
+    run();
+  }
+})();
+</script>
+
 </body>
 </html>
