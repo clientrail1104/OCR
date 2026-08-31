@@ -243,7 +243,7 @@ window.extractFrontPhotoSideFields = function(lines) {
 <h2>Upload documents</h2>
 <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose document files"><div class="plus">＋</div><strong>Drop files here</strong><small>Front + back images · JPG · PNG · WEBP · TIFF</small><div class="actions"><label class="pick" for="files">Choose files</label><button class="btn" id="clear" type="button">Clear</button></div></div>
 <input id="files" class="file-input" type="file" multiple accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff">
-<div class="label">OCR language</div><select id="lang"><option value="eng+msa">English + Malay</option><option value="eng">English</option><option value="msa">Malay</option></select>
+<div class="label">OCR language</div><select id="lang"><option value="eng+msa">Auto — English + Malay</option><option value="eng+msa+ind">Auto — English + Malay + Indonesian</option><option value="eng+msa+tam">English + Malay + Tamil</option><option value="eng+msa+chi_sim">English + Malay + Chinese</option><option value="eng">English</option><option value="msa">Malay</option></select>
 <div class="label">Instant processing</div><div class="mini">Upload only prepares the document. The OCR engine may preload in the background, but it never reads the document until Run OCR is clicked. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
 <div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Upload ready. Click Run OCR to begin.</p></div>
 <button class="btn run" id="runOCR" type="button" style="width:100%;margin-top:7px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff">Run OCR</button>
@@ -273,6 +273,7 @@ E.files.addEventListener('change',e=>{const fs=[...e.target.files];e.target.valu
 E.drop.addEventListener('click',e=>{if(e.target.closest('label')||e.target.closest('button'))return;E.files.click()});
 E.clear.addEventListener('click',clearAll);
 E.run.addEventListener('click',runOCR);
+E.lang.addEventListener('change',async()=>{if(S.running)return;try{if(S.worker){await S.worker.terminate();S.worker=null;S.workerLang=null}status('READY');E.notice.textContent='OCR language changed. Run OCR to use the selected multilingual model.';}catch(e){console.warn(e)}});
 E.drop.addEventListener('dragover',e=>{e.preventDefault();E.drop.style.transform='scale(1.01)'});
 E.drop.addEventListener('dragleave',()=>E.drop.style.transform='');
 E.drop.addEventListener('drop',e=>{e.preventDefault();E.drop.style.transform='';addFiles([...e.dataTransfer.files])});
@@ -506,6 +507,11 @@ async function ocr(c,psm){
   OCR_QUEUE=job.catch(()=>{});
   return job;
 };
+async function ocrWithLanguageFallback(c,psm){
+  /* Try the selected multilingual model first. If the model cannot load, fail
+     safely; never substitute a different language silently. */
+  return await ocr(c,psm);
+}
 function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
 function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
 function lines(t){return String(t).split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean)}
@@ -585,31 +591,29 @@ function normalizeNameEvidence(line){
   return s;
 }
 function findNameCandidates(text){
-  /* NAMEADDRESS is spatially segmented by the visible name/address gap. Every
-     surviving OCR row is name evidence. A one-token final row such as MOHAMED
-     is valid and must not be discarded. No spelling/character/punctuation
-     correction is performed. */
-  const raw=String(text||"").split(/\r?\n/),rows=[];
-  const banned=/^(?:KAD|PENGENALAN|IDENTITY|CARD|MALAYSIA|MYKAD|WARGANEGARA|PEREMPUAN|LELAKI|FEMALE|MALE|SCANNED|WITH|CAMSCANNER|DATEMPL\.COM|WWW\b|HTTP\b)$/i;
+  /* The caller supplies ONLY the highlighted Full Name ROI. Therefore every
+     non-metadata OCR row in that ROI is name evidence. This is deliberately
+     language-neutral: no English/Malay vocabulary is required to accept a
+     name. OCR disagreement remains a conflict rather than a correction. */
+  const raw=String(text||'').split(/\r?\n/),rows=[];
+  const banned=/^(?:KAD|PENGENALAN|IDENTITY|CARD|MALAYSIA|MYKAD|WARGANEGARA|WARG|PEREMPUAN|LELAKI|FEMALE|MALE|SCANNED|WITH|CAMSCANNER|DATEMPL\.COM|WWW\b|HTTP\b)$/iu;
   for(const line of raw){
     const value=normalizeNameEvidence(line);
-    if(!value||value.length<2||value.length>100)continue;
-    if(banned.test(value)||/(?:\.com|https?:\/\/|www\.)/i.test(value))continue;
-    if(/\d/.test(value))continue;
-    if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MYKAD|SCANNED\s+WITH/i.test(value))continue;
+    if(!value||value.length<2||value.length>120)continue;
+    if(banned.test(value)||/(?:\.com|https?:\/\/|www\.)/iu.test(value))continue;
+    if(/\d/u.test(value))continue;
+    if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MYKAD|SCANNED\s+WITH/iu.test(value))continue;
+    const letters=(value.match(/\p{L}/gu)||[]).length;
+    if(letters<2)continue;
     const tokens=value.split(/\s+/).filter(Boolean);
-    if(!tokens.length||tokens.length>12)continue;
-    if(!tokens.every(t=>/^[\p{L}\p{N}][\p{L}\p{N}'’./·()\-]*$/u.test(t)||t==="/"))continue;
+    if(!tokens.length||tokens.length>16)continue;
+    // Unicode letters plus common name punctuation. This accepts scripts such
+    // as Latin, Cyrillic, Greek, Arabic, Devanagari, Tamil, Han, etc. without
+    // transliteration or silent correction.
+    if(!tokens.every(t=>/^[\p{L}\p{M}][\p{L}\p{M}'’./·()\-]*$/u.test(t)||t==='/'))continue;
     rows.push(value);
   }
-  if(!rows.length)return [];
-  /* A multi-row name is ONE field candidate, not several competing candidates.
-     Returning each row as an alternative made a valid two-line name such as
-     "NOOR AIN BINTI" + "MOHAMED" incorrectly become UNCERTAIN. Row-level
-     evidence is already preserved by nameText; the field value must be the
-     ordered concatenation of the accepted name rows. */
-  const joined=rows.join(" ");
-  return joined.length>=2&&joined.length<=100?[joined]:[];
+  return rows.length?[rows.join(' ')]:[];
 }
 function extractAddress(text){
   /* STRICT ADDRESS ROI ONLY.
@@ -632,13 +636,26 @@ function extractAddress(text){
 }
 
 function extractRace(text){
- const t=String(text||'');
- const explicit=t.match(/\b(?:Race|Bangsa|Kaum)\b\s*[:=\-]?\s*(Hindu|India|Cina|Chinese|Indian|Malay|Melayu|Islam|Buddha|Buddhist|Kristian|Christian)\b/i);
- if(explicit)return explicit[1];
- for(const v of ['Hindu','India','Cina','Chinese','Indian','Malay','Melayu','Islam','Buddha','Buddhist','Kristian','Christian']){
-   if(new RegExp('(?:^|\\s)'+v+'(?:$|\\s)','i').test(t))return v;
- }
- return null;
+  /* Race is accepted only from explicit metadata evidence. This function is
+     intentionally multilingual, but never infers race from a person's name,
+     nationality, photo or address. */
+  const t=String(text||'').replace(/\r/g,' ');
+  const labels='Race|Bangsa|Kaum|Ras|Ethnicity|Ethnic(?:ity)?';
+  const values=[
+    'Hindu','India','Indian','Cina','Chinese','China','Malay','Melayu','Islam',
+    'Buddha','Buddhist','Kristian','Christian','Sikh','Punjabi','Iban','Kadazan',
+    'Dusun','Dayak','Melanau','Bajau','Jawa','Javanese','Bugis','Banjar','Murut',
+    'Thai','Arab','Siam','Orang Asli','Pribumi','Bumiputera','Bumiputra'
+  ];
+  const valueAlt=values.map(v=>v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
+  const explicit=new RegExp('(?:'+labels+')\\s*[:=\\-]?\\s*('+valueAlt+')\\b','iu').exec(t);
+  if(explicit)return explicit[1];
+  // Metadata ROI is authoritative; allow a standalone printed value only.
+  for(const v of values){
+    const re=new RegExp('(?:^|[\\n\\r])\\s*'+v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*(?:$|[\\n\\r])','iu');
+    if(re.test(String(text||'')))return v;
+  }
+  return null;
 }
 function extract(front,back){
  const out=[];const ft=String(front.text||''),bt=String(back.text||'');
@@ -1348,6 +1365,30 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
     console.info('OCR MASTER V13 regression:',window.OCR_MASTER_V13_TEST);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+})();
+</script>
+<script id="v15-auto-name-race-tests">
+(function(){
+ const A=window.OCR_MASTER_API, failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+ const names=[
+  ['Latin','NOOR AIN BINTI MOHAMED'],
+  ['A/P symbol','Rajeshwary A/P Vasu'],
+  ['Tamil','ராஜேஸ்வரி'],
+  ['Arabic','محمد علي'],
+  ['Cyrillic','Иван Петров'],
+  ['Chinese','王小明']
+ ];
+ for(const [label,value] of names){
+  const got=A.findNameCandidates(value)[0];
+  assert(label+' name preserved',got===value);
+ }
+ assert('no arbitrary name injection',A.extractAddress('NO 17\\nJALAN PERISAI 3\\nBANDAR SEBERANG PERAK\\n36800 KAMPUNG GAJAH\\nPERAK')[0]==='NO 17');
+ for(const race of ['Islam','Hindu','Cina','Indian','Melayu','Sikh']){
+  assert('explicit race '+race,A.extractRace('WARGANEGARA\\n'+race+'\\nPEREMPUAN')===race);
+ }
+ assert('name/address API available',typeof A.findNameCandidates==='function'&&typeof A.extractAddress==='function');
+ window.OCR_MASTER_V15_AUTO_NAME_RACE_TEST={passed:failures.length===0,failures};
+ if(failures.length)console.error('V15 AUTO NAME/RACE TEST FAILED',failures); else console.info('V15 AUTO NAME/RACE TEST PASS');
 })();
 </script>
 </body>
