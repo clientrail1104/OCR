@@ -1493,5 +1493,46 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 })();
 </script>
 
+
+<script id="v18-remove-race-from-verified-extraction">
+(function () {
+  "use strict";
+  function removeRace() {
+    const nodes = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,div,section,article"));
+    const heading = nodes.find(el => (el.textContent || "").trim().toLowerCase() === "verified extraction");
+    if (!heading) return;
+    let root = heading;
+    for (let i = 0; i < 6 && root.parentElement; i++) {
+      const t = (root.textContent || "").toLowerCase();
+      if (t.includes("full name") && t.includes("nric number") && t.includes("nationality")) break;
+      root = root.parentElement;
+    }
+    Array.from(root.querySelectorAll("*")).forEach(el => {
+      if (el.children.length) return;
+      if ((el.textContent || "").trim().toLowerCase() !== "race") return;
+      let card = el;
+      for (let i = 0; i < 6 && card.parentElement; i++) {
+        const cls = String(card.className || "").toLowerCase();
+        const field = String(card.getAttribute("data-field") || "").toLowerCase();
+        if (field === "race" || /field|card|row|item/.test(cls)) {
+          card.remove();
+          return;
+        }
+        card = card.parentElement;
+      }
+      el.remove();
+    });
+  }
+  function init() {
+    removeRace();
+    new MutationObserver(removeRace).observe(document.body, {childList:true, subtree:true});
+    window.OCR_MASTER_V18 = {removeRace};
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, {once:true});
+  } else init();
+})();
+</script>
+
 </body>
 </html>
