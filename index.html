@@ -1534,5 +1534,130 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 })();
 </script>
 
+
+<script id="v19-malaysian-id-language">
+(function () {
+  "use strict";
+
+  const MALAYSIAN_ID_PATTERNS = [
+    /\bMYKAD\b/i,
+    /\bMYPR\b/i,
+    /\bMYTENT\b/i,
+    /\bKAD\s+PENGENALAN\b/i,
+    /\bKAD\s+PENGENALAN\s+MALAYSIA\b/i,
+    /\bJABATAN\s+PENDAFTARAN\s+NEGARA\b/i,
+    /\bWARGANEGARA\b/i,
+    /\bNO\.?\s*KP\b/i,
+    /\bNO\.?\s*PENGENALAN\b/i,
+    /\bMALAYSIA\b/i
+  ];
+
+  function isMalaysianIdentityDocument(evidenceText) {
+    const text = String(evidenceText || "").toUpperCase();
+    let hits = 0;
+    for (const pattern of MALAYSIAN_ID_PATTERNS) {
+      if (pattern.test(text)) hits++;
+    }
+    // Require an identity-card signal, or two independent Malaysian signals.
+    const idSignal = /\bMYKAD\b|\bMYPR\b|\bMYTENT\b|\bKAD\s+PENGENALAN\b|\bNO\.?\s*KP\b|\bNO\.?\s*PENGENALAN\b|\bJABATAN\s+PENDAFTARAN\s+NEGARA\b/i.test(text);
+    return idSignal || hits >= 2;
+  }
+
+  function selectMalayForMalaysianID(evidenceText) {
+    if (!isMalaysianIdentityDocument(evidenceText)) return false;
+
+    const selectors = Array.from(document.querySelectorAll("select"));
+    const languageSelect = selectors.find(function (s) {
+      const context = ((s.id || "") + " " + (s.name || "") + " " +
+        (s.getAttribute("aria-label") || "") + " " +
+        (s.parentElement ? s.parentElement.textContent : "")).toLowerCase();
+      return /ocr|language|lang/.test(context);
+    });
+
+    if (!languageSelect) return false;
+
+    const option = Array.from(languageSelect.options).find(function (o) {
+      const value = String(o.value || "").toLowerCase();
+      const label = String(o.textContent || "").toLowerCase();
+      return value === "msa" || value === "mal" || value === "may" ||
+             /(^|[^a-z])malay([^a-z]|$)/.test(label) ||
+             /bahasa melayu/.test(label);
+    });
+
+    if (!option) return false;
+
+    languageSelect.value = option.value;
+    languageSelect.dispatchEvent(new Event("change", {bubbles:true}));
+    window.OCR_MASTER_V19 = {
+      detected: true,
+      language: "Malay",
+      value: option.value
+    };
+    return true;
+  }
+
+  // Exposed for the existing Run OCR flow. No automatic document OCR occurs.
+  window.OCR_MASTER_V19_API = {
+    isMalaysianIdentityDocument,
+    selectMalayForMalaysianID
+  };
+
+  // Also support apps whose Run OCR handler exposes OCR text in a common
+  // global variable. This does not execute OCR itself.
+  window.OCR_MASTER_V19_AUTO_SELECT = function (evidenceText) {
+    return selectMalayForMalaysianID(evidenceText);
+  };
+})();
+</script>
+
+
+<script id="v19-run-ocr-language-hook">
+(function () {
+  "use strict";
+  function applyLanguageFromEvidence() {
+    let evidence = "";
+    if (window.OCR_MASTER_V19_EVIDENCE) evidence += " " + window.OCR_MASTER_V19_EVIDENCE;
+    if (window.frontData) evidence += " " + JSON.stringify(window.frontData);
+    if (window.lastOCRText) evidence += " " + window.lastOCRText;
+
+    // Inspect visible OCR result text only; never invent evidence.
+    const result = document.querySelector("#ocrResults,#ocrOutput,.ocr-results,.ocr-output");
+    if (result) evidence += " " + (result.textContent || "");
+
+    return window.OCR_MASTER_V19_AUTO_SELECT(evidence);
+  }
+
+  window.OCR_MASTER_V19_APPLY_LANGUAGE = applyLanguageFromEvidence;
+})();
+</script>
+
+
+<script id="v19-regression-tests">
+(function () {
+  "use strict";
+  function assert(condition, message) {
+    if (!condition) throw new Error(message);
+  }
+
+  const api = window.OCR_MASTER_V19_API;
+  assert(api && typeof api.isMalaysianIdentityDocument === "function",
+         "V19 language API missing");
+
+  assert(api.isMalaysianIdentityDocument("MALAYSIA MYKAD WARGANEGARA"),
+         "MyKad Malay detection failed");
+  assert(api.isMalaysianIdentityDocument("KAD PENGENALAN JABATAN PENDAFTARAN NEGARA"),
+         "Malaysian identity-card detection failed");
+  assert(api.isMalaysianIdentityDocument("MYPR MALAYSIA"),
+         "Permanent Resident card detection failed");
+  assert(!api.isMalaysianIdentityDocument("US PASSPORT"),
+         "Non-Malaysian document incorrectly classified");
+
+  window.OCR_MASTER_V19_TESTS = {
+    passed: true,
+    tests: 4
+  };
+})();
+</script>
+
 </body>
 </html>
