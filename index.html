@@ -357,7 +357,7 @@ function cropFrontNricRegions(c){
   return {
     nric:crop(c,.030,.215,.345,.125,10),
     name:crop(c,.030,.600,.405,.140,12),
-    address:crop(c,.030,.732,.435,.230,12),
+    address:crop(c,.0335,.755,.410,.205,14),
     metadata:crop(c,.690,.790,.285,.185,10)
   };
 }
@@ -400,6 +400,76 @@ async function ocrFixedRows(c,count,threshold=100,fast=true){
   }
   const rows=vals.map((value,i)=>({row:i+1,value,conf:Number(primary.conf)||0,candidates:[value],passes}));
   while(rows.length<count) rows.push({row:rows.length+1,value:'',conf:Number(primary.conf)||0,candidates:[],passes});
+  return rows;
+}
+
+
+function cropStrictAddressRows(c){
+  /*
+    Malaysian identity-card address block: five physical printed rows.
+    Segment the dedicated ROI before OCR so Tesseract cannot merge the
+    surname/name row into address text or merge adjacent address rows.
+    This function never creates text; it creates five source-image regions.
+  */
+  const h=c.height, w=c.width;
+  const bands=[
+    [0.00,0.205],
+    [0.175,0.405],
+    [0.375,0.605],
+    [0.575,0.805],
+    [0.775,1.00]
+  ];
+  return bands.map(([ya,yb])=>{
+    const sy=Math.max(0,Math.floor(h*ya));
+    const ey=Math.min(h,Math.ceil(h*yb));
+    const o=document.createElement('canvas');
+    o.width=Math.max(1,w);
+    o.height=Math.max(1,ey-sy);
+    const q=o.getContext('2d',{alpha:false});
+    q.imageSmoothingEnabled=true;
+    q.imageSmoothingQuality='high';
+    q.fillStyle='#fff';
+    q.fillRect(0,0,o.width,o.height);
+    q.drawImage(c,0,sy,w,ey-sy,0,0,w,o.height);
+    return o;
+  });
+}
+
+async function ocrStrictAddressRows(c){
+  const rowCanvases=cropStrictAddressRows(c);
+  const rows=[];
+  for(let i=0;i<rowCanvases.length;i++){
+    const primary=await ocr(mykadTextPreprocess(rowCanvases[i],100,14),7);
+    const pLines=normalizeFieldLines(primary.text||'');
+    const primaryText=pLines.join(' ').trim();
+
+    let candidates=primaryText?[primaryText]:[];
+    let fallback=null;
+
+    /*
+      Corroboration is used only when the first pass is weak/empty.
+      If corroboration disagrees, both candidates are preserved and the row
+      is marked uncertain. No plausible spelling is selected.
+    */
+    if(!primaryText || Number(primary.conf||0)<95){
+      fallback=await ocr(textPreprocess(rowCanvases[i]),7);
+      const fLines=normalizeFieldLines(fallback.text||'');
+      const fallbackText=fLines.join(' ').trim();
+      if(fallbackText && !candidates.includes(fallbackText)) candidates.push(fallbackText);
+    }
+
+    const unique=[...new Set(candidates)];
+    rows.push({
+      row:i+1,
+      value:unique.length===1?unique[0]:'',
+      candidates:unique,
+      conf:Number(primary.conf||0),
+      uncertain:unique.length!==1 || !unique[0],
+      evidence:unique.length>1
+        ? 'PRIMARY: '+unique[0]+'\nCORROBORATION: '+unique[1]
+        : (unique[0]||'[NO RELIABLE TEXT READ]')
+    });
+  }
   return rows;
 }
 
@@ -729,7 +799,7 @@ function extract(front,back){
  const addressCandidates=[...new Set(addressEvidence.split(/\n+/).map(x=>x.replace(/^\[[^\]]+%\]$/,'').trim()).filter(x=>x && !/^\[[^\]]+%\]$/.test(x)))];
  const addressConflict=false;
  const addressStatus=address.length===5 && !addressConflict?fieldStatus(front.addressConf||0):'UNCERTAIN';
- const addressDisplay=address.join(' ')||'UNKNOWN';
+ const addressDisplay=address.join('\n')||'UNKNOWN';
  out.push(mk('Address',addressDisplay,address.length?Math.min(front.addressConf||0,100):0,addressStatus,addressEvidence||'No reliable five-line address block detected.','Address is captured only from the dedicated left-side five-line address ROI. Multiple preprocessing passes are corroboration only; no spelling, digit, postcode, town, state, word or character is silently corrected.',addressConflict?'OCR passes disagree on one or more address characters/numbers. All pass evidence is preserved; no candidate is silently selected.':(address.length===5?'Verify every address character against the source image.':'The address region did not yield all five lines reliably; no missing line is guessed.')));
  // Verified Extraction display order is intentional: Full Name must appear above NRIC Number.
  const nameIndex=out.findIndex(f=>f.name==='Full Name');
@@ -772,17 +842,19 @@ async function runOCR(){
     nameAddressEvidence:{nameLines:nameRows,addressLines:[],visibleGap:true,method:'strict-highlighted-roi'},dedicatedRegions:{name:nameRows,address:[]}};
   render(extract(emptyBase,{text:'',conf:0,nricText:'',wholeText:''}));
 
-  const addressPrimary=await ocr(mykadTextPreprocess(R.address,100,12),6);
-  let addressRows=normalizeFieldLines(addressPrimary.text||'').slice(0,5);
-  let addressCorro=null;
-  if(addressRows.length<5){
-    addressCorro=await ocr(textPreprocess(R.address),6);
-    const alt=normalizeFieldLines(addressCorro.text||'').slice(0,5);
-    if(alt.length>addressRows.length)addressRows=alt;
-  }
-  prog(67,'Address captured');
-  render(extract({...emptyBase,addressConf:addressPrimary.conf||0,addressText:addressRows.join('\n'),
-    addressEvidence:addressRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(addressPrimary.conf||0).toFixed(1)+'%] '+x).join('\n'),
+  const addressRowResults=await ocrStrictAddressRows(R.address);
+  const addressRows=addressRowResults.map(r=>r.value).filter(Boolean);
+  const addressConf=addressRowResults.length
+    ? Math.min(...addressRowResults.map(r=>Number(r.conf||0)))
+    : 0;
+  const addressUncertain=addressRowResults.some(r=>r.uncertain) || addressRows.length!==5;
+  const addressEvidence=addressRowResults.map(r=>
+    'ROW '+r.row+' ['+Number(r.conf||0).toFixed(1)+'%] '+(r.value||'[UNCERTAIN]')+
+    (r.candidates.length>1?'\nCANDIDATES: '+r.candidates.join(' | '):'')
+  ).join('\n');
+  prog(67,'Address captured line-by-line');
+  render(extract({...emptyBase,addressConf:addressConf,addressText:addressRows.join('\n'),
+    addressEvidence:addressEvidence,
     nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi',addressStart:addressRows[0]||''},
     dedicatedRegions:{name:nameRows,address:addressRows}},{text:'',conf:0,nricText:'',wholeText:''}));
 
@@ -791,9 +863,9 @@ async function runOCR(){
   const metadata=await ocr(mykadTextPreprocess(R.metadata,100,10),6);
   prog(82,'Nationality, Race and Gender captured');
 
-  const frontData={text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:addressPrimary.conf||0,
+  const frontData={text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:addressConf,
     genderConf:metadata.conf||0,metadataConf:metadata.conf||0,nricText:nric.text||'',nameText:nameRows.join('\n'),addressText:addressRows.join('\n'),
-    addressEvidence:addressRows.length?addressRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(addressPrimary.conf||0).toFixed(1)+'%] '+x).join('\n'):'[no reliable address row detected]',
+    addressEvidence:addressEvidence||'[no reliable address row detected]',
     addressRowCandidates:addressRows.map((value,i)=>({row:i+1,value,conf:addressPrimary.conf||0,candidates:[value]})),
     nameEvidence:nameRows.length?nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'):'[no reliable name row detected]',
     genderText:metadata.text||'',nationalityText:metadata.text||'',metadataText:metadata.text||'',wholeText:'',
@@ -1656,6 +1728,52 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
     passed: true,
     tests: 4
   };
+})();
+</script>
+
+
+<script id="v20-address-row-regression">
+(function(){
+  "use strict";
+  const failures=[];
+  const assert=(name,value)=>{if(!value)failures.push(name);};
+
+  // The strict segmenter must always produce exactly five physical row ROIs.
+  if(typeof cropStrictAddressRows==="function"){
+    const c=document.createElement("canvas");
+    c.width=1580;c.height=500;
+    const rows=cropStrictAddressRows(c);
+    assert("exactly five address row regions",rows.length===5);
+    assert("row regions have positive height",rows.every(r=>r.width===1580&&r.height>0));
+  }else{
+    failures.push("cropStrictAddressRows missing");
+  }
+
+  // The parser must preserve supplied five-line structure and not treat
+  // name/metadata as address content.
+  if(typeof extractAddress==="function"){
+    const sample=[
+      "NO 17",
+      "JALAN PERISAI 3",
+      "BANDAR SEBERANG PERAK",
+      "36800 KAMPUNG GAJAH",
+      "PERAK",
+      "WARGANEGARA",
+      "ISLAM",
+      "PEREMPUAN"
+    ].join("\\n");
+    const a=extractAddress(sample);
+    assert("five rows preserved",a.length===5);
+    assert("row 1 preserved",a[0]==="NO 17");
+    assert("row 2 preserved",a[1]==="JALAN PERISAI 3");
+    assert("row 3 preserved",a[2]==="BANDAR SEBERANG PERAK");
+    assert("row 4 preserved",a[3]==="36800 KAMPUNG GAJAH");
+    assert("row 5 preserved",a[4]==="PERAK");
+    assert("metadata excluded",!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(a.join(" ")));
+    assert("name excluded",!/NOOR|MOHAMED/i.test(a.join(" ")));
+  }
+
+  window.OCR_MASTER_V20_TEST={passed:failures.length===0,failures};
 })();
 </script>
 
