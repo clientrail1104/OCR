@@ -255,7 +255,7 @@ window.extractFrontPhotoSideFields = function(lines) {
 <h2>Upload documents</h2>
 <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose document files"><div class="plus">＋</div><strong>Drop files here</strong><small>Front + back images · JPG · PNG · WEBP · TIFF</small><div class="actions"><label class="pick" for="files">Choose files</label><button class="btn" id="clear" type="button">Clear</button></div></div>
 <input id="files" class="file-input" type="file" multiple accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff">
-<div class="label">OCR language</div><select id="lang"><option value="eng+msa">Auto — English + Malay</option><option value="eng+msa+ind">Auto — English + Malay + Indonesian</option><option value="eng+msa+tam">English + Malay + Tamil</option><option value="eng+msa+chi_sim">English + Malay + Chinese</option><option value="eng">English</option><option value="msa">Malay</option></select>
+<div class="label">OCR language</div><select id="lang"><option value="mal+eng" selected>Malay+English</option><option value="eng+msa">Auto — English + Malay</option><option value="eng+msa+ind">Auto — English + Malay + Indonesian</option><option value="eng+msa+tam">English + Malay + Tamil</option><option value="eng+msa+chi_sim">English + Malay + Chinese</option><option value="eng">English</option><option value="msa">Malay</option></select>
 <div class="label">Instant processing</div><div class="mini">Upload only prepares the document. The OCR engine may preload in the background, but it never reads the document until Run OCR is clicked. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
 <div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Upload ready. Click Run OCR to begin.</p></div>
 <button class="btn run" id="runOCR" type="button" style="width:100%;margin-top:7px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff">Run OCR</button>
@@ -1774,6 +1774,104 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
   }
 
   window.OCR_MASTER_V20_TEST={passed:failures.length===0,failures};
+})();
+</script>
+
+
+<script id="v21-malay-english-default">
+(function () {
+  "use strict";
+
+  function findOCRLanguageSelect() {
+    const selects = Array.from(document.querySelectorAll("select"));
+    return selects.find(function (s) {
+      const ctx = (
+        (s.id || "") + " " +
+        (s.name || "") + " " +
+        (s.getAttribute("aria-label") || "") + " " +
+        (s.parentElement ? s.parentElement.textContent : "")
+      ).toLowerCase();
+      return /ocr|language|lang/.test(ctx);
+    }) || null;
+  }
+
+  function setMalayEnglishDefault() {
+    const select = findOCRLanguageSelect();
+    if (!select) return false;
+
+    let option = Array.from(select.options).find(function (o) {
+      const text = (o.textContent || "").trim().toLowerCase();
+      const value = (o.value || "").trim().toLowerCase();
+      return text === "malay+english" ||
+             text === "malay + english" ||
+             text === "english + malay" ||
+             value === "mal+eng" ||
+             value === "msa+eng" ||
+             value === "eng+msa";
+    });
+
+    if (!option) {
+      option = document.createElement("option");
+      option.value = "mal+eng";
+      option.textContent = "Malay+English";
+      select.insertBefore(option, select.firstChild);
+    }
+
+    select.value = option.value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    window.OCR_MASTER_V21 = {
+      defaultLanguage: "Malay+English",
+      languageValue: option.value
+    };
+    return true;
+  }
+
+  function init() {
+    setMalayEnglishDefault();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
+  }
+
+  window.OCR_MASTER_V21_API = {
+    findOCRLanguageSelect,
+    setMalayEnglishDefault
+  };
+})();
+</script>
+
+
+<script id="v21-regression-tests">
+(function () {
+  "use strict";
+  const failures = [];
+  function assert(name, condition) {
+    if (!condition) failures.push(name);
+  }
+
+  assert("V21 API exists",
+    !!window.OCR_MASTER_V21_API &&
+    typeof window.OCR_MASTER_V21_API.setMalayEnglishDefault === "function");
+
+  const select = window.OCR_MASTER_V21_API.findOCRLanguageSelect();
+  assert("OCR language select exists", !!select);
+
+  if (select) {
+    const option = Array.from(select.options).find(function (o) {
+      return (o.textContent || "").trim().toLowerCase() === "malay+english" ||
+             (o.value || "").toLowerCase() === "mal+eng";
+    });
+    assert("Malay+English option exists", !!option);
+    assert("Malay+English selected", !!option && select.value === option.value);
+  }
+
+  window.OCR_MASTER_V21_TESTS = {
+    passed: failures.length === 0,
+    failures
+  };
 })();
 </script>
 
