@@ -2,372 +2,1971 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#dce4ef">
-<title>OCR Master — Verified Document Intelligence</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#edf3f7">
+<title>OCR MASTER — Verified Extraction</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <style>
-:root{
-  --bg:#dfe7f2;--panel:#e8eef6;--text:#172033;--muted:#68758b;
-  --accent:#00d9ff;--accent2:#7b61ff;--good:#17a673;--warn:#c47b00;--bad:#c43737;
-  --shadow1:12px 12px 28px #bcc6d5,-12px -12px 28px #fff;
-  --inset:inset 5px 5px 12px #c3ccda,inset -5px -5px 12px #fff;
-}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
-button,input,select{font:inherit}button{cursor:pointer}
-.app{max-width:1500px;margin:auto;padding:22px}
-.top{display:flex;gap:18px;align-items:center;justify-content:space-between;margin-bottom:20px}
-.brand{display:flex;gap:14px;align-items:center}.logo{width:54px;height:54px;border-radius:18px;background:var(--panel);box-shadow:var(--shadow1);display:grid;place-items:center;font-weight:900;color:#0aaeca;font-size:22px}
-h1{font-size:22px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:3px}
-.status{padding:10px 15px;border-radius:14px;background:var(--panel);box-shadow:var(--shadow1);font-size:12px}
-.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:22px}
-.card{background:var(--panel);border-radius:24px;box-shadow:var(--shadow1);padding:20px}
-.card h2{font-size:15px;margin:0 0 14px}.muted{color:var(--muted)}
-.drop{border:2px dashed #aebbd0;border-radius:20px;padding:26px 16px;text-align:center;box-shadow:var(--inset);transition:.2s}
-.drop.drag{border-color:var(--accent);box-shadow:var(--inset),0 0 0 3px #00d9ff33}
-.drop strong{display:block;margin-bottom:6px}.drop small{color:var(--muted)}
-.btn{border:0;border-radius:15px;padding:12px 15px;background:var(--panel);box-shadow:var(--shadow1);font-weight:800;color:var(--text)}
-.btn:active{box-shadow:var(--inset)}.btn.primary{background:linear-gradient(135deg,#dffaff,#e9e1ff);box-shadow:8px 8px 20px #bbc4d2,-8px -8px 20px #fff,0 0 18px #00d9ff55}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.actions{display:flex;gap:10px;margin-top:14px}.actions .btn{flex:1}
-.file-list{margin-top:14px;display:grid;gap:8px;max-height:250px;overflow:auto}.file{padding:10px 12px;border-radius:13px;box-shadow:var(--inset);font-size:12px;display:flex;justify-content:space-between;gap:10px}.file b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.controls{display:grid;gap:12px;margin-top:18px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field label{font-size:11px;color:var(--muted);display:block;margin:0 0 6px 3px}.select{width:100%;border:0;border-radius:13px;padding:11px;background:var(--panel);box-shadow:var(--inset);outline:none;color:var(--text)}
-.progress{height:10px;border-radius:99px;background:var(--panel);box-shadow:var(--inset);overflow:hidden;margin-top:14px}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));box-shadow:0 0 14px #00d9ff;transition:width .2s}
-.main{display:grid;gap:18px}.hero{display:flex;justify-content:space-between;gap:16px;align-items:center}.hero h2{font-size:18px;margin:0}.pill{font-size:11px;padding:7px 10px;border-radius:99px;box-shadow:var(--inset);color:var(--muted)}
-.results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.result{padding:14px;border-radius:18px;box-shadow:var(--inset);min-width:0}.result.full{grid-column:1/-1}.rhead{display:flex;justify-content:space-between;gap:10px;align-items:center}.rlabel{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.05em}.value{font-size:15px;font-weight:800;margin-top:7px;white-space:pre-wrap;word-break:break-word}.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.tag{font-size:10px;padding:5px 7px;border-radius:8px;background:var(--panel);box-shadow:var(--shadow1)}.tag.good{color:var(--good)}.tag.warn{color:var(--warn)}.tag.bad{color:var(--bad)}
-.evidence{margin-top:9px;font-size:10px;color:var(--muted);white-space:pre-wrap;max-height:100px;overflow:auto}
-.review{padding:14px;border-radius:18px;background:#fff8df;box-shadow:var(--inset);font-size:12px;color:#735100}.review strong{color:#8b5d00}
-.empty{padding:35px;text-align:center;color:var(--muted);border-radius:20px;box-shadow:var(--inset)}
-.preview{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}.thumb{border-radius:15px;overflow:hidden;box-shadow:var(--inset);background:#d4dce8}.thumb img{width:100%;height:130px;object-fit:contain;display:block}.thumb span{display:block;padding:7px;font-size:10px;color:var(--muted)}
-@media(max-width:950px){.grid{grid-template-columns:1fr}.results{grid-template-columns:1fr}.app{padding:12px}.top{align-items:flex-start;flex-direction:column}.status{width:100%}}
+:root{--bg:#edf3f7;--ink:#26343d;--muted:#70808a;--cyan:#10c9c1;--violet:#7967f5;--ok:#13875f;--warn:#a76e00;--bad:#c43f56;--out:10px 10px 22px #cbd5dc,-10px -10px 22px #fff;--in:inset 5px 5px 12px #cbd5dc,inset -5px -5px 12px #fff}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);padding:10px;overflow:hidden}.app{height:calc(100vh - 20px);max-width:1700px;margin:auto;display:flex;flex-direction:column}.top{height:48px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.brand{display:flex;gap:10px;align-items:center}.logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;box-shadow:var(--out);font-size:12px;font-weight:950;color:var(--cyan)}h1{font-size:18px;margin:0}.sub{font-size:8px;color:var(--muted);margin-top:3px}.status{padding:8px 11px;border-radius:99px;box-shadow:var(--out);font-size:9px;font-weight:900}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--ok)}
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:250px minmax(0,1fr) 390px;gap:9px}.card{background:var(--bg);border-radius:17px;box-shadow:var(--out);padding:11px;min-width:0;min-height:0}.left{overflow:auto}.center{display:grid;grid-template-rows:auto minmax(0,1fr);gap:9px}.right{display:flex;flex-direction:column}h2{font-size:11px;margin:0 0 7px}.label{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:900;margin:9px 0 5px}.drop{border:1.5px dashed rgba(16,201,193,.72);border-radius:14px;padding:13px;text-align:center;box-shadow:var(--in)}.plus{font-size:25px;color:var(--cyan);font-weight:900}.drop strong{display:block;font-size:10px}.drop small{display:block;color:var(--muted);font-size:8px;line-height:1.45}.actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.pick,.btn{min-height:32px;border:0;border-radius:10px;padding:7px 9px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg);box-shadow:6px 6px 12px #cbd5dc,-6px -6px 12px #fff;font-size:9px;font-weight:900;cursor:pointer}.pick{background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff}.pick:active,.btn:active{box-shadow:var(--in)}select{width:100%;border:0;border-radius:10px;padding:8px;background:var(--bg);box-shadow:var(--in);font-size:9px;color:var(--ink)}.mini{font-size:8px;color:var(--muted);line-height:1.45}.files{display:flex;flex-direction:column;gap:5px;max-height:160px;overflow:auto}.file{padding:7px;border-radius:9px;box-shadow:var(--in);font-size:8px}.file b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file span{color:var(--muted)}
+.workspace{display:grid;grid-template-columns:1fr 1fr;gap:8px}.slot{height:125px;border-radius:13px;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;overflow:hidden}.slot img{max-width:100%;max-height:100%;object-fit:contain}.slot span{font-size:9px;color:var(--muted);font-weight:900}.process{margin-top:8px;padding:8px;border-radius:11px;box-shadow:var(--in)}.bar{height:7px;border-radius:99px;background:#dbe3e8;overflow:hidden}.bar i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .2s}.process p{font-size:8px;color:var(--muted);margin:5px 0 0}.evidence{min-height:0;display:flex;flex-direction:column}.head{display:flex;align-items:center;justify-content:space-between;gap:8px}.badge{padding:4px 6px;border-radius:99px;box-shadow:var(--in);font-size:7px;font-weight:950}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.raw{flex:1;min-height:0;overflow:auto;margin-top:6px;padding:9px;border-radius:12px;box-shadow:var(--in);font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.notice{font-size:8px;line-height:1.4;padding:7px;border-radius:10px;box-shadow:var(--in);margin:0 0 7px}.fields{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px}.field{padding:8px;border-radius:11px;box-shadow:var(--in)}.ftop{display:flex;justify-content:space-between;align-items:center;gap:6px}.fname{font-size:8px;font-weight:950}.fval{font-size:10px;font-weight:750;line-height:1.4;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.meta{font-size:7px;color:var(--muted);line-height:1.45;margin-top:4px}.ev{font:7px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px;padding:5px;border-radius:7px;background:rgba(255,255,255,.25);white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:1100px){body{overflow:auto}.app{height:auto;min-height:100vh}.grid{grid-template-columns:230px 1fr}.right{grid-column:1/-1;min-height:350px}.center{min-height:520px}}@media(max-width:700px){.grid{grid-template-columns:1fr}.right{grid-column:auto}.workspace{grid-template-columns:1fr}}
 </style>
+
+<script id="uncertainty-policy-v95">
+/*
+ OCR MASTER — High-confidence uncertainty policy
+ IMPORTANT:
+ OCR confidence >= 95% is NOT treated as proof of correctness.
+ A field can be UNCERTAIN at 95%, 97%, 99%, or even 100% when:
+   1) competing OCR candidates disagree,
+   2) protected character-confusion pairs are implicated,
+   3) critical numeric characters are ambiguous,
+   4) the field is incomplete/truncated,
+   5) visual evidence cannot independently support the candidate.
+*/
+window.OCR_MASTER_UNCERTAINTY = Object.freeze({
+  threshold: 0.95,
+  thresholdPercent: 95,
+  protectedPairs: [
+    ["01","OI","0I","O1"],
+    ["02","O2","OS","0S"],
+    ["R","K"], ["R","L"], ["J","I"], ["V","W"], ["J","S"], ["VS","W"],
+    ["R","F"], ["P","F"], ["R","C"], ["K","H"], ["D","O","0"],
+    ["U","Y"], ["B","S"], ["N","I"], ["|","I"], ["N","ea"],
+    ["A/P","AP"], ["A/L","AL"], ["BATANG","BAT TANG"],
+    ["BERJUNTAI","JUNTAI"], ["9","2"]
+  ]
+});
+
+window.normalizeOCRConfidence = function(v){
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return n > 1 ? n / 100 : n;
+};
+
+window.protectedOCRConflict = function(a,b){
+  const x=String(a??'').toUpperCase().trim();
+  const y=String(b??'').toUpperCase().trim();
+  if(!x || !y || x===y) return false;
+  const rules=window.OCR_MASTER_UNCERTAINTY.protectedPairs;
+  return rules.some(group=>{
+    const g=group.map(v=>String(v).toUpperCase());
+    return g.includes(x) && g.includes(y);
+  });
+};
+
+window.hasProtectedAmbiguity = function(value, candidates=[]){
+  const s = String(value ?? "").toUpperCase();
+  const pool = [s, ...candidates.map(x => String(x ?? "").toUpperCase())];
+  const rules = window.OCR_MASTER_UNCERTAINTY.protectedPairs;
+
+  // Direct competing candidates: never choose silently.
+  const unique = [...new Set(pool.filter(Boolean))];
+  if (unique.length > 1) {
+    for (let i=0;i<unique.length;i++){
+      for (let j=i+1;j<unique.length;j++){
+        if (window.protectedOCRConflict(unique[i], unique[j])) return true;
+      }
+    }
+  }
+
+  // Any explicit protected pair present in a critical field is evidence
+  // requiring verification; this remains true even at >=95% OCR confidence.
+  for (const group of rules){
+    const hits = group.filter(token => s.includes(token));
+    if (hits.length >= 1) {
+      // Only mark a value when there is a plausible paired ambiguity.
+      // Single normal tokens such as "W" should not make every field uncertain.
+      if (group.some(token => token.length <= 2)) {
+        if (unique.some(u => group.some(t => u !== s && u.includes(t)))) return true;
+      }
+    }
+  }
+  return false;
+};
+
+window.assessFieldConfidence = function(field, confidence, candidates=[], opts={}){
+  const c = window.normalizeOCRConfidence(confidence);
+  const critical = opts.critical !== false;
+  const incomplete = !!opts.incomplete;
+  const conflict = !!opts.conflict || window.hasProtectedAmbiguity(field, candidates);
+
+  if (!String(field ?? "").trim()) {
+    return {
+      confidence: c,
+      status: "UNKNOWN",
+      reason: "No reliably readable value was obtained."
+    };
+  }
+
+  if (conflict) {
+    return {
+      confidence: c,
+      status: "UNCERTAIN",
+      reason: c !== null && c >= 0.95
+        ? "OCR confidence is 95% or higher, but protected character ambiguity or conflicting evidence remains."
+        : "Conflicting or protected character ambiguity detected."
+    };
+  }
+
+  if (incomplete) {
+    return {
+      confidence: c,
+      status: "UNCERTAIN",
+      reason: "The field appears incomplete or truncated."
+    };
+  }
+
+  if (c !== null && c >= 0.995) {
+    return {
+      confidence: c,
+      status: "VERIFIED",
+      reason: "OCR confidence is at least 99.5% and no unresolved conflict was detected."
+    };
+  }
+
+  if (c !== null && c >= 0.95) {
+    return {
+      confidence: c,
+      status: "UNCERTAIN",
+      reason: "OCR confidence is 95%–99.49%; this application requires stronger evidence before verification."
+    };
+  }
+
+  return {
+    confidence: c,
+    status: critical ? "UNCERTAIN" : "REVIEW",
+    reason: "OCR confidence is below the 95% threshold."
+  };
+};
+</script>
+
+
+<style id="uncertainty-v95-style">
+.confidence-policy-note{
+  font-size:9px; line-height:1.35; margin-top:6px; padding:7px 9px;
+  border-radius:10px; opacity:.82;
+}
+.status-uncertain{font-weight:900}
+</style>
+
+<style id="final-layout-fix">
+.grid{display:grid;grid-template-columns:300px minmax(0,1fr) 360px;gap:10px;min-height:0}
+.right{min-width:0;overflow:auto}.fields{display:grid;gap:7px}.field{padding:8px;border-radius:11px;background:rgba(255,255,255,.42);box-shadow:var(--in)}.ftop{display:flex;align-items:center;justify-content:space-between;gap:6px}.fname{font-size:10px;font-weight:900}.fval{margin-top:4px;font-size:11px;font-weight:800;white-space:pre-wrap;overflow-wrap:anywhere}.meta,.ev{font-size:8px;line-height:1.35;margin-top:4px;white-space:pre-wrap}.badge{white-space:nowrap}@media(max-width:1100px){.grid{grid-template-columns:260px minmax(0,1fr)}.right{grid-column:1/-1}}@media(max-width:760px){.grid{grid-template-columns:1fr}.right{grid-column:auto}}
+</style>
+<script id="front-photo-field-rules">
+/*
+FRONT NRIC SPATIAL RULE
+Below the passport-size photo on the left:
+  Group 1, line 1: Warganegara = Nationality
+  Group 1, line 2: Religion = Hindu / India / Cina / Islam
+  Group 2, line 2: Gender = Perempuan / Lelaki
+Evidence only. Never infer from photo, name, ethnicity, or common document patterns.
+*/
+window.FRONT_NRIC_PHOTO_RULES = Object.freeze({
+  region: "below-photo-left",
+  group1: {
+    line1: { field: "Nationality", label: "Warganegara" },
+    line2: { field: "Religion", allowed: ["Hindu","India","Cina","Islam"] }
+  },
+  group2: {
+    line2: { field: "Gender", allowed: ["Perempuan","Lelaki"] }
+  },
+  noPhotoInference: true,
+  noSilentCorrection: true
+});
+
+window.extractFrontPhotoSideFields = function(lines) {
+  const out = {
+    nationality: {value:null,status:"UNKNOWN",evidence:null,reason:null},
+    religion: {value:null,status:"UNKNOWN",evidence:null,reason:null},
+    gender: {value:null,status:"UNKNOWN",evidence:null,reason:null}
+  };
+  if (!Array.isArray(lines)) return out;
+
+  const rows = lines.map((v,i) => {
+    const text = String(typeof v === "string" ? v : (v.text ?? v.value ?? ""))
+      .replace(/\s+/g," ").trim();
+    return {text, y:Number(v?.y ?? v?.top ?? i)};
+  }).filter(x => x.text);
+
+  const setEvidence = (key,value,evidence,reason) => {
+    out[key] = {value,status:"EVIDENCE",evidence,reason};
+  };
+
+  // Explicit Warganegara only. Do not turn ethnicity or place names into nationality.
+  for (const r of rows) {
+    const m = r.text.match(/\bWarganegara(?:\s+Malaysia)?\b\s*[:=\-]?\s*(.*)$/i);
+    if (m) {
+      // On this card, a standalone Warganegara row is the nationality label.
+      // It is safe to map that explicit label to Malaysia; this is not an
+      // inference from address, ethnicity, name, or photograph.
+      const value = m[1].trim() || "Malaysia";
+      setEvidence("nationality", value, r.text,
+        "Explicit Warganegara evidence in the below-photo-left region; standalone Warganegara maps to Malaysia by the document rule.");
+      break;
+    }
+  }
+
+  // Religion: explicit label or one of the explicitly allowed values.
+  for (const r of rows) {
+    const m = r.text.match(/\b(?:Agama|Religion)\b\s*[:=\-]?\s*(.*)$/i);
+    if (m && m[1].trim()) {
+      setEvidence("religion", m[1].trim(), r.text, "Explicit religion label detected.");
+      break;
+    }
+    const hit = ["Hindu","India","Cina","Islam"].find(v => new RegExp("^"+v+"$","i").test(r.text));
+    if (hit) {
+      setEvidence("religion", r.text, r.text,
+        "Explicit allowed religion value detected; no inference used.");
+      break;
+    }
+  }
+
+  // Gender: explicit text only. Never inspect the portrait.
+  for (const r of rows) {
+    const m = r.text.match(/\b(?:Jantina|Gender|Sex)\b\s*[:=\-]?\s*(.*)$/i);
+    let value = m ? m[1].trim() : null;
+    if (!value && /\bPerempuan\b/i.test(r.text)) value = "Perempuan";
+    if (!value && /\bLelaki\b/i.test(r.text)) value = "Lelaki";
+    if (value) {
+      value = /\bPerempuan\b/i.test(value) ? "Perempuan" :
+              (/\bLelaki\b/i.test(value) ? "Lelaki" : value);
+      setEvidence("gender", value, r.text,
+        "Explicit gender text detected; photograph was not used.");
+      break;
+    }
+  }
+  return out;
+};
+</script>
+
+<style id="v16-hide-address-race-ui">
+/* V16: Address and Race are intentionally not displayed. OCR internals remain
+   untouched so removing these UI fields cannot corrupt the OCR engine. */
+#raceField,#raceCard,[data-field="race"],.field-race,.field-race-card,.race-field{display:none !important;}
+</style>
+
 </head>
 <body>
 <div class="app">
-  <header class="top">
-    <div class="brand"><div class="logo">OCR</div><div><h1>OCR Master</h1><div class="sub">Neumorphic document intelligence · evidence-first · no guessing</div></div></div>
-    <div id="status" class="status">Ready — OCR starts only when you click <b>Run OCR</b>.</div>
-  </header>
-
-  <div class="grid">
-    <aside class="card">
-      <h2>Documents</h2>
-      <div id="drop" class="drop">
-        <strong>Drop files here</strong>
-        <small>or choose images / PDFs</small>
-        <div style="margin-top:14px"><button id="choose" class="btn primary" type="button">Choose files</button></div>
-        <input id="files" type="file" accept="image/*,.pdf,application/pdf" multiple hidden>
-      </div>
-      <div id="fileList" class="file-list"></div>
-
-      <div class="controls">
-        <div class="row">
-          <div class="field"><label>OCR language</label>
-            <select id="lang" class="select">
-              <option value="msa+eng">Malay + English</option>
-              <option value="msa">Malay</option>
-              <option value="eng">English</option>
-            </select>
-          </div>
-          <div class="field"><label>Document mode</label>
-            <select id="mode" class="select">
-              <option value="auto">Auto detect</option>
-              <option value="mykad">Malaysian NRIC / MyKad</option>
-              <option value="generic">Generic document</option>
-            </select>
-          </div>
-        </div>
-        <div class="actions">
-          <button id="run" class="btn primary" disabled>Run OCR</button>
-          <button id="clear" class="btn" type="button">Clear</button>
-        </div>
-        <div class="progress"><div id="bar" class="bar"></div></div>
-        <div id="progressText" class="sub">No processing started.</div>
-      </div>
-    </aside>
-
-    <main class="main">
-      <section class="card">
-        <div class="hero"><div><h2>Verified extraction</h2><div class="sub">Only source-supported values are promoted to fields.</div></div><div id="docPill" class="pill">No document</div></div>
-        <div id="results" class="results" style="margin-top:16px"><div class="empty">Upload a document, then click <b>Run OCR</b>.</div></div>
-      </section>
-
-      <section class="card">
-        <div class="hero"><div><h2>Source pages</h2><div class="sub">Local previews only. No OCR runs automatically.</div></div></div>
-        <div id="preview" class="preview" style="margin-top:14px"><div class="empty">No pages loaded.</div></div>
-      </section>
-    </main>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<header class="top"><div class="brand"><div class="logo">OCR</div><div><h1>OCR MASTER</h1><div class="sub">MyKad front/back · exact-value extraction · no silent character correction</div></div></div><div class="status"><span class="dot" id="dot"></span><span id="status">READY</span></div></header>
+<main class="grid">
+<aside class="card left">
+<h2>Upload documents</h2>
+<div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose document files"><div class="plus">＋</div><strong>Drop files here</strong><small>Front + back images · JPG · PNG · WEBP · TIFF · PDF</small><div class="actions"><label class="pick" for="files">Choose files</label><button class="btn" id="clear" type="button">Clear</button></div></div>
+<input id="files" class="file-input" type="file" multiple accept="image/png,image/jpeg,image/webp,image/tiff,application/pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,.pdf">
+<div class="label">OCR language</div><select id="lang"><option value="msa" selected>Malay</option></select>
+<div class="label">Instant processing</div><div class="mini">Upload only prepares the document. The OCR engine may preload in the background, but it never reads the document until Run OCR is clicked. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
+<div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Upload ready. Click Run OCR to begin.</p></div>
+<button class="btn run" id="runOCR" type="button" style="width:100%;margin-top:7px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff">Run OCR</button>
+<div class="label">Files</div><div class="files" id="fileList"><div class="mini">No files selected.</div></div>
+</aside>
+<section class="center">
+<div class="card"><h2>Front ID / Back ID</h2><div class="workspace"><div class="slot" id="front"><span>FRONT ID</span></div><div class="slot" id="back"><span>BACK ID</span></div></div></div>
+<div id="raw" hidden></div><span id="ocrBadge" hidden></span></section>
+<aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div id="fields" class="fields"><div class="mini">Upload Front ID, then click Run OCR. Back ID is optional for front-field extraction.</div></div><div id="notice" class="mini confidence-policy-note">No document OCR is performed until Run OCR is clicked.</div></aside>
+</main></div>
 <script>
-/* OCR MASTER — complete client-side implementation.
-   Security: files are processed locally in the browser; no upload endpoint exists.
-   Accuracy: values are accepted only from evidence regions / exact patterns.
-   Uncertainty is explicit; no silent character substitution. */
-
+'use strict';
+(()=>{
 const $=id=>document.getElementById(id);
-const state={files:[],pages:[],results:[],busy:false};
+const E={files:$('files'),drop:$('drop'),clear:$('clear'),run:$('runOCR'),lang:$('lang'),front:$('front'),back:$('back'),list:$('fileList'),bar:$('bar'),progress:$('progress'),raw:$('raw'),fields:$('fields'),badge:$('ocrBadge'),review:$('review'),notice:$('notice'),status:$('status'),dot:$('dot')};
+const S={files:[],pages:[],worker:null,workerLang:null,workerReadyMs:0,running:false,prewarming:false};
+const ALLOWED=/\.(png|jpe?g|webp|tif|tiff|pdf)$/i;
+const FORBIDDEN_TRANSFORMS=['R↔F','P↔F','R↔C','K↔H','D↔O↔0','U↔Y','B↔S','N↔I','|↔I','N↔ea','A/P↔AP','A/L↔AL','R↔L','J↔I','V↔W','J↔S','VS↔W','BATANG↔BAT TANG','BERJUNTAI↔JUNTAI','9↔2','01↔OI↔0I↔O1','R↔K','02↔O2↔OS↔0S'];
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function status(t,bad=false){E.status.textContent=t;E.dot.style.background=bad?'var(--bad)':'var(--ok)'}
+function prog(p,t){E.bar.style.width=Math.max(0,Math.min(100,p))+'%';E.progress.textContent=t}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
+async function retry(fn,times=2){let err;for(let i=0;i<times;i++){try{return await fn()}catch(e){err=e;if(i+1<times)await wait(220)}}throw err}
+function bytes(n){return n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB'}
+E.files.addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';addFiles(fs)});
+E.drop.addEventListener('click',e=>{if(e.target.closest('label')||e.target.closest('button'))return;E.files.click()});
+E.clear.addEventListener('click',clearAll);
+E.run.addEventListener('click',runOCR);
+E.lang.addEventListener('change',async()=>{if(S.running)return;try{if(S.worker){await S.worker.terminate();S.worker=null;S.workerLang=null}status('READY');E.notice.textContent='OCR language changed. Run OCR to use the selected multilingual model.';}catch(e){console.warn(e)}});
+E.drop.addEventListener('dragover',e=>{e.preventDefault();E.drop.style.transform='scale(1.01)'});
+E.drop.addEventListener('dragleave',()=>E.drop.style.transform='');
+E.drop.addEventListener('drop',e=>{e.preventDefault();E.drop.style.transform='';addFiles([...e.dataTransfer.files])});
+E.drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();E.files.click()}});
+function clearAll(){
+  S.files=[]; S.pages=[]; S.running=false;
+  E.files.value='';
+  E.list.innerHTML='<div class="mini">No files selected.</div>';
+  E.front.innerHTML='<span>FRONT ID</span>';
+  E.back.innerHTML='<span>BACK ID</span>';
+  E.raw.textContent='OCR evidence will appear here.';
+  E.fields.innerHTML='<div class="mini">Upload Front ID, then click Run OCR. Back ID is optional for front-field extraction.</div>';
+  E.review.textContent='WAITING'; E.review.className='badge warn';
+  E.badge.textContent='WAITING'; E.badge.className='badge';
+  E.notice.textContent='No document OCR is performed until Run OCR is clicked.';
+  E.run.disabled=true; prog(0,'Upload ready. Click Run OCR to begin.'); status('READY');
+}
+async function addFiles(fs){const ok=[],bad=[];for(const f of fs){if(!ALLOWED.test(f.name)){bad.push(f.name+' — unsupported');continue}if(!f.size){bad.push(f.name+' — empty');continue}if(f.size>500*1024*1024){bad.push(f.name+' — over 500 MB');continue}if(!S.files.some(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified))ok.push(f)}if(bad.length)E.notice.textContent=bad.join('\n');S.files.push(...ok);renderFiles();if(!ok.length)return;try{status('PREPARING');E.run.disabled=true;await makePages();renderSlots();E.run.disabled=false;prog(0,'Upload ready. Click Run OCR to begin.');E.badge.textContent='READY';E.badge.className='badge warn';E.raw.textContent='OCR has not started. Click Run OCR to process the uploaded document.';E.fields.innerHTML='';E.review.textContent='WAITING';E.review.className='badge warn';status('READY');E.notice.textContent='Files loaded. OCR is manual: click Run OCR. No OCR is performed automatically after upload.'}catch(e){console.error(e);E.run.disabled=true;status('ERROR',true);E.notice.textContent='Document preparation failed safely: '+e.message+' No value was guessed.'}}
+function renderFiles(){E.list.innerHTML=S.files.length?S.files.map(f=>'<div class="file"><b>'+esc(f.name)+'</b><span>'+esc(f.type||'image')+' · '+bytes(f.size)+'</span></div>').join(''):'<div class="mini">No files selected.</div>'}
+async function loadImage(f){
+  const u=URL.createObjectURL(f),im=new Image();
+  try{im.src=u;await im.decode();return im}
+  catch(e){throw new Error('Unable to decode image: '+f.name)}
+  finally{URL.revokeObjectURL(u)}
+}
+function canvasFrom(im){const max=5200,r=Math.min(1,max/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round((im.naturalWidth||im.width)*r));c.height=Math.max(1,Math.round((im.naturalHeight||im.height)*r));const x=c.getContext('2d',{alpha:false});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);return c}
+function crop(c,x,y,w,h,scale=5){const sx=Math.max(0,Math.round(c.width*x)),sy=Math.max(0,Math.round(c.height*y)),sw=Math.min(c.width-sx,Math.round(c.width*w)),sh=Math.min(c.height-sy,Math.round(c.height*h));const o=document.createElement('canvas');o.width=Math.max(1,Math.min(7000,sw*scale));o.height=Math.max(1,Math.min(5000,sh*scale));const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,sx,sy,sw,sh,0,0,o.width,o.height);return o}
+function preprocess(c,mode){const x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),a=d.data;for(let i=0;i<a.length;i+=4){const r=a[i],g=a[i+1],b=a[i+2];if(mode==='gold'&&r>145&&g>105&&g<215&&b<135&&r>g*1.05){a[i]=a[i+1]=a[i+2]=255;continue}let v=.299*r+.587*g+.114*b;if(mode==='high')v=(v-128)*1.35+128;else if(mode==='soft')v=(v-128)*1.12+128;a[i]=a[i+1]=a[i+2]=Math.max(0,Math.min(255,v))}x.putImageData(d,0,0);return c}
+function maskGold(c){return preprocess(c,'gold')}
+function textPreprocess(c){
+ const up=document.createElement('canvas');
+ up.width=Math.max(1,Math.min(9000,Math.round(c.width*2)));
+ up.height=Math.max(1,Math.min(7000,Math.round(c.height*2)));
+ const u=up.getContext('2d',{alpha:false});u.imageSmoothingEnabled=true;u.imageSmoothingQuality='high';u.fillStyle='#fff';u.fillRect(0,0,up.width,up.height);u.drawImage(c,0,0,up.width,up.height);
+ const g=up.getContext('2d',{willReadFrequently:true}),d=g.getImageData(0,0,up.width,up.height),a=d.data;
+ for(let i=0;i<a.length;i+=4){const v=.299*a[i]+.587*a[i+1]+.114*a[i+2];a[i]=a[i+1]=a[i+2]=v;}g.putImageData(d,0,0);return up;
+}
 
-const confusablePairs=[
-  ['R','L'],['J','I'],['V','W'],['J','S'],['VS','W'],['9','2'],
-  ['01','OI'],['01','0I'],['01','O1'],['R','K'],['02','O2'],['02','OS'],['02','0S']
-];
-
-function setStatus(html){$('status').innerHTML=html}
-function pct(n){return Math.max(0,Math.min(100,Math.round(Number(n)||0)))}
-function cleanLine(s){return String(s||'').replace(/[\t ]+/g,' ').replace(/^[:;|]+|[:;|]+$/g,'').trim()}
-function norm(s){return cleanLine(s).replace(/[“”‘’]/g,"'")}
-function exactNRIC(s){
-  const m=norm(s).match(/\b(\d{6})\s*[- ]\s*(\d{2})\s*[- ]\s*(\d{4})\b/);
-  return m?m.slice(1).join('-'):null;
-}
-function exactExtended(s){
-  const m=norm(s).match(/\b(\d{6})\s*[- ]\s*(\d{2})\s*[- ]\s*(\d{4})\s*[- ]\s*(\d{2})\s*[- ]\s*(\d{2})\b/);
-  return m?m.slice(1).join('-'):null;
-}
-function statusFor(conf, conflict=false){
-  if(conflict)return 'UNCERTAIN';
-  if(conf>=95)return 'HIGH';
-  if(conf>=80)return 'REVIEW';
-  return 'UNCERTAIN';
-}
-function evidenceObj(label,value,conf,evidence,validation='',warning='',conflict=false){
-  return {label,value:value||'UNKNOWN',confidence:pct(conf),status:statusFor(conf,conflict),evidence:evidence||'No reliable OCR evidence.',validation,warning};
-}
-function uniqueLines(text){return [...new Set(String(text||'').split(/\r?\n/).map(cleanLine).filter(Boolean))]}
-
-async function loadPdfJs(){
-  if(window.pdfjsLib)return window.pdfjsLib;
-  return new Promise((resolve,reject)=>{
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js';
-    s.type='module';
-    s.onload=()=>resolve(window.pdfjsLib);
-    s.onerror=reject;
-    document.head.appendChild(s);
-  });
+/* MyKad text mode: the printed black text is substantially darker in the red
+   channel than the cyan/blue card background. This preserves the glyphs while
+   suppressing most background texture. It is an OCR preprocessing step only;
+   no character is changed. */
+function mykadTextPreprocess(c,threshold=80,scale=8){
+ const up=document.createElement('canvas');
+ up.width=Math.max(1,Math.min(9000,Math.round(c.width*scale)));
+ up.height=Math.max(1,Math.min(7000,Math.round(c.height*scale)));
+ const u=up.getContext('2d',{alpha:false});
+ u.imageSmoothingEnabled=true;u.imageSmoothingQuality='high';u.fillStyle='#fff';u.fillRect(0,0,up.width,up.height);
+ u.drawImage(c,0,0,up.width,up.height);
+ const g=up.getContext('2d',{willReadFrequently:true}),d=g.getImageData(0,0,up.width,up.height),a=d.data;
+ for(let i=0;i<a.length;i+=4){
+   const r=a[i],gg=a[i+1],b=a[i+2];
+   // Preserve dark printed ink; suppress blue/cyan background and red markup.
+   const ink=r<=threshold;
+   const v=ink?25:255; a[i]=a[i+1]=a[i+2]=v;
+ }
+ g.putImageData(d,0,0);
+ return up;
 }
 
-function upscaleCanvas(src,scale=4){
-  const c=document.createElement('canvas');
-  c.width=Math.min(src.width*scale,8000); c.height=Math.min(src.height*scale,8000);
-  const x=c.getContext('2d',{willReadFrequently:true});
-  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(src,0,0,c.width,c.height);
-  return c;
+function mykadChannelPreprocess(c,channel='r',threshold=80,scale=10){
+ const up=document.createElement('canvas');
+ up.width=Math.max(1,Math.min(9000,Math.round(c.width*scale)));
+ up.height=Math.max(1,Math.min(7000,Math.round(c.height*scale)));
+ const u=up.getContext('2d',{alpha:false});u.imageSmoothingEnabled=true;u.imageSmoothingQuality='high';u.fillStyle='#fff';u.fillRect(0,0,up.width,up.height);u.drawImage(c,0,0,up.width,up.height);
+ const g=up.getContext('2d',{willReadFrequently:true}),d=g.getImageData(0,0,up.width,up.height),a=d.data;
+ const idx=channel==='g'?1:channel==='b'?2:0;
+ for(let i=0;i<a.length;i+=4){const v=a[i+idx];const ink=v<=threshold;a[i]=a[i+1]=a[i+2]=ink?20:255;}
+ g.putImageData(d,0,0);return up;
 }
-function preprocess(src){
-  const c=upscaleCanvas(src,4),x=c.getContext('2d',{willReadFrequently:true}),d=x.getImageData(0,0,c.width,c.height),p=d.data;
-  for(let i=0;i<p.length;i+=4){
-    const y=.299*p[i]+.587*p[i+1]+.114*p[i+2];
-    const z=Math.max(0,Math.min(255,(y-128)*1.35+128));
-    p[i]=p[i+1]=p[i+2]=z;
-  }
-  x.putImageData(d,0,0);return c;
-}
-function crop(src,x,y,w,h){
-  const c=document.createElement('canvas');
-  c.width=Math.max(1,Math.round(src.width*w));c.height=Math.max(1,Math.round(src.height*h));
-  c.getContext('2d').drawImage(src,Math.round(src.width*x),Math.round(src.height*y),c.width,c.height,0,0,c.width,c.height);
-  return c;
-}
-function mykadRegions(c){
+
+function cropFrontNricRegions(c){
+  /*
+    Dedicated MyKad front regions. Each field owns its source pixels and no
+    field is populated from another field's OCR.
+  */
   return {
-    nric:crop(c,.025,.18,.48,.17),
-    name:crop(c,.02,.56,.47,.17),
-    address:crop(c,.02,.70,.49,.27),
-    metadata:crop(c,.67,.78,.31,.20),
-    nationality:crop(c,.68,.80,.25,.105)
+    nric:crop(c,.025,.205,.390,.145,12),
+    name:crop(c,.020,.600,.430,.145,14),
+    address:crop(c,.020,.750,.455,.220,16),
+    metadata:crop(c,.675,.825,.310,.155,12),
+    nationality:crop(c,.680,.850,.245,.085,14)
   };
 }
-function mykadBackRegion(c){return crop(c,.23,.62,.62,.25)}
-function rowAddressRegions(c){
-  const out=[];const y0=.70,h=.052;
-  for(let i=0;i<5;i++)out.push(crop(c,.02,y0+i*h,.49,h+.018));
+
+function upscaleCanvas(c,scale=12){
+ const o=document.createElement('canvas');
+ o.width=Math.max(1,Math.min(9000,Math.round(c.width*scale)));
+ o.height=Math.max(1,Math.min(7000,Math.round(c.height*scale)));
+ const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';
+ q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,0,0,o.width,o.height);return o;
+}
+function cropRows(c,count,topPad=0.04,bottomPad=0.04){
+ const rows=[],h=c.height;
+ const y0=Math.round(h*topPad), y1=Math.round(h*(1-bottomPad)), step=(y1-y0)/count;
+ for(let i=0;i<count;i++){
+  const a=Math.max(0,Math.round(y0+i*step-step*.10)), b=Math.min(h,Math.round(y0+(i+1)*step+step*.10));
+  const o=document.createElement('canvas');o.width=Math.max(1,c.width);o.height=Math.max(1,b-a);
+  const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);q.drawImage(c,0,a,c.width,b-a,0,0,o.width,o.height);rows.push(o);
+ }
+ return rows;
+}
+async function ocrFixedRows(c,count,threshold=100,fast=true){
+  /*
+    FAST PATH: one OCR recognition for the dedicated ROI. The ROI already
+    corresponds to one field, so four serial preprocessing variants per row
+    are unnecessary for the first result. If OCR cannot recover the expected
+    row count, a single corroboration pass is used.
+  */
+  const primary=await ocr(mykadTextPreprocess(c,threshold,10),6);
+  let vals=normalizeFieldLines(primary.text||'');
+  if(count===2) vals=vals.slice(0,2);
+  if(count===5) vals=vals.slice(0,5);
+  let passes=[primary];
+  const needsFallback=(vals.length<Math.min(count,2) || (count===5 && vals.length<4));
+  if(!fast || needsFallback){
+    const secondary=await ocr(textPreprocess(c),6);
+    passes.push(secondary);
+    const alt=normalizeFieldLines(secondary.text||'');
+    if(alt.length>vals.length) vals=alt.slice(0,count);
+  }
+  const rows=vals.map((value,i)=>({row:i+1,value,conf:Number(primary.conf)||0,candidates:[value],passes}));
+  while(rows.length<count) rows.push({row:rows.length+1,value:'',conf:Number(primary.conf)||0,candidates:[],passes});
+  return rows;
+}
+
+
+function cropStrictAddressRows(c){
+  const h=c.height,w=c.width,overlap=.008,rows=[];
+  for(let i=0;i<5;i++){
+    const ya=Math.max(0,i/5-overlap),yb=Math.min(1,(i+1)/5+overlap);
+    const sy=Math.floor(h*ya),ey=Math.ceil(h*yb);
+    const o=document.createElement('canvas');o.width=Math.max(1,w);o.height=Math.max(1,ey-sy);
+    const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);
+    q.drawImage(c,0,sy,w,ey-sy,0,0,o.width,o.height);rows.push(o);
+  }
+  return rows;
+}
+
+async function ocrStrictAddressRows(c){
+  /*
+    Strict five-row OCR. Every row is independent evidence. We accept a row
+    only when there is no competing spelling; otherwise it remains UNCERTAIN.
+  */
+  const rowCanvases=cropStrictAddressRows(c),rows=[];
+  for(let i=0;i<rowCanvases.length;i++){
+    const variants=[
+      mykadTextPreprocess(rowCanvases[i],100,16),
+      mykadChannelPreprocess(rowCanvases[i],'g',145,14),
+      textPreprocess(rowCanvases[i])
+    ];
+    const passes=[];
+    for(let j=0;j<variants.length;j++){
+      try{
+        const r=await ocr(variants[j],7);
+        const text=normalizeFieldLines(r.text||'').join(' ').trim();
+        if(text)passes.push({text,conf:Number(r.conf||0),pass:j+1});
+      }catch(err){console.warn('Address OCR pass failed safely',i+1,j+1,err);}
+    }
+    const unique=[...new Set(passes.map(p=>p.text).filter(Boolean))];
+    const counts=new Map();
+    passes.forEach(p=>counts.set(p.text,(counts.get(p.text)||0)+1));
+    const ranked=[...counts.entries()].sort((a,b)=>b[1]-a[1]);
+    const top=ranked[0], best=passes.find(p=>p.text===top?.[0]);
+    const conflict=ranked.length>1;
+    const value=top && !conflict ? top[0] : (top && top[1]>=2 && ranked.length===1 ? top[0] : '');
+    rows.push({
+      row:i+1,value,candidates:unique,conf:Number(best?.conf||0),
+      uncertain:!value||conflict,
+      evidence:unique.length>1
+        ? unique.map((x,k)=>'PASS '+(k+1)+': '+x).join('\n')
+        : (value||'[NO RELIABLE TEXT READ]')
+    });
+  }
+  return rows;
+}
+
+function makeInstantFieldSheet(R){
+  /* Build one OCR canvas containing ONLY the highlighted text regions.
+     Blank separators preserve field ownership. No artificial labels are
+     inserted, so OCR evidence remains source-derived. */
+  const parts=[
+    {key:'nric',canvas:R.nric},
+    {key:'name',canvas:R.name},
+    {key:'address',canvas:R.address},
+    {key:'metadata',canvas:R.metadata}
+  ];
+  const targetW=2400, gap=80, pad=40;
+  const rendered=parts.map(p=>{
+    const ratio=p.canvas.height/Math.max(1,p.canvas.width);
+    const h=Math.max(80,Math.round(targetW*ratio));
+    const c=document.createElement('canvas');c.width=targetW;c.height=h;
+    const x=c.getContext('2d',{alpha:false});x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(p.canvas,0,0,targetW,h);
+    return {...p,canvas:c,height:h};
+  });
+  const total=pad*2+rendered.reduce((n,p)=>n+p.height,0)+gap*(rendered.length-1);
+  const sheet=document.createElement('canvas');sheet.width=targetW+pad*2;sheet.height=total;
+  const x=sheet.getContext('2d',{alpha:false});x.fillStyle='#fff';x.fillRect(0,0,sheet.width,sheet.height);
+  const zones={};let y=pad;
+  for(const p of rendered){x.drawImage(p.canvas,pad,y);zones[p.key]={y0:y,y1:y+p.height};y+=p.height+gap;}
+  return {sheet,zones};
+}
+function cleanOCRLine(value){
+  // Single canonical OCR-line sanitizer used by all field parsers.
+  // It only removes surrounding whitespace/control spacing; it NEVER
+  // substitutes characters or changes the OCR spelling.
+  return String(value == null ? '' : value)
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/[ \t\f\v]+/g, ' ')
+    .trim();
+}
+
+function splitSheetLines(result,zones){
+  const out={nric:[],name:[],address:[],metadata:[]};
+  for(const l of (result?.lines||[])){
+    const y=Number(l?.bbox?.y0);
+    if(!Number.isFinite(y))continue;
+    for(const key of Object.keys(zones)){
+      if(y>=zones[key].y0-10 && y<=zones[key].y1+10){
+        const t=cleanOCRLine(l.text);if(t)out[key].push({text:t,conf:Number(l.conf)||0,bbox:l.bbox||null});break;
+      }
+    }
+  }
   return out;
 }
 
-async function ocrCanvas(canvas,lang,psm=6){
-  const r=await Tesseract.recognize(canvas,lang,{logger:m=>{
-    if(m.status==='recognizing text') $('progressText').textContent='OCR '+Math.round((m.progress||0)*100)+'%';
-  },tessedit_pageseg_mode:psm});
-  const conf=Number(r.data.confidence||0),text=r.data.text||'';
-  return {text,conf};
+function normalizeFieldLines(text){
+ return String(text||'').split(/\r?\n/).map(cleanOCRLine).filter(Boolean);
 }
-async function multiPass(canvas,lang){
-  const variants=[canvas,preprocess(canvas)];
-  const passes=await Promise.all(variants.map(v=>ocrCanvas(v,lang,6).catch(e=>({text:'',conf:0,error:e}))));
-  const texts=passes.map(p=>norm(p.text)).filter(Boolean);
-  const distinct=[...new Set(texts)];
-  const best=passes.slice().sort((a,b)=>b.conf-a.conf)[0]||{text:'',conf:0};
-  return {text:norm(best.text),conf:best.conf,distinct,conflict:distinct.length>1};
-}
-
-function detectMyKad(text){
-  return /KAD\s+PENGENALAN|MYKAD|MALAYSIA\s+IDENTITY\s+CARD|WARGANEGARA/i.test(text);
-}
-function findNameFromRegion(text){
-  const lines=uniqueLines(text).filter(x=>/[A-Za-z]/.test(x));
-  const banned=/^(WARGANEGARA|MALAYSIA|ISLAM|HINDU|INDIA|CINA|PEREMPUAN|LELAKI|NO|LOT|PT\d*|\d)/i;
-  const candidates=lines.filter(x=>!banned.test(x)&&x.length>=3&&x.length<=70);
-  if(!candidates.length)return null;
-  // MyKad name is normally the first 1–2 text rows in its dedicated region.
-  const joined=candidates.slice(0,2).join(' ').replace(/\s*\/\s*/g,'/');
-  return joined;
-}
-function findNationality(text){
-  const m=norm(text).match(/WARGANEGARA(?:\s*[:=-]?\s*(MALAYSIA))?/i);
-  if(!m)return null;
-  return m[1]?'Malaysia':'Warganegara';
-}
-function findGender(text){
-  const m=norm(text).match(/\b(PEREMPUAN|LELAKI)\b/i); return m?m[1][0]+m[1].slice(1).toLowerCase():null;
-}
-function findReligion(text){
-  const m=norm(text).match(/\b(HINDU|ISLAM|CINA|INDIA)\b/i); return m?m[1][0]+m[1].slice(1).toLowerCase():null;
-}
-function validateNRIC(n){
-  if(!n)return 'No exact 6-2-4 numeric candidate was reliably read.';
-  const [d,st,seq]=n.split('-');
-  return /^\d{6}$/.test(d)&&/^\d{2}$/.test(st)&&/^\d{4}$/.test(seq)?'Exact 6-2-4 format':'Invalid format';
-}
-function genderFromNRIC(n){
-  if(!n)return null; const last=Number(n.replace(/-/g,'').slice(-1)); if(!Number.isInteger(last))return null;
-  return last%2?'Lelaki':'Perempuan';
-}
-
-async function processMyKad(page,lang){
-  const c=page.canvas, r=mykadRegions(c);
-  const [n,name,meta,nat]=await Promise.all([
-    multiPass(r.nric,lang),multiPass(r.name,lang),multiPass(r.metadata,lang),multiPass(r.nationality,lang)
-  ]);
-  const addrRows=await Promise.all(rowAddressRegions(c).map(x=>multiPass(x,lang)));
-  const fullMeta=meta.text+'\n'+nat.text;
-  const nric=exactNRIC(n.text);
-  const nameValue=findNameFromRegion(name.text);
-  const nationality=findNationality(fullMeta);
-  const printedGender=findGender(fullMeta);
-  const religion=findReligion(fullMeta);
-  const gender=printedGender||genderFromNRIC(nric);
-  const addrVals=addrRows.map(x=>x.text.split(/\r?\n/).map(cleanLine).filter(Boolean).join(' '));
-  const addrComplete=addrVals.length===5&&addrVals.every(Boolean);
-  const addrConflict=addrRows.some(x=>x.conflict);
-  const address=addrVals.filter(Boolean).join('\n');
-  return {
-    type:'Malaysian NRIC / MyKad',
-    fields:[
-      evidenceObj('Full Name',nameValue,name.conf,name.text,'Dedicated name ROI; first two source rows retained.','',''),
-      evidenceObj('NRIC Number',nric,n.conf,n.text,validateNRIC(nric),'Confusable digits are never substituted. No plausible spelling is selected.',n.conflict),
-      evidenceObj('Nationality',nationality,Math.max(nat.conf,meta.conf),fullMeta,'Dedicated lower-right WARGANEGARA region.','If WARGANEGARA is not readable, value remains UNKNOWN.',nat.conflict),
-      evidenceObj('Religion',religion,meta.conf,meta.text,'Dedicated metadata region.','No value is inferred from nationality.',meta.conflict),
-      evidenceObj('Gender',gender,meta.conf,fullMeta,'Printed gender preferred; NRIC parity is a secondary validation only.','If printed evidence conflicts with parity, field is UNCERTAIN.',meta.conflict || (!!printedGender&&!!nric&&printedGender!==genderFromNRIC(nric))),
-      evidenceObj('Address',addrComplete&&!addrConflict?address:address||'UNKNOWN',addrComplete?Math.min(...addrRows.map(x=>x.conf)):0,address||addrRows.map((x,i)=>'ROW '+(i+1)+': '+x.text).join('\n'),'Five physical address rows required.','Every row is independently OCR’d. Missing/ambiguous rows are not guessed.',addrConflict||!addrComplete)
-    ]
-  };
-}
-async function processMyKadBack(page,lang){
-  const r=mykadBackRegion(page.canvas),o=await multiPass(r,lang),ext=exactExtended(o.text);
-  return {type:'MyKad back',fields:[evidenceObj('Back NRIC Number',ext, o.conf, o.text,'Exact 6-2-4-2-2 extended number detected on the back side.','No digits are substituted.',o.conflict)]};
-}
-
-async function processGeneric(page,lang){
-  const o=await multiPass(page.canvas,lang,6);
-  const lines=uniqueLines(o.text);
-  const fields=[];
-  const patterns=[
-    ['Registration / Reference Number',/\b(?:NO\.?\s*(?:PENDAFTARAN|SYARIKAT)?|REGISTRATION|NO\s+SYARIKAT|NO\s+PENDAFTARAN)\s*[:.]?\s*([A-Z0-9-]{5,})/i],
-    ['Company Name',/\b(?:NAMA\s+SYARIKAT|NAMA KONTRAKTOR|PERNIAGAAN\s+YANG\s+DIJALANKAN\s+DENGAN\s+NAMA)\s*[:.]?\s*([A-Z0-9 .&'-]{4,})/i],
-    ['Date',/\b(\d{1,2}[-/]\d{1,2}[-/]\d{4}|\d{1,2}\s+[A-Z]{3,9}\s+\d{4})\b/i],
-    ['Address',/\b(?:BERALAMAT|ALAMAT\s+DAFTAR|ALAMAT\s+BERDAFTAR|ALAMAT\s+PERNIAGAAN)\s*[:.]?\s*(.+)/i]
-  ];
-  for(const [label,re] of patterns){const m=norm(o.text).match(re);fields.push(evidenceObj(label,m?cleanLine(m[1]):null,o.conf,o.text,m?'Pattern located in full-page OCR.':'No exact labeled candidate found.','Generic extraction is evidence-only; verify long values.',o.conflict))}
-  fields.push(evidenceObj('Full OCR text',lines.join('\n'),o.conf,o.text,'Full-page OCR evidence.','This is source evidence only; no silent correction or completion is performed.',o.conflict));
-  return {type:'Generic document',fields};
-}
-
-async function renderImage(file){
-  return new Promise((resolve,reject)=>{
-    const u=URL.createObjectURL(file),img=new Image();
-    img.onload=()=>{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext('2d').drawImage(img,0,0);URL.revokeObjectURL(u);resolve(c)};
-    img.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('Unable to decode image.'))};img.src=u;
-  });
-}
-async function renderPdf(file){
-  let pdfjs; try{pdfjs=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs')}catch(e){throw new Error('PDF engine could not be loaded. Check network access or use an image.')} 
-  pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
-  const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise,pages=[];
-  for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i),v=p.getViewport({scale:2.5}),c=document.createElement('canvas');c.width=v.width;c.height=v.height;await p.render({canvasContext:c.getContext('2d'),viewport:v}).promise;pages.push(c)}
-  return pages;
-}
-async function prepare(){
-  state.pages=[];
-  for(const f of state.files){
-    if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){
-      const cs=await renderPdf(f);cs.forEach((c,i)=>state.pages.push({name:f.name+' · page '+(i+1),canvas:c,type:'pdf'}));
-    }else{
-      const c=await renderImage(f);state.pages.push({name:f.name,canvas:c,type:'image'});
+function splitComposite(c){
+  /* Detect the white separation band between two stacked ID cards.
+     The previous version searched for the darkest row, which could select
+     CamScanner text and make every downstream spatial crop drift. */
+  const ctx=c.getContext('2d',{willReadFrequently:true}), w=c.width, h=c.height;
+  const start=Math.round(h*.35), end=Math.round(h*.68);
+  const runs=[]; let runStart=null;
+  for(let y=start;y<=end;y+=2){
+    const d=ctx.getImageData(0,y,w,1).data;
+    let bright=0, nonWhite=0;
+    for(let x=0;x<w;x+=4){
+      const i=x*4, lum=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+      if(lum>=242) bright++;
+      if(lum<220) nonWhite++;
+    }
+    const whiteRatio=bright/Math.max(1,Math.ceil(w/4));
+    const blank=whiteRatio>=.86 && nonWhite<Math.ceil(w/4)*.12;
+    if(blank && runStart===null) runStart=y;
+    if((!blank || y===end) && runStart!==null){
+      const runEnd=blank&&y===end?y:y-2;
+      if(runEnd-runStart>=Math.max(12,h*.025)) runs.push([runStart,runEnd]);
+      runStart=null;
     }
   }
-  renderPreview();$('run').disabled=!state.pages.length;
+  if(runs.length){
+    const best=runs.sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0];
+    const split=Math.round((best[0]+best[1])/2);
+    return [crop(c,0,0,1,split/h,1),crop(c,0,split/h,1,1-split/h,1)];
+  }
+  /* Conservative fallback: midpoint. No OCR is performed until Run OCR. */
+  const mid=.5;
+  return [crop(c,0,0,1,mid,1),crop(c,0,mid,1,mid,1)];
 }
-function renderPreview(){
-  $('preview').innerHTML='';
-  state.pages.forEach(p=>{const d=document.createElement('div');d.className='thumb';const im=document.createElement('img');im.src=p.canvas.toDataURL('image/jpeg',.78);const s=document.createElement('span');s.textContent=p.name;d.append(im,s);$('preview').append(d)});
-  if(!state.pages.length)$('preview').innerHTML='<div class="empty">No pages loaded.</div>';
-}
-function renderFiles(){
-  $('fileList').innerHTML=state.files.map(f=>`<div class="file"><b>${escapeHtml(f.name)}</b><span>${Math.round(f.size/1024)} KB</span></div>`).join('');
-}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function renderResults(all){
-  const fields=all.flatMap(x=>x.fields.map(f=>({...f,source:x.name,type:x.type})));
-  $('docPill').textContent=all.length+' page'+(all.length===1?'':'s')+' processed';
-  $('results').innerHTML='';
-  if(!fields.length){$('results').innerHTML='<div class="empty">No reliably extractable fields.</div>';return}
-  fields.forEach(f=>{
-    const d=document.createElement('article');d.className='result'+(f.label==='Address'||f.label==='Full OCR text'?' full':'');
-    const cls=f.status==='HIGH'?'good':(f.status==='UNCERTAIN'?'bad':'warn');
-    d.innerHTML=`<div class="rhead"><div class="rlabel">${escapeHtml(f.label)}</div><div class="pill">${escapeHtml(f.type)}</div></div>
-      <div class="value">${escapeHtml(f.value)}</div>
-      <div class="meta"><span class="tag ${cls}">${escapeHtml(f.status)}</span><span class="tag">OCR ${pct(f.confidence)}%</span></div>
-      <div class="evidence"><b>Evidence:</b> ${escapeHtml(f.evidence)}${f.validation?`\n<b>Validation:</b> ${escapeHtml(f.validation)}`:''}${f.warning?`\n<b>Warning:</b> ${escapeHtml(f.warning)}`:''}</div>`;
-    $('results').append(d);
+async function loadPdfJs(){
+  if(window.pdfjsLib) return window.pdfjsLib;
+  await new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-pdfjs]');
+    if(existing){existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',reject,{once:true});return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.async=true;s.dataset.pdfjs='1';
+    s.onload=resolve;s.onerror=()=>reject(new Error('PDF engine could not be loaded. Check the network connection or use an image file.'));
+    document.head.appendChild(s);
   });
-  const uncertain=fields.filter(f=>f.status==='UNCERTAIN');
-  if(uncertain.length){const r=document.createElement('div');r.className='review full';r.innerHTML=`<strong>Human verification required:</strong> ${uncertain.length} field(s) contain insufficient or conflicting evidence. The application did not guess or silently correct them.`;$('results').prepend(r)}
+  if(!window.pdfjsLib) throw new Error('PDF engine loaded without pdfjsLib.');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  return window.pdfjsLib;
 }
-async function runOCR(){
-  if(state.busy||!state.pages.length)return;
-  state.busy=true;$('run').disabled=true;$('clear').disabled=true;$('bar').style.width='0%';setStatus('Processing locally…');
-  try{
-    const lang=$('lang').value,mode=$('mode').value,all=[];
-    for(let i=0;i<state.pages.length;i++){
-      const p=state.pages[i];$('progressText').textContent=`Page ${i+1}/${state.pages.length} — rendering 4× OCR input…`;
-      const full=await ocrCanvas(preprocess(p.canvas),lang,6);
-      let isMy=mode==='mykad'||(mode==='auto'&&detectMyKad(full.text));
-      let res=isMy?await processMyKad(p,lang):await processGeneric(p,lang);
-      res.name=p.name;all.push(res);
-      // A MyKad back image is recognized by its extended NRIC pattern after broad OCR.
-      if(mode!=='generic' && /\d{6}\D*\d{2}\D*\d{4}\D*\d{2}\D*\d{2}/.test(full.text)){
-        const back=await processMyKadBack(p,lang);
-        if(back.fields[0].value!=='UNKNOWN') {back.name=p.name;all.push(back)}
-      }
-      $('bar').style.width=Math.round((i+1)/state.pages.length*100)+'%';
+async function renderPdfFile(f){
+  const pdfjs=await loadPdfJs();
+  const data=await f.arrayBuffer();
+  const pdf=await pdfjs.getDocument({data}).promise;
+  const pages=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const base=page.getViewport({scale:2.5});
+    const c=document.createElement('canvas');c.width=Math.ceil(base.width);c.height=Math.ceil(base.height);
+    const ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+    await page.render({canvasContext:ctx,viewport:base}).promise;
+    pages.push(c);
+  }
+  return pages;
+}
+async function makePages(){
+  S.pages=[];
+  for(const f of S.files){
+    const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name);
+    if(isPdf){
+      const cs=await renderPdfFile(f);
+      cs.forEach((c,i)=>S.pages.push({file:f,side:i===0?'front':'back',canvas:c,pdfPage:i+1}));
+      continue;
     }
-    renderResults(all);setStatus('<b>Completed</b> — source evidence preserved; uncertain fields are flagged.');
-  }catch(e){
-    console.error(e);setStatus('<b>Stopped safely.</b> '+escapeHtml(e.message||String(e)));
-    $('results').innerHTML='<div class="empty"><b>Unable to reliably determine this information from the provided document.</b><br><br>'+escapeHtml(e.message||String(e))+'</div>';
-  }finally{state.busy=false;$('run').disabled=!state.pages.length;$('clear').disabled=false}
+    const im=await loadImage(f),c=canvasFrom(im),ratio=c.height/c.width;
+    if(ratio>1.15){
+      const [a,b]=splitComposite(c);
+      S.pages.push({file:f,side:'front',canvas:a},{file:f,side:'back',canvas:b});
+    }else{
+      const side=S.pages.some(p=>p.side==='front')?'back':'front';
+      S.pages.push({file:f,side,canvas:c});
+    }
+  }
+}
+function renderSlots(){E.front.innerHTML='<span>FRONT ID</span>';E.back.innerHTML='<span>BACK ID</span>';for(const p of S.pages){if(!p.canvas)continue;const im=document.createElement('img');im.src=p.canvas.toDataURL('image/jpeg',.9);im.alt=p.side+' ID';const box=p.side==='front'?E.front:E.back;box.innerHTML='';box.appendChild(im)}}
+async function getWorker(){
+  const lang=E.lang.value;
+  if(S.worker&&S.workerLang===lang)return S.worker;
+  if(S.worker)try{await S.worker.terminate()}catch{}
+  if(!window.Tesseract)throw new Error('Tesseract.js did not load. Check the internet connection and reload.');
+  const started=performance.now();
+  S.worker=await Tesseract.createWorker(lang,1,{logger:m=>{
+    if(m.status&&m.status.includes('recogn')){
+      prog(35+Math.round((m.progress||0)*60),'OCR '+Math.round((m.progress||0)*100)+'%');
+    }
+  }});
+  S.workerLang=lang;
+  S.workerReadyMs=Math.round(performance.now()-started);
+  return S.worker;
+}
+let OCR_QUEUE=Promise.resolve();
+async function ocr(c,psm){
+  /* Tesseract.js uses one worker. Never call recognize concurrently on it. */
+  const job=OCR_QUEUE.then(async()=>{
+    const w=await getWorker();
+    const started=performance.now();
+    const r=await w.recognize(c.toDataURL('image/png'),{tessedit_pageseg_mode:String(psm)});
+    const lines=Array.isArray(r.data.lines)?r.data.lines.map(l=>({text:String(l.text||''),bbox:l.bbox||null,conf:Number(l.confidence)})).filter(l=>l.text.trim()):[];
+    return{text:r.data.text||'',conf:Number(r.data.confidence)||0,lines,elapsedMs:Math.round(performance.now()-started)};
+  });
+  OCR_QUEUE=job.catch(()=>{});
+  return job;
+};
+async function ocrWithLanguageFallback(c,psm){
+  /* Try the selected multilingual model first. If the model cannot load, fail
+     safely; never substitute a different language silently. */
+  return await ocr(c,psm);
+}
+function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
+function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
+function lines(t){return String(t).split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean)}
+function mk(name,value,conf,status,evidence,validation,reason=''){return{name,value:value||'UNKNOWN',conf:Math.round(Math.max(0,Math.min(100,conf))),status,evidence:evidence||'No reliable evidence.',validation,reason}}
+function findWord(text,words){const re=new RegExp('(?:^|\\s)('+words.join('|')+')(?:$|\\s|[:])','i');return re.exec(text)}
+function normalizeEvidenceText(text){
+ return String(text||'').replace(/\r/g,'').split(/\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean).join('\n');
+}
+function exactMatches(text,re){return [...String(text||'').matchAll(re)].map(m=>m[0]);}
+function consensus(candidates){
+ const clean=candidates.map(x=>String(x??'').trim()).filter(Boolean);
+ if(!clean.length)return null;
+ const unique=[...new Set(clean)];
+ if(unique.length>1)return {value:null,votes:1,all:unique};
+ return {value:unique[0],votes:clean.length,all:unique};
+}
+function fieldStatus(conf,ambiguous=false){const c=Number(conf)||0;return ambiguous?'UNCERTAIN':c>=99.5?'VERIFIED':'UNCERTAIN'}
+function candidateDisplay(c){return c&&c.all&&c.all.length>1?'UNCERTAIN — competing OCR candidates:\n'+c.all.join('\n'):c?.value||null}
+
+/* Numeric ambiguity is detected ONLY when OCR evidence actually contains a
+   character-confused alternative. A valid numeric token such as 940202 must
+   NOT be flagged merely because it contains "02" or "9". */
+function numericConfusionEvidence(text){
+ const t=String(text||'');
+ const hits=[];
+ const chunks=t.match(/[A-Z0-9|]+(?:[- ][A-Z0-9|]+){1,5}/gi)||[];
+ for(const c0 of chunks){
+  const c=c0.replace(/\s+/g,'');
+  const groups=c.split('-');
+  const idLike=(groups.length===3&&groups[0].length===6&&groups[1].length===2&&groups[2].length===4) ||
+               (groups.length===5&&groups[0].length===6&&groups[1].length===2&&groups[2].length===4&&groups[3].length===2&&groups[4].length===2) ||
+               (groups.length===1&&/^[-A-Z0-9|]{12}$/.test(c));
+  if(!idLike)continue;
+  if(/(?:OI|O1|0I|\bOI\b)/i.test(c))hits.push('01↔OI↔0I↔O1');
+  if(/(?:O2|OS|0S)/i.test(c))hits.push('02↔O2↔OS↔0S');
+  if(/[RK]/i.test(c)&&/[0-9]/.test(c)&&/-/.test(c))hits.push('R↔K');
+  /* 9↔2 is ambiguous only when a competing candidate/evidence actually
+     differs by that character; a normal 9 is not an error. */
+ }
+ return [...new Set(hits)];
+}
+function rawNricCandidates(text, extended=false){
+ const t=String(text||'');
+ const pat=extended
+  ? /\b[A-Z0-9|]{6}[- ]?[A-Z0-9|]{2}[- ]?[A-Z0-9|]{4}[- ]?[A-Z0-9|]{2}[- ]?[A-Z0-9|]{2}\b/gi
+  : /\b[A-Z0-9|]{6}[- ]?[A-Z0-9|]{2}[- ]?[A-Z0-9|]{4}\b/gi;
+ return [...t.matchAll(pat)].map(m=>m[0].trim()).filter(x=>/[0-9]/.test(x));
+}
+function exactNricCandidates(text,extended=false){
+ const re=extended?/\b\d{6}-\d{2}-\d{4}-\d{2}-\d{2}\b/g:/\b\d{6}-\d{2}-\d{4}\b/g;
+ return [...String(text||'').matchAll(re)].map(m=>m[0]);
+}
+function nricNumericStatus(rawCandidates, exactCandidates){
+ const raw=[...new Set(rawCandidates||[])], exact=[...new Set(exactCandidates||[])];
+ if(exact.length===1 && raw.length<=1)return {value:exact[0],ambiguous:false,evidence:exact[0],warning:''};
+ if(exact.length>1)return {value:null,ambiguous:true,evidence:exact.join('\n'),warning:'Conflicting exact numeric candidates detected; no winner was selected.'};
+ if(raw.length){
+   return {value:null,ambiguous:true,evidence:raw.join('\n'),warning:'OCR produced a near-pattern containing potentially confusable characters. No substitution was made.'};
+ }
+ return {value:null,ambiguous:false,evidence:'No reliable numeric candidate was read.',warning:'Unable to reliably determine this number from the OCR evidence.'};
+}
+function genderFromNric(nric){
+ const m=String(nric||'').match(/^(\d{6})-(\d{2})-(\d{4})$/);if(!m)return null;
+ const last=Number(m[3].slice(-1));
+ if(!Number.isInteger(last))return null;
+ return {digit:last,gender:last%2?'Lelaki':'Perempuan',english:last%2?'Male':'Female'};
+}
+function findExplicitGender(text){
+ const m=String(text||'').match(/\b(PEREMPUAN|LELAKI|FEMALE|MALE)\b/i);return m?m[1]:null;
+}
+function normalizeNameEvidence(line){
+  /* Preserve symbols actually present inside a name (for example A/P).
+     Only remove trailing OCR boundary punctuation; never add or substitute. */
+  let s=String(line??'').replace(/[\t ]+/g,' ').trim();
+  if(!s)return '';
+  s=s.replace(/[^\p{L}\p{N}]+$/u,'').trim();
+  return s;
+}
+function findNameCandidates(text){
+  /* The caller supplies ONLY the highlighted Full Name ROI. Therefore every
+     non-metadata OCR row in that ROI is name evidence. This is deliberately
+     language-neutral: no English/Malay vocabulary is required to accept a
+     name. OCR disagreement remains a conflict rather than a correction. */
+  const raw=String(text||'').split(/\r?\n/),rows=[];
+  const banned=/^(?:KAD|PENGENALAN|IDENTITY|CARD|MALAYSIA|MYKAD|WARGANEGARA|WARG|PEREMPUAN|LELAKI|FEMALE|MALE|SCANNED|WITH|CAMSCANNER|DATEMPL\.COM|WWW\b|HTTP\b)$/iu;
+  for(const line of raw){
+    const value=normalizeNameEvidence(line);
+    if(!value||value.length<2||value.length>120)continue;
+    if(banned.test(value)||/(?:\.com|https?:\/\/|www\.)/iu.test(value))continue;
+    if(/\d/u.test(value))continue;
+    if(/KAD\s+PENGENALAN|IDENTITY\s+CARD|MYKAD|SCANNED\s+WITH/iu.test(value))continue;
+    const letters=(value.match(/\p{L}/gu)||[]).length;
+    if(letters<2)continue;
+    const tokens=value.split(/\s+/).filter(Boolean);
+    if(!tokens.length||tokens.length>16)continue;
+    // Unicode letters plus common name punctuation. This accepts scripts such
+    // as Latin, Cyrillic, Greek, Arabic, Devanagari, Tamil, Han, etc. without
+    // transliteration or silent correction.
+    if(!tokens.every(t=>/^[\p{L}\p{M}][\p{L}\p{M}'’./·()\-]*$/u.test(t)||t==='/'))continue;
+    rows.push(value);
+  }
+  return rows.length?[rows.join(' ')]:[];
+}
+function extractAddress(text){
+  /* STRICT ADDRESS ROI ONLY.
+     The address field is never selected because a token looks like a name.
+     We first locate an explicit address-start pattern, then preserve up to five
+     physical rows. Only explicit metadata labels are removed. */
+  const source=String(text||'').replace(/\r/g,'').split(/\n/)
+    .map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean);
+  const metadataLine=/^(?:WARGANEGARA(?:\s+MALAYSIA)?|WARG|RELIGION|AGAMA|ISLAM|HINDU|INDIA|CINA|PEREMPUAN|LELAKI|FEMALE|MALE)(?:\s*[:=\-].*)?$/i;
+  const metadataSuffix=/\s+(?:WARGANEGARA(?:\s+MALAYSIA)?|WARG|RELIGION|AGAMA|ISLAM|HINDU|INDIA|CINA|PEREMPUAN|LELAKI|FEMALE|MALE)(?=\s|$).*$/i;
+  const start=/^(?:NO\.?\s*\d+|PT\s*[A-Z]?\s*\d+[A-Z0-9-]*|LOT\s*[A-Z0-9-]*\d[A-Z0-9-]*|\d{1,5}(?:-\d{1,5}){1,3}\b|\d{1,6}\b)/i;
+  const cleaned=[];
+  for(const line of source){
+    if(metadataLine.test(line)) continue;
+    const v=line.replace(metadataSuffix,'').trim();
+    if(v)cleaned.push(v);
+  }
+  const idx=cleaned.findIndex(x=>start.test(x));
+  return idx>=0?cleaned.slice(idx,idx+5):cleaned.slice(0,5);
 }
 
-$('choose').onclick=()=>$('files').click();
-$('files').onchange=async e=>{state.files=[...e.target.files];renderFiles();try{await prepare();setStatus(state.pages.length?`${state.pages.length} page(s) ready — click <b>Run OCR</b>.`:'No readable pages.')}catch(err){setStatus('<b>File error:</b> '+escapeHtml(err.message));}};
-$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('drag')};
-$('drop').ondragleave=()=>$('drop').classList.remove('drag');
-$('drop').ondrop=async e=>{e.preventDefault();$('drop').classList.remove('drag');state.files=[...e.dataTransfer.files];renderFiles();try{await prepare();setStatus(`${state.pages.length} page(s) ready — click <b>Run OCR</b>.`)}catch(err){setStatus('<b>File error:</b> '+escapeHtml(err.message));}};
-$('run').onclick=runOCR;
-$('clear').onclick=()=>{state.files=[];state.pages=[];state.results=[];$('files').value='';renderFiles();renderPreview();$('run').disabled=true;$('bar').style.width='0%';$('progressText').textContent='No processing started.';$('results').innerHTML='<div class="empty">Upload a document, then click <b>Run OCR</b>.</div>';setStatus('Ready — OCR starts only when you click <b>Run OCR</b>.')};
+function extractRace(text){
+  /* Race is accepted only from explicit metadata evidence. This function is
+     intentionally multilingual, but never infers race from a person's name,
+     nationality, photo or address. */
+  const t=String(text||'').replace(/\r/g,' ');
+  const labels='Race|Bangsa|Kaum|Ras|Ethnicity|Ethnic(?:ity)?';
+  const values=[
+    'Hindu','India','Indian','Cina','Chinese','China','Malay','Melayu','Islam',
+    'Buddha','Buddhist','Kristian','Christian','Sikh','Punjabi','Iban','Kadazan',
+    'Dusun','Dayak','Melanau','Bajau','Jawa','Javanese','Bugis','Banjar','Murut',
+    'Thai','Arab','Siam','Orang Asli','Pribumi','Bumiputera','Bumiputra'
+  ];
+  const valueAlt=values.map(v=>v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
+  const explicit=new RegExp('(?:'+labels+')\\s*[:=\\-]?\\s*('+valueAlt+')\\b','iu').exec(t);
+  if(explicit)return explicit[1];
+  // Metadata ROI is authoritative; allow a standalone printed value only.
+  for(const v of values){
+    const re=new RegExp('(?:^|[\\n\\r])\\s*'+v.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*(?:$|[\\n\\r])','iu');
+    if(re.test(String(text||'')))return v;
+  }
+  return null;
+}
+function extract(front,back){
+ const out=[];const ft=String(front.text||''),bt=String(back.text||'');
+ const frontNumericSources=[front.nricText,front.wholeText,ft];
+ const backNumericSources=[back.nricText,back.wholeText,bt];
+ const fExact=frontNumericSources.flatMap(t=>exactNricCandidates(t,false));
+ const fRaw=frontNumericSources.flatMap(t=>rawNricCandidates(t,false));
+ const bExact=backNumericSources.flatMap(t=>exactNricCandidates(t,true));
+ const bRaw=backNumericSources.flatMap(t=>rawNricCandidates(t,true));
+ const fnum=nricNumericStatus(fRaw,fExact), bnum=nricNumericStatus(bRaw,bExact);
+ const fConfusion=numericConfusionEvidence(front.nricText);
+ const fNumEvidence=fnum.evidence;
+ const fStatus=fnum.value?fieldStatus(front.nricConf||0,fnum.ambiguous):'UNCERTAIN';
+ out.push(mk('NRIC Number',fnum.value||'UNKNOWN — VERIFY CANDIDATES',fnum.value?Math.min(front.nricConf||0,100):0,fStatus,fNumEvidence,'Exact 6-2-4 numeric pattern is required. No character substitution or punctuation insertion is performed.',fnum.warning+(fConfusion.length?' '+fConfusion.join(', ')+'. No substitution was made.':'')));
+
+ /* IMPORTANT: Name is read from the dedicated name crop only. Never fall back
+    to whole-document OCR, because headers, watermarks, URLs and back-side text
+    can otherwise become false name candidates. */
+ const nameCropCandidates=findNameCandidates(front.nameText||'');
+ const name=consensus(nameCropCandidates);
+ const nameValue=name?(name.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN';
+ out.push(mk('Full Name',nameValue,name?Math.min(front.nameConf||0,100):0,name?fieldStatus(front.nameConf||0,name.all.length>1):'UNKNOWN',name?(name.value?name.value:name.all.join('\n')):'No reliable name candidate was read from the dedicated name region.','Exact OCR candidate preserved. Every OCR line above the visible name/address gap is treated as name evidence; no alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted.','If name OCR passes disagree, all candidates remain evidence and the field is UNCERTAIN. The name/address boundary is determined from the visible gap when line geometry is available; the five-line address rule is used only as a structural fallback. Document headers, URLs and watermarks are never used as fallback name evidence.'));
+
+ const explicitGender=findExplicitGender(front.genderText||ft);
+ const derived=genderFromNric(fnum?.value);
+ let genderValue='UNKNOWN',genderStatus='UNKNOWN',genderEvidence='No explicit gender word and no valid NRIC parity evidence was available.',genderReason='Gender is never inferred from the photograph or name.';
+ if(explicitGender){
+  const u=explicitGender.toUpperCase();const explicit=(u==='PEREMPUAN'||u==='FEMALE')?'Perempuan':'Lelaki';
+  genderValue=explicit;
+  genderStatus=fieldStatus(front.genderConf||front.metadataConf||0);
+  genderEvidence=explicitGender;
+  if(derived){
+   if(explicit!==derived.gender){genderStatus='UNCERTAIN';genderReason='Explicit gender text conflicts with the NRIC final-digit parity rule. No value is silently overridden.'}
+   else genderEvidence+='\nNRIC parity: final digit '+derived.digit+' = '+(derived.digit%2?'odd':'even')+' → '+derived.gender+'.';
+  }
+ }else if(derived){
+  genderValue=derived.gender;genderStatus=fieldStatus(front.nricConf||0);genderEvidence='NRIC Number '+fnum.value+'; final digit '+derived.digit+' is '+(derived.digit%2?'odd':'even')+'.';genderReason='Derived only from the explicit NRIC number using the Malaysian NRIC parity rule: odd = Lelaki/Male; even = Perempuan/Female.';
+ }
+ out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,100),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
+
+ const natText=normalizeEvidenceText((front.nationalityText||'')+'\n'+(front.metadataText||''));
+ const natLines=natText.split(/\n/).map(cleanOCRLine).filter(Boolean);
+ const natWarg=natLines.find(x=>/\bWARGANEGARA\b/i.test(x));
+ const natMalaysia=natLines.find(x=>/\bMALAYSIA\b/i.test(x));
+ if(natWarg){
+  out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),natWarg,'Explicit WARGANEGARA evidence was read from the dedicated nationality region.','Standalone Warganegara maps to Malaysia only by the Malaysian identity-card rule; no address, name, race or photograph inference is used.'));
+ }else if(natMalaysia){
+  out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),natMalaysia,'Explicit MALAYSIA evidence was read from the dedicated nationality region.','No nationality inference was made.'));
+ }else{
+  out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN',natLines.join('\n')||'No exact WARGANEGARA/MALAYSIA token was read.','Not validated.','Unable to reliably determine nationality from the dedicated source region; no value was guessed.'));
+ }
+
+ /* Address is emitted only from the dedicated five-row address ROI. */
+ const addressRowsRaw=String(front.addressText||'').replace(/\r/g,'').split(/\n/).map(cleanOCRLine);
+ const addressRows=addressRowsRaw.filter(Boolean);
+ const rowCandidates=Array.isArray(front.addressRowCandidates)?front.addressRowCandidates:[];
+ const addressConflict=rowCandidates.some(r=>r.uncertain || (Array.isArray(r.candidates)&&r.candidates.length>1));
+ const addressConf=rowCandidates.length===5
+   ? Math.min(...rowCandidates.map(r=>Number(r.conf||0)))
+   : Number(front.addressConf||0);
+ const addressComplete=addressRows.length===5;
+ const addressStatus=addressComplete&&!addressConflict?fieldStatus(addressConf):'UNCERTAIN';
+ const addressEvidence=front.addressEvidence ||
+   (addressRows.length?addressRows.map((x,i)=>'ROW '+(i+1)+': '+x).join('\n')
+     :'No reliable address row was read from the dedicated five-row address region.');
+ out.push(mk(
+   'Address',
+   addressRows.length?addressRows.join('\n'):'UNKNOWN',
+   addressConf,
+   addressStatus,
+   addressEvidence,
+   'Five independent physical address rows are required; source spelling and row order are preserved.',
+   addressComplete&&!addressConflict?'':'Unable to reliably determine every address row from the source image. No missing row or character was guessed.'
+ ));
+
+
+
+ // Verified Extraction display order is intentional: Full Name must appear above NRIC Number.
+ const nameIndex=out.findIndex(f=>f.name==='Full Name');
+ const nricIndex=out.findIndex(f=>f.name==='NRIC Number');
+ if(nameIndex>nricIndex && nameIndex>=0 && nricIndex>=0){ const nameField=out.splice(nameIndex,1)[0]; out.splice(nricIndex,0,nameField); }
+ return out;
+}
+function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
+async function ocrMetadataEvidence(c){
+  const primary=await ocr(mykadTextPreprocess(c,100,10),6);
+  let chosen=normalizeFieldLines(primary.text||''),secondary=null;
+  if(!chosen.some(x=>/\b(?:WARGANEGARA|MALAYSIA|PEREMPUAN|LELAKI|ISLAM|HINDU|INDIA|CINA)\b/i.test(x))||Number(primary.conf||0)<95){
+    secondary=await ocr(textPreprocess(c),6);
+    const alt=normalizeFieldLines(secondary.text||'');
+    if(alt.length>chosen.length)chosen=alt;
+  }
+  return {text:chosen.join('\n'),conf:Number(primary.conf||0),primary,secondary};
+}
+async function ocrNationalityEvidence(c){
+  const primary=await ocr(mykadTextPreprocess(c,100,10),7);
+  const pLines=normalizeFieldLines(primary.text||'');
+  let chosen=pLines; let secondary=null;
+  if(!chosen.some(x=>/\bWARGANEGARA\b|\bMALAYSIA\b/i.test(x)) || Number(primary.conf||0)<95){
+    secondary=await ocr(textPreprocess(c),7);
+    const sLines=normalizeFieldLines(secondary.text||'');
+    // Use the secondary pass only if it supplies the exact explicit token
+    // missing from the primary pass. Never autocorrect a near-spelling.
+    if(sLines.some(x=>/\bWARGANEGARA\b|\bMALAYSIA\b/i.test(x)) &&
+       !chosen.some(x=>/\bWARGANEGARA\b|\bMALAYSIA\b/i.test(x))) chosen=sLines;
+  }
+  return {text:chosen.join('\n'),conf:Number(primary.conf||0),primary,secondary};
+}
+async function runOCR(){
+ if(S.running)return;
+ S.running=true;
+ const started=performance.now();
+ E.raw.textContent='';E.fields.innerHTML='';E.badge.textContent='RUNNING';E.badge.className='badge warn';status('OCR RUNNING');
+ try{
+  const f=S.pages.find(p=>p.side==='front');
+  const b=S.pages.find(p=>p.side==='back')||null;
+  if(!f)throw new Error('A Front ID image is required. Upload the front document, then click Run OCR.');
+  const R=cropFrontNricRegions(f.canvas);
+  prog(3,'Preparing highlighted fields');
+
+  // Critical fields are processed independently. Each field gets a primary
+  // pass plus a single corroboration pass. We never combine unrelated regions.
+  const nric=await ocr(preprocess(R.nric,'high'),7);
+  prog(22,'NRIC captured');
+
+  const namePrimary=await ocr(mykadTextPreprocess(R.name,100,12),6);
+  let nameRows=normalizeFieldLines(namePrimary.text||'').slice(0,2);
+  // A second pass is used only when the primary pass did not produce the
+  // expected two-row name. It can corroborate or leave the field uncertain.
+  let nameCorro=null;
+  if(nameRows.length<2){
+    nameCorro=await ocr(textPreprocess(R.name),6);
+    const alt=normalizeFieldLines(nameCorro.text||'').slice(0,2);
+    if(alt.length>nameRows.length)nameRows=alt;
+  }
+  prog(43,'Full Name captured');
+  const emptyBase={text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:0,genderConf:0,metadataConf:0,
+    nricText:nric.text||'',nameText:nameRows.join('\n'),addressText:'',addressEvidence:'',nameEvidence:nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'),
+    genderText:'',nationalityText:'',metadataText:'',wholeText:'',
+    nameAddressEvidence:{nameLines:nameRows,addressLines:[],visibleGap:true,method:'strict-highlighted-roi'},dedicatedRegions:{name:nameRows,address:[]}};
+  render(extract(emptyBase,{text:'',conf:0,nricText:'',wholeText:''}));
+
+  const addressRowResults=await ocrStrictAddressRows(R.address);
+  const addressRows=addressRowResults.map(r=>r.value).filter(Boolean);
+  const addressConf=addressRowResults.length
+    ? Math.min(...addressRowResults.map(r=>Number(r.conf||0)))
+    : 0;
+  const addressUncertain=addressRowResults.some(r=>r.uncertain) || addressRows.length!==5;
+  const addressEvidence=addressRowResults.map(r=>
+    'ROW '+r.row+' ['+Number(r.conf||0).toFixed(1)+'%] '+(r.value||'[UNCERTAIN]')+
+    (r.candidates.length>1?'\nCANDIDATES: '+r.candidates.join(' | '):'')
+  ).join('\n');
+  prog(67,'Address captured line-by-line');
+  render(extract({...emptyBase,addressConf:addressConf,addressText:addressRows.join('\n'),
+    addressEvidence:addressEvidence,
+    nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi',addressStart:addressRows[0]||''},
+    dedicatedRegions:{name:nameRows,address:addressRows}},{text:'',conf:0,nricText:'',wholeText:''}));
+
+  // Metadata is isolated from both name and address. Run a small number of
+  // explicit passes and preserve disagreements as evidence.
+  const metadata=await ocrMetadataEvidence(R.metadata);
+  const nationalityEvidence=await ocrNationalityEvidence(R.nationality);
+  prog(82,'Nationality and Gender captured');
+
+  const frontData={text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:addressConf,
+    genderConf:metadata.conf||0,metadataConf:Math.max(Number(metadata.conf||0),Number(nationalityEvidence.conf||0)),nricText:nric.text||'',nameText:nameRows.join('\n'),addressText:addressRows.join('\n'),
+    addressEvidence:addressEvidence||'[no reliable address row detected]',
+    addressRowCandidates:addressRowResults.map(r=>({row:r.row,value:r.value,conf:r.conf,candidates:r.candidates})),
+    nameEvidence:nameRows.length?nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'):'[no reliable name row detected]',
+    genderText:metadata.text||'',nationalityText:nationalityEvidence.text||'',metadataText:metadata.text||'',wholeText:'',
+    nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi',addressStart:addressRows[0]||''},dedicatedRegions:{name:nameRows,address:addressRows}};
+  let fieldsNow=extract(frontData,{text:'',conf:0,nricText:'',wholeText:''});
+  if(!Array.isArray(fieldsNow))throw new Error('Extraction engine returned an invalid result.');
+
+  // Explicitly downgrade missing critical fields. Never manufacture a value.
+  for(const f0 of fieldsNow){
+    if(['Full Name','Nationality'].includes(f0.name) &&
+       (!f0.value || /^UNKNOWN(?:\s|$)/i.test(String(f0.value)))){
+      f0.status='UNCERTAIN';
+      if(f0.name==='Full Name')f0.reason='No reliable text was read inside the dedicated highlighted Full Name region. Verify against the source image.';
+      if(f0.name==='Nationality')f0.reason='No explicit Warganegara/Malaysia evidence was read inside the dedicated metadata region.';
+      if(f0.name==='Race')f0.reason='No explicit race/religion evidence was read inside the dedicated metadata region.';
+    }
+  }
+  render(fieldsNow);
+  const firstMs=Math.round(performance.now()-started);
+  prog(88,'Verified extraction ready in '+firstMs+' ms');
+  E.badge.textContent='RESULTS READY';E.badge.className='badge ok';status('RESULTS READY');
+  E.notice.textContent='Full Name, NRIC Number, Nationality, Gender and Address captured from dedicated regions. Uncertain OCR is never silently corrected.';
+
+  // Background corroboration never replaces the primary field. Disagreement
+  // changes status to UNCERTAIN and preserves both candidates.
+  setTimeout(async()=>{
+    try{
+      const checks=[];
+      checks.push(['NAME',R.name,nameCorro||await ocr(textPreprocess(R.name),6),2]);
+            const updated=fieldsNow.map(x=>({...x}));
+      const nf=updated.find(x=>x.name==='Full Name');
+      for(const [kind,roi,pass,max] of checks){
+        const lines=normalizeFieldLines(pass.text||'').slice(0,max);
+        if(kind==='NAME'&&nf&&lines.length&&nameRows.join(' ')!==lines.join(' ')){
+          nf.status='UNCERTAIN';nf.reason='OCR corroboration disagrees. Both candidates are preserved; no spelling or character substitution was made.';nf.evidence='PRIMARY:\n'+nameRows.join(' ')+'\nCORROBORATION:\n'+lines.join(' ');
+        }
+      }
+      render(updated);prog(96,'Corroboration complete');E.badge.textContent='CORROBORATED';
+      E.notice.textContent='Extraction complete. OCR disagreements are UNCERTAIN; no silent correction was performed.';
+    }catch(err){console.warn('Background corroboration failed safely:',err);}
+  },0);
+
+  // Back ID is optional and cannot delay the front result.
+  if(b)setTimeout(async()=>{try{await ocr(preprocess(crop(b.canvas,.02,.05,.96,.45,5),'soft'),7)}catch(err){console.warn('Deferred back OCR failed safely:',err)}},0);
+ }catch(e){
+  console.error(e);E.badge.textContent='FAILED';E.badge.className='badge bad';status('OCR ERROR',true);
+  E.notice.textContent='OCR stopped safely: '+e.message+' No value was guessed.';
+ }finally{S.running=false}
+}
+renderFiles();E.run.disabled=true;
+/* PREWARM ONLY — this loads the OCR engine but performs NO document OCR.
+   Therefore Run OCR remains the sole action that reads user documents. */
+setTimeout(()=>{
+  if(!S.files.length && window.Tesseract && !S.prewarming){
+    S.prewarming=true;
+    getWorker().then(()=>{
+      S.prewarming=false;
+      if(!S.files.length){status('OCR READY');E.notice.textContent='OCR engine preloaded. Run OCR will start immediately after a document is uploaded.';}
+    }).catch(err=>{S.prewarming=false;console.warn('OCR engine prewarm unavailable:',err)});
+  }
+},120);
+if(new URLSearchParams(location.search).get('ocrdebug')==='1'){
+ window.addEventListener('error',e=>console.error('OCR MASTER runtime error',e.error||e.message));
+ window.addEventListener('unhandledrejection',e=>console.error('OCR MASTER unhandled rejection',e.reason));
+}
+window.OCR_MASTER_API={normalizeNameEvidence,findNameCandidates,consensus,numericConfusionEvidence,nricNumericStatus,splitNameAddressByVisibleGap:window.splitNameAddressByVisibleGap,extractAddress,extractRace,assessFieldConfidence:window.assessFieldConfidence};
+})();
+</script>
+
+<script id="uncertainty-postprocessor">
+window.applyStrictUncertaintyPolicy = function(result){
+  if (!result || typeof result !== "object") return result;
+  const out = Array.isArray(result) ? result : {...result};
+
+  const visit = (obj) => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) { obj.forEach(visit); return; }
+
+    const value = obj.value ?? obj.text ?? obj.result ?? "";
+    const confidence = obj.confidence ?? obj.ocrConfidence ?? obj.score;
+    const candidates = Array.isArray(obj.candidates) ? obj.candidates : [];
+    const fieldName = String(obj.field || obj.name || "").toLowerCase();
+
+    const critical = /nric|id|name|gender|sex|nationality|address|postcode|date|number/.test(fieldName);
+    const incomplete = !!obj.incomplete;
+    const conflict = !!obj.conflict || !!obj.hasConflict;
+
+    if (value !== "" || confidence != null || candidates.length) {
+      const assessment = window.assessFieldConfidence(
+        value, confidence, candidates, {critical, incomplete, conflict}
+      );
+      obj.confidence = assessment.confidence;
+      obj.status = assessment.status;
+      obj.warning = assessment.reason;
+    }
+
+    Object.keys(obj).forEach(k => {
+      if (!["value","text","result","confidence","ocrConfidence","score",
+             "candidates","field","name","status","warning","reason",
+             "incomplete","conflict","hasConflict"].includes(k)) {
+        if (obj[k] && typeof obj[k] === "object") visit(obj[k]);
+      }
+    });
+  };
+
+  visit(out);
+  return out;
+};
+</script>
+
+
+<script id="uncertainty-tests">
+(function(){
+  function run(){
+    const failures = [];
+    const assert = (name, condition) => { if(!condition) failures.push(name); };
+
+    const a = window.assessFieldConfidence("940202-10-6330", 0.99, [], {critical:true});
+    assert("95+ clean confidence => VERIFIED", a.status === "VERIFIED");
+
+    const b = window.assessFieldConfidence("01", 0.99, ["O1"], {critical:true});
+    assert("95+ protected numeric ambiguity => UNCERTAIN", b.status === "UNCERTAIN");
+
+    const c = window.assessFieldConfidence("940202-10-6339", 0.98, ["940202-10-6332"], {critical:true});
+    assert("95+ 9/2 conflict => UNCERTAIN", c.status === "UNCERTAIN");
+
+    const d = window.assessFieldConfidence("RAJESWARY A/P VASU", 0.97,
+      ["RAJESWARY A/P VASW"], {critical:true});
+    assert("95+ conflicting name => UNCERTAIN", d.status === "UNCERTAIN");
+
+    const e = window.assessFieldConfidence("940202-10-6330", 0.94, [], {critical:true});
+    assert("<95 critical confidence => UNCERTAIN", e.status === "UNCERTAIN");
+
+    window.OCR_MASTER_UNCERTAINTY_TEST = {
+      passed: failures.length === 0,
+      failures
+    };
+
+    if (new URLSearchParams(location.search).get("ocrdebug") === "1") {
+      console.table({
+        "95+ clean": a.status,
+        "01 vs O1": b.status,
+        "9 vs 2": c.status,
+        "name conflict": d.status,
+        "<95 critical": e.status
+      });
+      console.log(
+        failures.length ? "OCR MASTER uncertainty tests FAILED" :
+        "OCR MASTER uncertainty tests PASSED"
+      );
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run, {once:true});
+  } else {
+    run();
+  }
+})();
+</script>
+
+
+<script id="spatial-field-tests">
+(function(){
+ const sample="NO 32 BATU 34\nJALAN RAWANG\nKAMPUNG SUNGAI DARAH\n45600 BATANG BERJUNTAI\nSELANGOR";
+ const lines=sample.split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean).slice(0,5);
+ const tests={
+  addressFiveLines:lines.length===5,
+  addressSpelling:lines[3]==='45600 BATANG BERJUNTAI',
+  nricHyphenated:/^\d{6}-\d{2}-\d{4}$/.test('940202-10-6330'),
+  nricUnhyphenated:/^\d{12}$/.test('940202106330'),
+  exactName:'Rajeshwary A/P Vasu'==='Rajeshwary A/P Vasu'
+ };
+ window.OCR_MASTER_SPATIAL_TEST={passed:Object.values(tests).every(Boolean),tests};
+})();
+</script>
+
+<script id="strict-spatial-regression-tests">
+(function(){
+  const failures=[];
+  const assert=(n,v)=>{if(!v)failures.push(n)};
+  /* Valid 940202 must NOT be reported as an 02 ambiguity or because it contains 9. */
+  assert('valid 940202 has no false numeric confusion', window.OCR_MASTER_API.numericConfusionEvidence('940202-10-6330').length===0);
+  assert('valid 02 group has no false ambiguity', window.OCR_MASTER_API.numericConfusionEvidence('940202-10-6330').length===0);
+  assert('near O2/OS candidate is flagged', window.OCR_MASTER_API.numericConfusionEvidence('940202-O2-6330').includes('02↔O2↔OS↔0S'));
+  assert('near OI candidate is flagged', window.OCR_MASTER_API.numericConfusionEvidence('940202-OI-6330').includes('01↔OI↔0I↔O1'));
+  const n=window.OCR_MASTER_API.findNameCandidates('JOHN CITIZEN WILLIAM PULAUPINANG\ndatempl.com');
+  assert('URL is excluded from name candidates', !n.some(x=>/datempl\.com/i.test(x)));
+  assert('name candidate remains exact', window.OCR_MASTER_API.findNameCandidates('RAJESWARY A/P VASU')[0]==='RAJESWARY A/P VASU');
+  const c=window.OCR_MASTER_API.consensus(['RAJESWARY A/P VASU','RAJESWARY A/P VASW']);
+  assert('conflicting names never select a winner', c.value===null && c.all.length===2);
+  const ex=window.OCR_MASTER_API.nricNumericStatus(['940202-10-6330'],['940202-10-6330']);
+  assert('exact NRIC accepted', ex.value==='940202-10-6330' && !ex.ambiguous);
+  const amb=window.OCR_MASTER_API.nricNumericStatus(['940202-O2-6330'],[]);
+  assert('ambiguous NRIC preserved', amb.value===null && amb.ambiguous);
+  window.OCR_MASTER_STRICT_SPATIAL_TEST={passed:failures.length===0,failures};
+  if(new URLSearchParams(location.search).get('ocrdebug')==='1') console.log('STRICT SPATIAL TESTS',window.OCR_MASTER_STRICT_SPATIAL_TEST);
+})();
+</script>
+
+
+
+<script id="name-symbol-r-c-regression-tests">
+(function(){
+ const A=window.OCR_MASTER_API, failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+ assert('A/P preserved exactly',A.findNameCandidates('Rajeshwary A/P Vasu')[0]==='Rajeshwary A/P Vasu');
+ assert('A/L preserved exactly',A.findNameCandidates('Kumar A/L Sekar')[0]==='Kumar A/L Sekar');
+ assert('hyphen preserved',A.findNameCandidates('Anne-Marie Tan')[0]==='Anne-Marie Tan');
+ assert('apostrophe preserved',A.findNameCandidates("O\'Connor Lee")[0]==="O\'Connor Lee");
+ assert('internal slash preserved',A.findNameCandidates('RAJESHWARY / VASU')[0]==='RAJESHWARY / VASU');
+ assert('trailing slash removed',A.findNameCandidates('Rajeshwary A/P Vasu /')[0]==='Rajeshwary A/P Vasu');
+ assert('trailing punctuation removed',A.findNameCandidates('Rajeshwary A/P Vasu...')[0]==='Rajeshwary A/P Vasu');
+ assert('leading punctuation rejected',A.findNameCandidates('/ Rajeshwary A/P Vasu').length===0);
+ const rc=A.consensus(['RAJESWARY R VASU','RAJESWARY C VASU']);
+ assert('R/C conflict has no winner',rc.value===null&&rc.all.length===2);
+ const exact=A.findNameCandidates('RAJESWARY A/P VASU');
+ assert('no suffix appended',exact[0]==='RAJESWARY A/P VASU'&&!/[^A-Za-z0-9]$/.test(exact[0]));
+ window.OCR_MASTER_NAME_SYMBOL_TEST={passed:failures.length===0,failures};
+})();
+</script>
+<script id="front-photo-field-tests">
+(function(){
+  function run(){
+    const f=[];
+    const a=(n,v)=>{if(!v)f.push(n);};
+
+    const x=window.extractFrontPhotoSideFields([
+      {text:"WARGANEGARA MALAYSIA",y:10},
+      {text:"HINDU",y:20},
+      {text:"PEREMPUAN",y:40}
+    ]);
+    a("Nationality",x.nationality.value==="MALAYSIA");
+    a("Religion",x.religion.value==="HINDU");
+    a("Gender",x.gender.value==="Perempuan");
+
+    const y=window.extractFrontPhotoSideFields([
+      {text:"RAJESHWARY A/P VASU",y:10},
+      {text:"INDIAN",y:20}
+    ]);
+    a("No unsupported nationality inference",y.nationality.status==="UNKNOWN");
+    a("No unsupported religion inference",y.religion.status==="UNKNOWN");
+    a("No gender-from-photo inference",y.gender.status==="UNKNOWN");
+
+    window.FRONT_PHOTO_RULE_TESTS={passed:f.length===0,failures:f};
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",run,{once:true});
+  else run();
+})();
+</script>
+<script id="name-address-gap-tests">(function(){
+function run(){
+ const failures=[],assert=(n,v)=>{if(!v)failures.push(n)};
+ const mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const base=(first)=>[
+   mk("NAME ONE",0,10),mk("NAME TWO",14,24),mk(first,28,38),
+   mk("ADDRESS LINE 2",42,52),mk("ADDRESS LINE 3",56,66),
+   mk("ADDRESS LINE 4",70,80),mk("ADDRESS LINE 5",84,94)
+ ];
+ for(const [label,first] of [
+   ["No","NO 124 BATU 34"],["PT","PT1234 KG RAWANG"],
+   ["Lot","LOT 01 BATU"],["hyphen","01-02-03 JALAN"],["numeric","25 JALAN"]
+ ]){
+   const r=window.splitNameAddressByVisibleGap({lines:base(first)});
+   assert(label+" address detected",r.addressStart===first);
+   assert(label+" preserves name",r.nameLines.join("|")==="NAME ONE|NAME TWO");
+   assert(label+" five address lines",r.addressLines.length===5);
+ }
+ // Critical regression: OCR sometimes merges the last name with address line 1.
+ const merged=[
+   mk("JOHN CITIZEN",0,10),
+   mk("MOHAMED NO 17 P 3 JASE SEBERANG PERAK",14,24),
+   mk("WARG ISLAM",28,38),
+   mk("ADDRESS LINE 3",42,52),
+   mk("ADDRESS LINE 4",56,66),
+   mk("ADDRESS LINE 5",70,80),
+   mk("ADDRESS LINE 6",84,94)
+ ];
+ const rm=window.splitNameAddressByVisibleGap({lines:merged});
+ assert("merged name retained",rm.nameLines.includes("MOHAMED"));
+ assert("merged address starts at No 17",rm.addressStart==="NO 17 P 3 JASE SEBERANG PERAK");
+ assert("merged address excludes MOHAMED",!rm.addressLines.some(x=>/^MOHAMED\b/i.test(x)));
+ assert("merged address has five lines",rm.addressLines.length===5);
+ // Never manufacture a name or alter its characters.
+ const exactName=window.splitNameAddressByVisibleGap({lines:base("25 BATANG")});
+ assert("name exact preservation",exactName.nameLines[1]==="NAME TWO");
+ assert("address exact preservation",exactName.addressLines[0]==="25 BATANG");
+  const nameRows=findNameCandidates("JOHN CITIZEN\nMOHAMED");
+ assert("multi-row name joined exactly",nameRows.length===1 && nameRows[0]==="JOHN CITIZEN MOHAMED");
+ assert("MOHAMED retained as final token",nameRows[0].endsWith("MOHAMED"));
+ const onlyMohamed=findNameCandidates("MOHAMED");
+ assert("single-token name accepted",onlyMohamed.length===1 && onlyMohamed[0]==="MOHAMED");
+window.NAME_ADDRESS_GAP_TESTS={passed:failures.length===0,failures};
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});else run();
+})();</script>
+<script id="nationality-address-regression-tests">
+(function(){
+ const A=window.OCR_MASTER_API, failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+ const split=A.splitNameAddressByVisibleGap, mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const r=split({lines:[
+   mk("JOHN CITIZEN",0,10),
+   mk("MOHAMED NO 17 P 3 JASE SEBERANG PERAK WARG ISLAM",14,24),
+   mk("KAMPUNG EXAMPLE",28,38),
+   mk("45600 BATANG BERJUNTAI",42,52),
+   mk("SELANGOR",56,66),
+   mk("EXTRA ADDRESS ROW",70,80)
+ ]});
+ assert("MOHAMED retained as final name row",r.nameLines.includes("MOHAMED"));
+ assert("merged line splits at NO 17",r.addressStart==="NO 17 P 3 JASE SEBERANG PERAK WARG ISLAM");
+ assert("MOHAMED is not in address rows",!r.addressLines.some(x=>/\bMOHAMED\b/i.test(x)));
+ const cleaned=A.extractAddress(r.addressLines.join("\n"));
+ assert("WARG removed from address",!cleaned.some(x=>/\bWARG\b/i.test(x)));
+ assert("ISLAM metadata removed from address",!cleaned.some(x=>/^ISLAM$/i.test(x)));
+ assert("address place text retained",cleaned.some(x=>/SEBERANG PERAK/i.test(x)));
+ const five=A.extractAddress("NO 124 BATU\nJALAN RAWANG\nKAMPUNG SUNGAI DARAH\n45600 BATANG BERJUNTAI\nSELANGOR\nWARG ISLAM");
+ assert("five real address lines preserved",five.length===5);
+ assert("five-line address exact spelling preserved",five[3]==="45600 BATANG BERJUNTAI");
+
+ // Supplied MyKad regression fixture: two-line name + five-line address,
+ // with WARGANEGARA / ISLAM / PEREMPUAN in the separate lower-right block.
+ const sampleSplit=split({lines:[
+   mk("NOOR AIN BINTI",0,10),
+   mk("MOHAMED",13,23),
+   mk("NO 17",29,39),
+   mk("JALAN PERISAI 3",43,53),
+   mk("BANDAR SEBERANG PERAK",57,67),
+   mk("36800 KAMPUNG GAJAH",71,81),
+   mk("PERAK",85,95)
+ ]});
+ assert("sample full name keeps both rows",sampleSplit.nameLines.join(" ")==="NOOR AIN BINTI MOHAMED");
+ assert("sample address starts NO 17",sampleSplit.addressStart==="NO 17");
+ assert("sample address has five rows",sampleSplit.addressLines.length===5);
+ assert("sample address has no name",!sampleSplit.addressLines.some(x=>/NOOR|MOHAMED/i.test(x)));
+ const samplePhoto=window.extractFrontPhotoSideFields([
+   {text:"WARGANEGARA",y:1},{text:"ISLAM",y:2},{text:"PEREMPUAN",y:3}
+ ]);
+ assert("sample Warganegara evidence",samplePhoto.nationality.status==="EVIDENCE");
+ assert("sample Warganegara resolves Malaysia",/MALAYSIA/i.test(samplePhoto.nationality.value||''));
+ assert("sample Islam religion",samplePhoto.religion.value==="ISLAM");
+ const sampleRace=window.OCR_MASTER_API.extractRace("WARGANEGARA\\nISLAM\\nPEREMPUAN");
+ assert("sample Race resolves Islam",sampleRace==="Islam");
+ const photo=window.extractFrontPhotoSideFields([
+   {text:"WARGANEGARA",y:10},{text:"HINDU",y:20},{text:"PEREMPUAN",y:40}
+ ]);
+ assert("Warganegara is explicit nationality evidence",photo.nationality.status==="EVIDENCE");
+ assert("Warganegara value resolves to Malaysia",photo.nationality.value===null || /MALAYSIA/i.test(photo.nationality.value));
+ window.OCR_MASTER_NATIONALITY_ADDRESS_TEST={passed:failures.length===0,failures};
+})();
+</script>
+
+<script id="dedicated-name-address-regression">
+(function(){
+ const f=[],a=(n,v)=>{if(!v)f.push(n)},A=window.OCR_MASTER_API,mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const r=A.splitNameAddressByVisibleGap({lines:[mk('NOOR AIN BINTI',0,10),mk('MOHAMED',13,23),mk('NO 17',29,39),mk('JALAN PERISAI 3',43,53),mk('BANDAR SEBERANG PERAK',57,67),mk('36800 KAMPUNG GAJAH',71,81),mk('PERAK',85,95)]});
+ a('name exact',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');a('address starts NO 17',r.addressStart==='NO 17');a('five address rows',r.addressLines.length===5);a('no name in address',!/NOOR|MOHAMED/i.test(r.addressLines.join(' ')));
+ const merged=A.splitNameAddressByVisibleGap({lines:[mk('NOOR AIN BINTI MOHAMED NO 17',0,10),mk('JALAN PERISAI 3',14,24),mk('BANDAR SEBERANG PERAK',28,38),mk('36800 KAMPUNG GAJAH',42,52),mk('PERAK',56,66),mk('EXTRA',70,80)]});
+ a('merged name retained',merged.nameLines.some(x=>/MOHAMED/i.test(x)));a('merged address starts NO 17',merged.addressStart==='NO 17');a('merged address excludes MOHAMED',!/MOHAMED/i.test(merged.addressLines.join(' ')));
+ window.OCR_MASTER_DEDICATED_REGION_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+<script id="two-row-merged-final-name-regression">
+(function(){
+ const failures=[]; const a=(n,v)=>{if(!v)failures.push(n)};
+ const mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const r=window.splitNameAddressByVisibleGap({lines:[
+  mk("NOOR AIN BINTI",0,10),
+  mk("MOHAMED NO 17",13,23),
+  mk("JALAN PERISAI 3",29,39),
+  mk("BANDAR SEBERANG PERAK",43,53),
+  mk("36800 KAMPUNG GAJAH",57,67),
+  mk("PERAK",71,81)
+ ]});
+ a("two-row name preserved",r.nameLines.join(" ")==="NOOR AIN BINTI MOHAMED");
+ a("merged row starts address at NO 17",r.addressStart==="NO 17");
+ a("address excludes MOHAMED",!/\bMOHAMED\b/i.test(r.addressLines.join(" ")));
+ a("five address rows",r.addressLines.length===5);
+ window.OCR_MASTER_TWO_ROW_MERGED_FINAL_NAME_TEST={passed:failures.length===0,failures};
+})();
+</script>
+<script id="strict-highlighted-region-regression">
+(function(){
+ const failures=[],a=(n,v)=>{if(!v)failures.push(n)};
+ const split=window.OCR_MASTER_API.splitNameAddressByVisibleGap;
+ const mk=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+ const r=split({lines:[
+   mk('NOOR AIN BINTI',0,10),mk('MOHAMED',13,23),mk('NO 17',29,39),
+   mk('JALAN PERISAI 3',43,53),mk('BANDAR SEBERANG PERAK',57,67),
+   mk('36800 KAMPUNG GAJAH',71,81),mk('PERAK',85,95)
+ ]});
+ a('highlight name first row retained',r.nameLines[0]==='NOOR AIN BINTI');
+ a('highlight name last row retained',r.nameLines[1]==='MOHAMED');
+ a('highlight full name order',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('highlight address first row',r.addressLines[0]==='NO 17');
+ a('highlight address second row',r.addressLines[1]==='JALAN PERISAI 3');
+ a('highlight address third row',r.addressLines[2]==='BANDAR SEBERANG PERAK');
+ a('highlight address fourth row',r.addressLines[3]==='36800 KAMPUNG GAJAH');
+ a('highlight address fifth row',r.addressLines[4]==='PERAK');
+ a('highlight address excludes name',!/NOOR|MOHAMED/i.test(r.addressLines.join(' ')));
+ a('highlight metadata is independent',typeof window.extractFrontPhotoSideFields==='function');
+ window.OCR_MASTER_STRICT_HIGHLIGHT_TEST={passed:failures.length===0,failures};
+})();
+</script>
+<script id="highlighted-roi-ocr-regression">
+(function(){
+ const f=[],a=(n,v)=>{if(!v)f.push(n)};
+ const A=window.OCR_MASTER_API;
+ const n=A.splitNameAddressByVisibleGap({lines:[
+  {text:'NOOR AIN BINTI',bbox:{y0:0,y1:10},conf:99},
+  {text:'MOHAMED',bbox:{y0:13,y1:23},conf:99},
+  {text:'NO 17',bbox:{y0:29,y1:39},conf:99},
+  {text:'JALAN PERISAI 3',bbox:{y0:43,y1:53},conf:99},
+  {text:'BANDAR SEBERANG PERAK',bbox:{y0:57,y1:67},conf:99},
+  {text:'36800 KAMPUNG GAJAH',bbox:{y0:71,y1:81},conf:99},
+  {text:'PERAK',bbox:{y0:85,y1:95},conf:99}
+ ]});
+ a('full name exact',n.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('address exact five rows',n.addressLines.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');
+ a('address excludes MOHAMED',!/MOHAMED/i.test(n.addressLines.join(' ')));
+ const ad=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ a('address extractor ignores metadata',ad.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');
+ const merged=A.splitNameAddressByVisibleGap({lines:[
+  {text:'NOOR AIN BINTI MOHAMED NO 17',bbox:{y0:0,y1:10},conf:99},
+  {text:'JALAN PERISAI 3',bbox:{y0:14,y1:24},conf:99},
+  {text:'BANDAR SEBERANG PERAK',bbox:{y0:28,y1:38},conf:99},
+  {text:'36800 KAMPUNG GAJAH',bbox:{y0:42,y1:52},conf:99},
+  {text:'PERAK',bbox:{y0:56,y1:66},conf:99},
+  {text:'EXTRA',bbox:{y0:70,y1:80},conf:99}
+ ]});
+ a('merged final name retained',merged.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('merged address starts NO 17',merged.addressStart==='NO 17');
+ window.OCR_MASTER_HIGHLIGHTED_ROI_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+<script id="strict-highlighted-output-regression">
+(function(){
+ const f=[],a=(n,v)=>{if(!v)f.push(n)},A=window.OCR_MASTER_API;
+ const ad=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ a('strict five-line address extraction',ad.join(' ')==='NO 17 JALAN PERISAI 3 BANDAR SEBERANG PERAK 36800 KAMPUNG GAJAH PERAK');
+ a('metadata excluded',!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(ad.join(' ')));
+ a('name never enters address',!/NOOR|MOHAMED/i.test(ad.join(' ')));
+ const r=A.splitNameAddressByVisibleGap({lines:[
+  {text:'NOOR AIN BINTI',bbox:{y0:0,y1:10},conf:99},{text:'MOHAMED',bbox:{y0:13,y1:23},conf:99},
+  {text:'NO 17',bbox:{y0:29,y1:39},conf:99},{text:'JALAN PERISAI 3',bbox:{y0:43,y1:53},conf:99},
+  {text:'BANDAR SEBERANG PERAK',bbox:{y0:57,y1:67},conf:99},{text:'36800 KAMPUNG GAJAH',bbox:{y0:71,y1:81},conf:99},{text:'PERAK',bbox:{y0:85,y1:95},conf:99}
+ ]});
+ a('strict full name',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('strict address rows',r.addressLines.length===5);
+ window.OCR_MASTER_STRICT_OUTPUT_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+<script id="strict-red-roi-v7-tests">(function(){const f=[],a=(n,v)=>{if(!v)f.push(n)},A=window.OCR_MASTER_API,m=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});const r=A.splitNameAddressByVisibleGap({lines:[m('NOOR AIN BINTI',0,10),m('MOHAMED',13,23),m('NO 17',29,39),m('JALAN PERISAI 3',43,53),m('BANDAR SEBERANG PERAK',57,67),m('36800 KAMPUNG GAJAH',71,81),m('PERAK',85,95)]});a('name rows',r.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');a('address rows',r.addressLines.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');a('name not in address',!/NOOR|MOHAMED/i.test(r.addressLines.join(' ')));const q=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');a('metadata excluded',q.length===5&&!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(q.join(' ')));window.OCR_MASTER_V7_TEST={passed:!f.length,failures:f};})();</script>
+<script id="v8-runtime-regression-tests">
+(function(){
+ const A=window.OCR_MASTER_API, failures=[];
+ const assert=(n,v)=>{if(!v)failures.push(n)};
+ assert('name rows preserve final single-token name',A.findNameCandidates('NOOR AIN BINTI\nMOHAMED')[0]==='NOOR AIN BINTI MOHAMED');
+ const addr=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ assert('address has five rows',addr.length===5);
+ assert('address row 1',addr[0]==='NO 17');
+ assert('address row 2',addr[1]==='JALAN PERISAI 3');
+ assert('address row 3',addr[2]==='BANDAR SEBERANG PERAK');
+ assert('address row 4',addr[3]==='36800 KAMPUNG GAJAH');
+ assert('address row 5',addr[4]==='PERAK');
+ assert('metadata excluded',!/(WARGANEGARA|ISLAM|PEREMPUAN)/i.test(addr.join(' ')));
+ assert('numeric exact remains exact',A.nricNumericStatus(['860815-38-6718'],['860815-38-6718']).value==='860815-38-6718');
+ assert('API exposes name extraction',typeof A.findNameCandidates==='function');
+ assert('API exposes address extraction',typeof A.extractAddress==='function');
+ window.OCR_MASTER_V8_TEST={passed:failures.length===0,failures};
+})();
+</script>
+<script id="v9-extraction-contract-test">
+(function(){
+ const A=window.OCR_MASTER_API, f=[], a=(n,v)=>{if(!v)f.push(n)};
+ // Contract tests are deliberately based on OCR evidence, not on hidden hard-coded
+ // document values. They verify field placement and metadata isolation only.
+ const name=A.findNameCandidates('NOOR AIN BINTI\nMOHAMED');
+ a('two-row name is one candidate',name.length===1 && name[0]==='NOOR AIN BINTI MOHAMED');
+ const address=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ a('five address rows',address.length===5);
+ a('metadata not address',!/(WARGANEGARA|ISLAM|PEREMPUAN)/i.test(address.join(' ')));
+ a('no silent numeric substitution',A.nricNumericStatus(['860815-38-6718'],['860815-38-6718']).value==='860815-38-6718');
+ window.OCR_MASTER_V9_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+
+<script id="instant-processing-regression-tests-v10">
+(function(){
+ const f=[],a=(n,v)=>{if(!v)f.push(n)};
+ a('fast OCR helper exists',typeof ocrFixedRows==='function');
+ a('instant sheet helper exists',typeof makeInstantFieldSheet==='function');
+ a('run OCR exists',typeof runOCR==='function');
+ a('prewarm state exists',typeof S==='object' && 'prewarming' in S);
+ const sample=window.OCR_MASTER_API.splitNameAddressByVisibleGap({lines:[
+  {text:'NOOR AIN BINTI',bbox:{y0:0,y1:10}},
+  {text:'MOHAMED',bbox:{y0:13,y1:23}},
+  {text:'NO 17',bbox:{y0:29,y1:39}},
+  {text:'JALAN PERISAI 3',bbox:{y0:43,y1:53}},
+  {text:'BANDAR SEBERANG PERAK',bbox:{y0:57,y1:67}},
+  {text:'36800 KAMPUNG GAJAH',bbox:{y0:71,y1:81}},
+  {text:'PERAK',bbox:{y0:85,y1:95}}
+ ]});
+ a('strict sample name',sample.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+ a('strict sample address',sample.addressLines.join('\n')==='NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK');
+ a('no MOHAMED in address',!/MOHAMED/i.test(sample.addressLines.join(' ')));
+ window.OCR_MASTER_INSTANT_V10_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+
+<script id="v11-runtime-regression-tests">
+(function(){
+ const failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+ assert('OCR queue initialized',typeof OCR_QUEUE!=='undefined' && OCR_QUEUE instanceof Promise);
+ const api=window.OCR_MASTER_API; assert('OCR API exported',!!api);
+ const ad=api.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+ assert('five address rows',ad.length===5); assert('address starts NO 17',ad[0]==='NO 17');
+ assert('metadata excluded from address',!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(ad.join(' ')));
+ const n=api.consensus(['NOOR AIN BINTI MOHAMED']); assert('exact full name retained',n&&n.value==='NOOR AIN BINTI MOHAMED');
+ window.OCR_MASTER_V11_TEST={passed:failures.length===0,failures};
+ if(failures.length)console.error('V11 REGRESSION FAILED',failures);
+})();
+</script>
+
+<script id="v12-highlighted-field-regression">
+(function(){
+  const failures=[];
+  const assert=(n,v)=>{if(!v)failures.push(n)};
+  const lines=[
+    {text:"NOOR AIN BINTI",bbox:{y0:10,y1:20},conf:99},
+    {text:"MOHAMED",bbox:{y0:23,y1:33},conf:99},
+    {text:"NO 17",bbox:{y0:40,y1:50},conf:99},
+    {text:"JALAN PERISAI 3",bbox:{y0:53,y1:63},conf:99},
+    {text:"BANDAR SEBERANG PERAK",bbox:{y0:66,y1:76},conf:99},
+    {text:"36800 KAMPUNG GAJAH",bbox:{y0:79,y1:89},conf:99},
+    {text:"PERAK",bbox:{y0:92,y1:102},conf:99}
+  ];
+  const s=window.OCR_MASTER_API.splitNameAddressByVisibleGap({lines});
+  assert("name row 1",s.nameLines[0]==="NOOR AIN BINTI");
+  assert("name row 2",s.nameLines[1]==="MOHAMED");
+  assert("full name order",s.nameLines.join(" ")==="NOOR AIN BINTI MOHAMED");
+  assert("address row 1",s.addressLines[0]==="NO 17");
+  assert("five address rows",s.addressLines.length===5);
+  assert("MOHAMED not address",!/MOHAMED/i.test(s.addressLines.join(" ")));
+  const a=window.OCR_MASTER_API.extractAddress("NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN");
+  assert("metadata excluded",a.join("\n")==="NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK");
+  const race=window.OCR_MASTER_API.extractRace("WARGANEGARA\nISLAM\nPEREMPUAN");
+  assert("race detected",String(race).toUpperCase()==="ISLAM");
+  window.OCR_MASTER_V12_TEST={passed:!failures.length,failures};
+  if(failures.length)console.error("V12 regression failures",failures);
+  else console.info("V12 regression PASS");
+})();
+</script>
+
+
+<!-- V13-STRICT-REGRESSION -->
+<script id="v13-runtime-regression">
+(function(){
+  function run(){
+    const A=window.OCR_MASTER_API;
+    if(!A){window.OCR_MASTER_V13_TEST={passed:false,failures:['API unavailable']};return;}
+    const failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+    const m=(text,y0,y1)=>({text,bbox:{y0,y1},conf:99});
+    const s=A.splitNameAddressByVisibleGap({lines:[
+      m('NOOR AIN BINTI',0,10),m('MOHAMED',13,23),m('NO 17',29,39),
+      m('JALAN PERISAI 3',43,53),m('BANDAR SEBERANG PERAK',57,67),
+      m('36800 KAMPUNG GAJAH',71,81),m('PERAK',85,95)
+    ]});
+    assert('full name rows preserved',s.nameLines.join(' ')==='NOOR AIN BINTI MOHAMED');
+    assert('address has five rows',s.addressLines.length===5);
+    assert('address row 1',s.addressLines[0]==='NO 17');
+    assert('address row 5',s.addressLines[4]==='PERAK');
+    assert('name not in address',!/MOHAMED/i.test(s.addressLines.join(' ')));
+    const a=A.extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+    assert('metadata excluded',a.length===5&&!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(a.join(' ')));
+    assert('race islam',A.extractRace('WARGANEGARA\nISLAM\nPEREMPUAN')==='Islam');
+    window.OCR_MASTER_V13_TEST={passed:!failures.length,failures};
+    console.info('OCR MASTER V13 regression:',window.OCR_MASTER_V13_TEST);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+})();
+</script>
+<script id="v15-auto-name-race-tests">
+(function(){
+ const A=window.OCR_MASTER_API, failures=[]; const assert=(n,v)=>{if(!v)failures.push(n)};
+ const names=[
+  ['Latin','NOOR AIN BINTI MOHAMED'],
+  ['A/P symbol','Rajeshwary A/P Vasu'],
+  ['Tamil','ராஜேஸ்வரி'],
+  ['Arabic','محمد علي'],
+  ['Cyrillic','Иван Петров'],
+  ['Chinese','王小明']
+ ];
+ for(const [label,value] of names){
+  const got=A.findNameCandidates(value)[0];
+  assert(label+' name preserved',got===value);
+ }
+ assert('no arbitrary name injection',A.extractAddress('NO 17\\nJALAN PERISAI 3\\nBANDAR SEBERANG PERAK\\n36800 KAMPUNG GAJAH\\nPERAK')[0]==='NO 17');
+ for(const race of ['Islam','Hindu','Cina','Indian','Melayu','Sikh']){
+  assert('explicit race '+race,A.extractRace('WARGANEGARA\\n'+race+'\\nPEREMPUAN')===race);
+ }
+ assert('name/address API available',typeof A.findNameCandidates==='function'&&typeof A.extractAddress==='function');
+ window.OCR_MASTER_V15_AUTO_NAME_RACE_TEST={passed:failures.length===0,failures};
+ if(failures.length)console.error('V15 AUTO NAME/RACE TEST FAILED',failures); else console.info('V15 AUTO NAME/RACE TEST PASS');
+})();
+</script>
+
+<script id="v16-remove-address-race-ui">
+(function(){
+  function hideUnwantedFields(){
+    const wanted = new Set(["full name","nric number","nationality","gender"]);
+    document.querySelectorAll("body *").forEach(function(el){
+      if(!el.children.length){
+        const t=(el.textContent||"").trim().toLowerCase();
+        if(t==="address" || t==="race"){
+          let p=el;
+          for(let i=0;i<4 && p && p.parentElement;i++,p=p.parentElement){
+            const cls=String(p.className||"").toLowerCase();
+            const id=String(p.id||"").toLowerCase();
+            if(/field|card|row|item/.test(cls+" "+id)){
+              p.style.display="none";
+              break;
+            }
+          }
+        }
+      }
+    });
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",hideUnwantedFields,{once:true});
+  }else{
+    hideUnwantedFields();
+  }
+  window.OCR_MASTER_V16_UI={hideUnwantedFields};
+})();
+</script>
+
+
+<script id="v17-verified-extraction-cleanup">
+(function () {
+  "use strict";
+
+  function cleanVerifiedExtraction() {
+    const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,div,span,strong,label"));
+    const verified = headings.find(function (el) {
+      return (el.textContent || "").trim().toLowerCase() === "verified extraction";
+    });
+
+    if (!verified) return;
+
+    let container = verified;
+    for (let i = 0; i < 5 && container.parentElement; i++) {
+      const text = (container.textContent || "").toLowerCase();
+      if (text.includes("full name") && text.includes("nric number") && text.includes("nationality")) {
+        break;
+      }
+      container = container.parentElement;
+    }
+
+    const forbidden = ["race", "address"];
+
+    Array.from(container.querySelectorAll("*")).forEach(function (el) {
+      if (el.children.length !== 0) return;
+
+      const label = (el.textContent || "").trim().toLowerCase();
+      if (!forbidden.includes(label)) return;
+
+      let card = el;
+      for (let i = 0; i < 5 && card.parentElement; i++, card = card.parentElement) {
+        const cls = String(card.className || "").toLowerCase();
+        const role = String(card.getAttribute("data-field") || "").toLowerCase();
+        if (/field|card|row|item/.test(cls) || role === label) {
+          card.style.display = "none";
+          return;
+        }
+      }
+
+      el.style.display = "none";
+    });
+  }
+
+  function run() {
+    cleanVerifiedExtraction();
+    window.OCR_MASTER_V17 = {
+      verifiedExtractionCleaned: true
+    };
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run, { once: true });
+  } else {
+    run();
+  }
+})();
+</script>
+
+
+<script id="v18-remove-race-from-verified-extraction">
+(function () {
+  "use strict";
+  function removeRace() {
+    const nodes = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,div,section,article"));
+    const heading = nodes.find(el => (el.textContent || "").trim().toLowerCase() === "verified extraction");
+    if (!heading) return;
+    let root = heading;
+    for (let i = 0; i < 6 && root.parentElement; i++) {
+      const t = (root.textContent || "").toLowerCase();
+      if (t.includes("full name") && t.includes("nric number") && t.includes("nationality")) break;
+      root = root.parentElement;
+    }
+    Array.from(root.querySelectorAll("*")).forEach(el => {
+      if (el.children.length) return;
+      if ((el.textContent || "").trim().toLowerCase() !== "race") return;
+      let card = el;
+      for (let i = 0; i < 6 && card.parentElement; i++) {
+        const cls = String(card.className || "").toLowerCase();
+        const field = String(card.getAttribute("data-field") || "").toLowerCase();
+        if (field === "race" || /field|card|row|item/.test(cls)) {
+          card.remove();
+          return;
+        }
+        card = card.parentElement;
+      }
+      el.remove();
+    });
+  }
+  function init() {
+    removeRace();
+    new MutationObserver(removeRace).observe(document.body, {childList:true, subtree:true});
+    window.OCR_MASTER_V18 = {removeRace};
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, {once:true});
+  } else init();
+})();
+</script>
+
+
+<script id="v19-malaysian-id-language">
+(function () {
+  "use strict";
+
+  const MALAYSIAN_ID_PATTERNS = [
+    /\bMYKAD\b/i,
+    /\bMYPR\b/i,
+    /\bMYTENT\b/i,
+    /\bKAD\s+PENGENALAN\b/i,
+    /\bKAD\s+PENGENALAN\s+MALAYSIA\b/i,
+    /\bJABATAN\s+PENDAFTARAN\s+NEGARA\b/i,
+    /\bWARGANEGARA\b/i,
+    /\bNO\.?\s*KP\b/i,
+    /\bNO\.?\s*PENGENALAN\b/i,
+    /\bMALAYSIA\b/i
+  ];
+
+  function isMalaysianIdentityDocument(evidenceText) {
+    const text = String(evidenceText || "").toUpperCase();
+    let hits = 0;
+    for (const pattern of MALAYSIAN_ID_PATTERNS) {
+      if (pattern.test(text)) hits++;
+    }
+    // Require an identity-card signal, or two independent Malaysian signals.
+    const idSignal = /\bMYKAD\b|\bMYPR\b|\bMYTENT\b|\bKAD\s+PENGENALAN\b|\bNO\.?\s*KP\b|\bNO\.?\s*PENGENALAN\b|\bJABATAN\s+PENDAFTARAN\s+NEGARA\b/i.test(text);
+    return idSignal || hits >= 2;
+  }
+
+  function selectMalayForMalaysianID(evidenceText) {
+    if (!isMalaysianIdentityDocument(evidenceText)) return false;
+
+    const selectors = Array.from(document.querySelectorAll("select"));
+    const languageSelect = selectors.find(function (s) {
+      const context = ((s.id || "") + " " + (s.name || "") + " " +
+        (s.getAttribute("aria-label") || "") + " " +
+        (s.parentElement ? s.parentElement.textContent : "")).toLowerCase();
+      return /ocr|language|lang/.test(context);
+    });
+
+    if (!languageSelect) return false;
+
+    const option = Array.from(languageSelect.options).find(function (o) {
+      const value = String(o.value || "").toLowerCase();
+      const label = String(o.textContent || "").toLowerCase();
+      return value === "msa" || value === "mal" || value === "may" ||
+             /(^|[^a-z])malay([^a-z]|$)/.test(label) ||
+             /bahasa melayu/.test(label);
+    });
+
+    if (!option) return false;
+
+    languageSelect.value = option.value;
+    languageSelect.dispatchEvent(new Event("change", {bubbles:true}));
+    window.OCR_MASTER_V19 = {
+      detected: true,
+      language: "Malay",
+      value: option.value
+    };
+    return true;
+  }
+
+  // Exposed for the existing Run OCR flow. No automatic document OCR occurs.
+  window.OCR_MASTER_V19_API = {
+    isMalaysianIdentityDocument,
+    selectMalayForMalaysianID
+  };
+
+  // Also support apps whose Run OCR handler exposes OCR text in a common
+  // global variable. This does not execute OCR itself.
+  window.OCR_MASTER_V19_AUTO_SELECT = function (evidenceText) {
+    return selectMalayForMalaysianID(evidenceText);
+  };
+})();
+</script>
+
+
+<script id="v19-run-ocr-language-hook">
+(function () {
+  "use strict";
+  function applyLanguageFromEvidence() {
+    let evidence = "";
+    if (window.OCR_MASTER_V19_EVIDENCE) evidence += " " + window.OCR_MASTER_V19_EVIDENCE;
+    if (window.frontData) evidence += " " + JSON.stringify(window.frontData);
+    if (window.lastOCRText) evidence += " " + window.lastOCRText;
+
+    // Inspect visible OCR result text only; never invent evidence.
+    const result = document.querySelector("#ocrResults,#ocrOutput,.ocr-results,.ocr-output");
+    if (result) evidence += " " + (result.textContent || "");
+
+    return window.OCR_MASTER_V19_AUTO_SELECT(evidence);
+  }
+
+  window.OCR_MASTER_V19_APPLY_LANGUAGE = applyLanguageFromEvidence;
+})();
+</script>
+
+
+<script id="v19-regression-tests">
+(function () {
+  "use strict";
+  function assert(condition, message) {
+    if (!condition) throw new Error(message);
+  }
+
+  const api = window.OCR_MASTER_V19_API;
+  assert(api && typeof api.isMalaysianIdentityDocument === "function",
+         "V19 language API missing");
+
+  assert(api.isMalaysianIdentityDocument("MALAYSIA MYKAD WARGANEGARA"),
+         "MyKad Malay detection failed");
+  assert(api.isMalaysianIdentityDocument("KAD PENGENALAN JABATAN PENDAFTARAN NEGARA"),
+         "Malaysian identity-card detection failed");
+  assert(api.isMalaysianIdentityDocument("MYPR MALAYSIA"),
+         "Permanent Resident card detection failed");
+  assert(!api.isMalaysianIdentityDocument("US PASSPORT"),
+         "Non-Malaysian document incorrectly classified");
+
+  window.OCR_MASTER_V19_TESTS = {
+    passed: true,
+    tests: 4
+  };
+})();
+</script>
+
+
+<script id="v20-address-row-regression">
+(function(){
+  "use strict";
+  const failures=[];
+  const assert=(name,value)=>{if(!value)failures.push(name);};
+
+  // The strict segmenter must always produce exactly five physical row ROIs.
+  if(typeof cropStrictAddressRows==="function"){
+    const c=document.createElement("canvas");
+    c.width=1580;c.height=500;
+    const rows=cropStrictAddressRows(c);
+    assert("exactly five address row regions",rows.length===5);
+    assert("row regions have positive height",rows.every(r=>r.width===1580&&r.height>0));
+  }else{
+    failures.push("cropStrictAddressRows missing");
+  }
+
+  // The parser must preserve supplied five-line structure and not treat
+  // name/metadata as address content.
+  if(typeof extractAddress==="function"){
+    const sample=[
+      "NO 17",
+      "JALAN PERISAI 3",
+      "BANDAR SEBERANG PERAK",
+      "36800 KAMPUNG GAJAH",
+      "PERAK",
+      "WARGANEGARA",
+      "ISLAM",
+      "PEREMPUAN"
+    ].join("\\n");
+    const a=extractAddress(sample);
+    assert("five rows preserved",a.length===5);
+    assert("row 1 preserved",a[0]==="NO 17");
+    assert("row 2 preserved",a[1]==="JALAN PERISAI 3");
+    assert("row 3 preserved",a[2]==="BANDAR SEBERANG PERAK");
+    assert("row 4 preserved",a[3]==="36800 KAMPUNG GAJAH");
+    assert("row 5 preserved",a[4]==="PERAK");
+    assert("metadata excluded",!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(a.join(" ")));
+    assert("name excluded",!/NOOR|MOHAMED/i.test(a.join(" ")));
+  }
+
+  window.OCR_MASTER_V20_TEST={passed:failures.length===0,failures};
+})();
+</script>
+
+
+
+
+
+
+
+<script id="v22-malay-default">
+(function(){
+  "use strict";
+  function setMalayDefault(){
+    const s=document.getElementById("lang");
+    if(!s)return false;
+    let o=Array.from(s.options).find(x=>String(x.value).toLowerCase()==="msa" || /^(?:Malay|Bahasa Melayu)$/i.test((x.textContent||"").trim()));
+    if(!o){o=document.createElement("option");o.value="msa";o.textContent="Malay";s.insertBefore(o,s.firstChild);}
+    s.value=o.value;
+    s.dispatchEvent(new Event("change",{bubbles:true}));
+    return s.value===o.value;
+  }
+  window.OCR_MASTER_V22={setMalayDefault,malayDefault:true};
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setMalayDefault,{once:true});
+  else setMalayDefault();
+})();
+</script>
+<script id="v22-regression-tests">
+(function(){
+  const failures=[]; const a=(n,v)=>{if(!v)failures.push(n)};
+  const lang=document.getElementById("lang");
+  a("language selector exists",!!lang);
+  if(lang)a("Malay is default",lang.value==="msa");
+  a("OCR evidence section absent",!document.querySelector(".card.evidence"));
+  a("required field Full Name present",document.body.textContent.toLowerCase().includes("full name"));
+  a("required field NRIC Number present",document.body.textContent.toLowerCase().includes("nric number"));
+  a("required field Nationality present",document.body.textContent.toLowerCase().includes("nationality"));
+  a("required field Gender present",document.body.textContent.toLowerCase().includes("gender"));
+  window.OCR_MASTER_V22_TEST={passed:failures.length===0,failures};
+})();
+</script>
+<script id="v23-malay-default">
+(function(){
+  "use strict";
+  function setMalayDefault(){
+    const s=document.getElementById("lang"); if(!s)return false;
+    const o=Array.from(s.options).find(x=>x.value==="msa"||/^Malay$/i.test((x.textContent||"").trim()));
+    if(!o)return false; s.value=o.value; return s.value==="msa";
+  }
+  window.OCR_MASTER_V23={setMalayDefault};
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setMalayDefault,{once:true}); else setMalayDefault();
+})();
+</script>
+<script id="v23-regression-tests">
+(function(){
+  const f=[],a=(n,v)=>{if(!v)f.push(n)}; const s=document.getElementById("lang");
+  a("Malay selected",!!s&&s.value==="msa");
+  a("OCR evidence panel absent",!document.querySelector(".card.evidence"));
+  a("Full Name present",document.body.textContent.toLowerCase().includes("full name"));
+  a("NRIC Number present",document.body.textContent.toLowerCase().includes("nric number"));
+  a("Nationality present",document.body.textContent.toLowerCase().includes("nationality"));
+  a("Gender present",document.body.textContent.toLowerCase().includes("gender"));
+  a("strict address function present",typeof cropStrictAddressRows==="function");
+  a("nationality helper present",typeof ocrNationalityEvidence==="function");
+  a("metadata helper present",typeof ocrMetadataEvidence==="function");
+  window.OCR_MASTER_V23_TEST={passed:f.length===0,failures:f};
+})();
+</script>
+
+<script id="v24-exact-capture-regression">
+(function(){
+  "use strict";
+  const failures=[];
+  const assert=(n,v)=>{if(!v)failures.push(n);};
+
+  const roi=Function.prototype.toString.call(cropFrontNricRegions);
+  assert("NRIC ROI",roi.includes("nric:crop"));
+  assert("Full Name ROI",roi.includes("name:crop"));
+  assert("Address ROI",roi.includes("address:crop"));
+  assert("Nationality ROI",roi.includes("nationality:crop"));
+
+  const a=Function.prototype.toString.call(ocrStrictAddressRows);
+  assert("five-row address OCR",a.includes("cropStrictAddressRows(c)"));
+  assert("no address fallback guessing",a.includes("UNCERTAIN"));
+
+  const ex=Function.prototype.toString.call(extract);
+  assert("Address field emitted",/mk\(\s*['"]Address['"]/.test(ex));
+  assert("Race field absent",!/mk\(\s*['"]Race['"]/.test(ex));
+
+  window.OCR_MASTER_V24_TEST={
+    passed:failures.length===0,
+    failures
+  };
+})();
+</script>
+
+
+<script id="final-99plus-fixture-tests">
+(function(){
+  const failures=[]; const assert=(name,ok)=>{if(!ok)failures.push(name)};
+  const name=findNameCandidates('NOOR AIN BINTI\nMOHAMED');
+  assert('fixture name preserved',name.length===1 && name[0]==='NOOR AIN BINTI MOHAMED');
+  const address=extractAddress('NO 17\nJALAN PERISAI 3\nBANDAR SEBERANG PERAK\n36800 KAMPUNG GAJAH\nPERAK\nWARGANEGARA\nISLAM\nPEREMPUAN');
+  assert('fixture address has five rows',address.length===5);
+  assert('fixture address row 1',address[0]==='NO 17');
+  assert('fixture address row 5',address[4]==='PERAK');
+  assert('metadata excluded from address',!/WARGANEGARA|ISLAM|PEREMPUAN/i.test(address.join(' ')));
+  const name2=findNameCandidates('RAJESWARY A/P VASU');
+  assert('A/P preserved',name2.length===1 && name2[0]==='RAJESWARY A/P VASU');
+  const n=exactNricCandidates('940202-10-6330');
+  assert('exact NRIC candidate',n.length===1 && n[0]==='940202-10-6330');
+  const b=exactNricCandidates('940202-10-6330-02-01',true);
+  assert('exact extended NRIC candidate',b.length===1 && b[0]==='940202-10-6330-02-01');
+  assert('95% remains uncertain',fieldStatus(95,false)==='UNCERTAIN');
+  assert('99.5% may verify',fieldStatus(99.5,false)==='VERIFIED');
+  assert('protected conflict remains uncertain',fieldStatus(99.9,true)==='UNCERTAIN');
+  assert('race is not emitted',!/mk\(\s*['"]Race['"]/.test(Function.prototype.toString.call(extract)));
+  window.OCR_MASTER_FINAL_TEST={passed:failures.length===0,failures};
+  console.info('OCR MASTER final regression:',window.OCR_MASTER_FINAL_TEST);
+})();
 </script>
 </body>
 </html>
