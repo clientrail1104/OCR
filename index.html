@@ -238,12 +238,7 @@ window.extractFrontPhotoSideFields = function(lines) {
 <style id="v16-hide-address-race-ui">
 /* V16: Address and Race are intentionally not displayed. OCR internals remain
    untouched so removing these UI fields cannot corrupt the OCR engine. */
-#addressField,#raceField,#addressCard,#raceCard,
-[data-field="address"],[data-field="race"],
-.field-address,.field-address-card,.field-race,.field-race-card,
-.address-field,.race-field {
-  display:none !important;
-}
+#raceField,#raceCard,[data-field="race"],.field-race,.field-race-card,.race-field{display:none !important;}
 </style>
 
 </head>
@@ -352,13 +347,16 @@ function mykadChannelPreprocess(c,channel='r',threshold=80,scale=10){
 }
 
 function cropFrontNricRegions(c){
-  /* Red-rectangle aligned, independent field ownership. */
+  /*
+    Dedicated MyKad front regions. Each field owns its source pixels and no
+    field is populated from another field's OCR.
+  */
   return {
-    nric:crop(c,.030,.215,.345,.125,10),
-    name:crop(c,.030,.600,.405,.140,12),
-    address:crop(c,.0335,.755,.410,.205,14),
-    metadata:crop(c,.690,.790,.285,.185,10),
-    nationality:crop(c,.700,.790,.220,.100,12)
+    nric:crop(c,.025,.205,.390,.145,12),
+    name:crop(c,.020,.600,.430,.145,14),
+    address:crop(c,.020,.750,.455,.220,16),
+    metadata:crop(c,.675,.825,.310,.155,12),
+    nationality:crop(c,.680,.850,.245,.085,14)
   };
 }
 
@@ -417,18 +415,39 @@ function cropStrictAddressRows(c){
 }
 
 async function ocrStrictAddressRows(c){
+  /*
+    Strict five-row OCR. Every row is independent evidence. We accept a row
+    only when there is no competing spelling; otherwise it remains UNCERTAIN.
+  */
   const rowCanvases=cropStrictAddressRows(c),rows=[];
   for(let i=0;i<rowCanvases.length;i++){
-    const primary=await ocr(mykadTextPreprocess(rowCanvases[i],100,14),7);
-    const p=normalizeFieldLines(primary.text||'').join(' ').trim();
-    const candidates=p?[p]:[];
-    if(!p || Number(primary.conf||0)<95){
-      const secondary=await ocr(textPreprocess(rowCanvases[i]),7);
-      const s=normalizeFieldLines(secondary.text||'').join(' ').trim();
-      if(s&&!candidates.includes(s))candidates.push(s);
+    const variants=[
+      mykadTextPreprocess(rowCanvases[i],100,16),
+      mykadChannelPreprocess(rowCanvases[i],'g',145,14),
+      textPreprocess(rowCanvases[i])
+    ];
+    const passes=[];
+    for(let j=0;j<variants.length;j++){
+      try{
+        const r=await ocr(variants[j],7);
+        const text=normalizeFieldLines(r.text||'').join(' ').trim();
+        if(text)passes.push({text,conf:Number(r.conf||0),pass:j+1});
+      }catch(err){console.warn('Address OCR pass failed safely',i+1,j+1,err);}
     }
-    const unique=[...new Set(candidates)];
-    rows.push({row:i+1,value:unique.length===1?unique[0]:'',candidates:unique,conf:Number(primary.conf||0),uncertain:unique.length!==1||!unique[0],evidence:unique.length>1?'PRIMARY: '+unique[0]+'\nCORROBORATION: '+unique[1]:(unique[0]||'[NO RELIABLE TEXT READ]')});
+    const unique=[...new Set(passes.map(p=>p.text).filter(Boolean))];
+    const counts=new Map();
+    passes.forEach(p=>counts.set(p.text,(counts.get(p.text)||0)+1));
+    const ranked=[...counts.entries()].sort((a,b)=>b[1]-a[1]);
+    const top=ranked[0], best=passes.find(p=>p.text===top?.[0]);
+    const conflict=ranked.length>1;
+    const value=top && !conflict ? top[0] : (top && top[1]>=2 && ranked.length===1 ? top[0] : '');
+    rows.push({
+      row:i+1,value,candidates:unique,conf:Number(best?.conf||0),
+      uncertain:!value||conflict,
+      evidence:unique.length>1
+        ? unique.map((x,k)=>'PASS '+(k+1)+': '+x).join('\n')
+        : (value||'[NO RELIABLE TEXT READ]')
+    });
   }
   return rows;
 }
@@ -750,6 +769,30 @@ function extract(front,back){
   out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN',natLines.join('\n')||'No exact WARGANEGARA/MALAYSIA token was read.','Not validated.','Unable to reliably determine nationality from the dedicated source region; no value was guessed.'));
  }
 
+ /* Address is emitted only from the dedicated five-row address ROI. */
+ const addressRowsRaw=String(front.addressText||'').replace(/\r/g,'').split(/\n/).map(cleanOCRLine);
+ const addressRows=addressRowsRaw.filter(Boolean);
+ const rowCandidates=Array.isArray(front.addressRowCandidates)?front.addressRowCandidates:[];
+ const addressConflict=rowCandidates.some(r=>r.uncertain || (Array.isArray(r.candidates)&&r.candidates.length>1));
+ const addressConf=rowCandidates.length===5
+   ? Math.min(...rowCandidates.map(r=>Number(r.conf||0)))
+   : Number(front.addressConf||0);
+ const addressComplete=addressRows.length===5;
+ const addressStatus=addressComplete&&!addressConflict?fieldStatus(addressConf):'UNCERTAIN';
+ const addressEvidence=front.addressEvidence ||
+   (addressRows.length?addressRows.map((x,i)=>'ROW '+(i+1)+': '+x).join('\n')
+     :'No reliable address row was read from the dedicated five-row address region.');
+ out.push(mk(
+   'Address',
+   addressRows.length?addressRows.join('\n'):'UNKNOWN',
+   addressConf,
+   addressStatus,
+   addressEvidence,
+   'Five independent physical address rows are required; source spelling and row order are preserved.',
+   addressComplete&&!addressConflict?'':'Unable to reliably determine every address row from the source image. No missing row or character was guessed.'
+ ));
+
+
 
  // Verified Extraction display order is intentional: Full Name must appear above NRIC Number.
  const nameIndex=out.findIndex(f=>f.name==='Full Name');
@@ -862,7 +905,7 @@ async function runOCR(){
   const firstMs=Math.round(performance.now()-started);
   prog(88,'Verified extraction ready in '+firstMs+' ms');
   E.badge.textContent='RESULTS READY';E.badge.className='badge ok';status('RESULTS READY');
-  E.notice.textContent='Full Name, NRIC Number, Nationality and Gender captured from dedicated regions. Uncertain OCR is never silently corrected.';
+  E.notice.textContent='Full Name, NRIC Number, Nationality, Gender and Address captured from dedicated regions. Uncertain OCR is never silently corrected.';
 
   // Background corroboration never replaces the primary field. Disagreement
   // changes status to UNCERTAIN and preserves both candidates.
@@ -1811,5 +1854,33 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
   window.OCR_MASTER_V23_TEST={passed:f.length===0,failures:f};
 })();
 </script>
+
+<script id="v24-exact-capture-regression">
+(function(){
+  "use strict";
+  const failures=[];
+  const assert=(n,v)=>{if(!v)failures.push(n);};
+
+  const roi=Function.prototype.toString.call(cropFrontNricRegions);
+  assert("NRIC ROI",roi.includes("nric:crop"));
+  assert("Full Name ROI",roi.includes("name:crop"));
+  assert("Address ROI",roi.includes("address:crop"));
+  assert("Nationality ROI",roi.includes("nationality:crop"));
+
+  const a=Function.prototype.toString.call(ocrStrictAddressRows);
+  assert("five-row address OCR",a.includes("cropStrictAddressRows(c)"));
+  assert("no address fallback guessing",a.includes("UNCERTAIN"));
+
+  const ex=Function.prototype.toString.call(extract);
+  assert("Address field emitted",/mk\(\s*['"]Address['"]/.test(ex));
+  assert("Race field absent",!/mk\(\s*['"]Race['"]/.test(ex));
+
+  window.OCR_MASTER_V24_TEST={
+    passed:failures.length===0,
+    failures
+  };
+})();
+</script>
+
 </body>
 </html>
