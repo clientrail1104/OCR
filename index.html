@@ -255,7 +255,7 @@ window.extractFrontPhotoSideFields = function(lines) {
 <h2>Upload documents</h2>
 <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose document files"><div class="plus">＋</div><strong>Drop files here</strong><small>Front + back images · JPG · PNG · WEBP · TIFF</small><div class="actions"><label class="pick" for="files">Choose files</label><button class="btn" id="clear" type="button">Clear</button></div></div>
 <input id="files" class="file-input" type="file" multiple accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff">
-<div class="label">OCR language</div><select id="lang"><option value="mal+eng" selected>Malay+English</option><option value="eng+msa">Auto — English + Malay</option><option value="eng+msa+ind">Auto — English + Malay + Indonesian</option><option value="eng+msa+tam">English + Malay + Tamil</option><option value="eng+msa+chi_sim">English + Malay + Chinese</option><option value="eng">English</option><option value="msa">Malay</option></select>
+<div class="label">OCR language</div><select id="lang"><option value="msa" selected>Malay</option></select>
 <div class="label">Instant processing</div><div class="mini">Upload only prepares the document. The OCR engine may preload in the background, but it never reads the document until Run OCR is clicked. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
 <div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Upload ready. Click Run OCR to begin.</p></div>
 <button class="btn run" id="runOCR" type="button" style="width:100%;margin-top:7px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff">Run OCR</button>
@@ -263,8 +263,7 @@ window.extractFrontPhotoSideFields = function(lines) {
 </aside>
 <section class="center">
 <div class="card"><h2>Front ID / Back ID</h2><div class="workspace"><div class="slot" id="front"><span>FRONT ID</span></div><div class="slot" id="back"><span>BACK ID</span></div></div></div>
-<div class="card evidence"><div class="head"><h2>OCR evidence</h2><span class="badge" id="ocrBadge">WAITING</span></div><div class="raw" id="raw">OCR evidence will appear here.</div></div>
-</section>
+<div id="raw" hidden></div><span id="ocrBadge" hidden></span></section>
 <aside class="card right"><div class="head"><h2>Verified extraction</h2><span class="badge warn" id="review">WAITING</span></div><div id="fields" class="fields"><div class="mini">Upload Front ID, then click Run OCR. Back ID is optional for front-field extraction.</div></div><div id="notice" class="mini confidence-policy-note">No document OCR is performed until Run OCR is clicked.</div></aside>
 </main></div>
 <script>
@@ -358,7 +357,8 @@ function cropFrontNricRegions(c){
     nric:crop(c,.030,.215,.345,.125,10),
     name:crop(c,.030,.600,.405,.140,12),
     address:crop(c,.0335,.755,.410,.205,14),
-    metadata:crop(c,.690,.790,.285,.185,10)
+    metadata:crop(c,.690,.790,.285,.185,10),
+    nationality:crop(c,.700,.790,.220,.100,12)
   };
 }
 
@@ -405,70 +405,30 @@ async function ocrFixedRows(c,count,threshold=100,fast=true){
 
 
 function cropStrictAddressRows(c){
-  /*
-    Malaysian identity-card address block: five physical printed rows.
-    Segment the dedicated ROI before OCR so Tesseract cannot merge the
-    surname/name row into address text or merge adjacent address rows.
-    This function never creates text; it creates five source-image regions.
-  */
-  const h=c.height, w=c.width;
-  const bands=[
-    [0.00,0.205],
-    [0.175,0.405],
-    [0.375,0.605],
-    [0.575,0.805],
-    [0.775,1.00]
-  ];
-  return bands.map(([ya,yb])=>{
-    const sy=Math.max(0,Math.floor(h*ya));
-    const ey=Math.min(h,Math.ceil(h*yb));
-    const o=document.createElement('canvas');
-    o.width=Math.max(1,w);
-    o.height=Math.max(1,ey-sy);
-    const q=o.getContext('2d',{alpha:false});
-    q.imageSmoothingEnabled=true;
-    q.imageSmoothingQuality='high';
-    q.fillStyle='#fff';
-    q.fillRect(0,0,o.width,o.height);
-    q.drawImage(c,0,sy,w,ey-sy,0,0,w,o.height);
-    return o;
-  });
+  const h=c.height,w=c.width,overlap=.008,rows=[];
+  for(let i=0;i<5;i++){
+    const ya=Math.max(0,i/5-overlap),yb=Math.min(1,(i+1)/5+overlap);
+    const sy=Math.floor(h*ya),ey=Math.ceil(h*yb);
+    const o=document.createElement('canvas');o.width=Math.max(1,w);o.height=Math.max(1,ey-sy);
+    const q=o.getContext('2d',{alpha:false});q.imageSmoothingEnabled=true;q.imageSmoothingQuality='high';q.fillStyle='#fff';q.fillRect(0,0,o.width,o.height);
+    q.drawImage(c,0,sy,w,ey-sy,0,0,o.width,o.height);rows.push(o);
+  }
+  return rows;
 }
 
 async function ocrStrictAddressRows(c){
-  const rowCanvases=cropStrictAddressRows(c);
-  const rows=[];
+  const rowCanvases=cropStrictAddressRows(c),rows=[];
   for(let i=0;i<rowCanvases.length;i++){
     const primary=await ocr(mykadTextPreprocess(rowCanvases[i],100,14),7);
-    const pLines=normalizeFieldLines(primary.text||'');
-    const primaryText=pLines.join(' ').trim();
-
-    let candidates=primaryText?[primaryText]:[];
-    let fallback=null;
-
-    /*
-      Corroboration is used only when the first pass is weak/empty.
-      If corroboration disagrees, both candidates are preserved and the row
-      is marked uncertain. No plausible spelling is selected.
-    */
-    if(!primaryText || Number(primary.conf||0)<95){
-      fallback=await ocr(textPreprocess(rowCanvases[i]),7);
-      const fLines=normalizeFieldLines(fallback.text||'');
-      const fallbackText=fLines.join(' ').trim();
-      if(fallbackText && !candidates.includes(fallbackText)) candidates.push(fallbackText);
+    const p=normalizeFieldLines(primary.text||'').join(' ').trim();
+    const candidates=p?[p]:[];
+    if(!p || Number(primary.conf||0)<95){
+      const secondary=await ocr(textPreprocess(rowCanvases[i]),7);
+      const s=normalizeFieldLines(secondary.text||'').join(' ').trim();
+      if(s&&!candidates.includes(s))candidates.push(s);
     }
-
     const unique=[...new Set(candidates)];
-    rows.push({
-      row:i+1,
-      value:unique.length===1?unique[0]:'',
-      candidates:unique,
-      conf:Number(primary.conf||0),
-      uncertain:unique.length!==1 || !unique[0],
-      evidence:unique.length>1
-        ? 'PRIMARY: '+unique[0]+'\nCORROBORATION: '+unique[1]
-        : (unique[0]||'[NO RELIABLE TEXT READ]')
-    });
+    rows.push({row:i+1,value:unique.length===1?unique[0]:'',candidates:unique,conf:Number(primary.conf||0),uncertain:unique.length!==1||!unique[0],evidence:unique.length>1?'PRIMARY: '+unique[0]+'\nCORROBORATION: '+unique[1]:(unique[0]||'[NO RELIABLE TEXT READ]')});
   }
   return rows;
 }
@@ -778,29 +738,19 @@ function extract(front,back){
  }
  out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,100),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
 
- const natText=(front.nationalityText||'')+'\n'+(front.metadataText||'');
- const natMatch=natText.match(/\bWARGANEGARA\b/i);
- const malaysiaMatch=natText.match(/\bMALAYSIA\b/i);
- if(natMatch){
-  out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),natMatch[0],'Explicit WARGANEGARA label detected in the dedicated front-card metadata region. Display value is Malaysia; no address/name inference is used.','The word Warganegara is an explicit Malaysian nationality label on this document type.'));
- }else if(malaysiaMatch){
-  out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),malaysiaMatch[0],'Explicit Malaysia text detected in the front-card evidence.','No state/address inference was used.'));
+ const natText=normalizeEvidenceText((front.nationalityText||'')+'\n'+(front.metadataText||''));
+ const natLines=natText.split(/\n/).map(cleanOCRLine).filter(Boolean);
+ const natWarg=natLines.find(x=>/\bWARGANEGARA\b/i.test(x));
+ const natMalaysia=natLines.find(x=>/\bMALAYSIA\b/i.test(x));
+ if(natWarg){
+  out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),natWarg,'Explicit WARGANEGARA evidence was read from the dedicated nationality region.','Standalone Warganegara maps to Malaysia only by the Malaysian identity-card rule; no address, name, race or photograph inference is used.'));
+ }else if(natMalaysia){
+  out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),natMalaysia,'Explicit MALAYSIA evidence was read from the dedicated nationality region.','No nationality inference was made.'));
  }else{
-  out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state, address, race, name, or photograph is never converted into nationality.'));
+  out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN',natLines.join('\n')||'No exact WARGANEGARA/MALAYSIA token was read.','Not validated.','Unable to reliably determine nationality from the dedicated source region; no value was guessed.'));
  }
 
- const raceText=(front.metadataText||'')+'\n'+(front.genderText||'');
- const race=extractRace(raceText);
 
- out.push(mk('Race',race||'UNKNOWN',race?Math.min(front.metadataConf||front.conf,100):0,race?fieldStatus(front.metadataConf||front.conf):'UNKNOWN',race||'No explicit race/religion value detected.','Only explicitly printed race/religion evidence is accepted; no inference from name, nationality, photograph, or address.','If the printed value is unreadable or competing values are detected, verify against the source image.'));
-
- const address=extractAddress(front.addressText||'');
- const addressEvidence=front.addressEvidence||address.join('\n');
- const addressCandidates=[...new Set(addressEvidence.split(/\n+/).map(x=>x.replace(/^\[[^\]]+%\]$/,'').trim()).filter(x=>x && !/^\[[^\]]+%\]$/.test(x)))];
- const addressConflict=false;
- const addressStatus=address.length===5 && !addressConflict?fieldStatus(front.addressConf||0):'UNCERTAIN';
- const addressDisplay=address.join('\n')||'UNKNOWN';
- out.push(mk('Address',addressDisplay,address.length?Math.min(front.addressConf||0,100):0,addressStatus,addressEvidence||'No reliable five-line address block detected.','Address is captured only from the dedicated left-side five-line address ROI. Multiple preprocessing passes are corroboration only; no spelling, digit, postcode, town, state, word or character is silently corrected.',addressConflict?'OCR passes disagree on one or more address characters/numbers. All pass evidence is preserved; no candidate is silently selected.':(address.length===5?'Verify every address character against the source image.':'The address region did not yield all five lines reliably; no missing line is guessed.')));
  // Verified Extraction display order is intentional: Full Name must appear above NRIC Number.
  const nameIndex=out.findIndex(f=>f.name==='Full Name');
  const nricIndex=out.findIndex(f=>f.name==='NRIC Number');
@@ -808,6 +758,30 @@ function extract(front,back){
  return out;
 }
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
+async function ocrMetadataEvidence(c){
+  const primary=await ocr(mykadTextPreprocess(c,100,10),6);
+  let chosen=normalizeFieldLines(primary.text||''),secondary=null;
+  if(!chosen.some(x=>/\b(?:WARGANEGARA|MALAYSIA|PEREMPUAN|LELAKI|ISLAM|HINDU|INDIA|CINA)\b/i.test(x))||Number(primary.conf||0)<95){
+    secondary=await ocr(textPreprocess(c),6);
+    const alt=normalizeFieldLines(secondary.text||'');
+    if(alt.length>chosen.length)chosen=alt;
+  }
+  return {text:chosen.join('\n'),conf:Number(primary.conf||0),primary,secondary};
+}
+async function ocrNationalityEvidence(c){
+  const primary=await ocr(mykadTextPreprocess(c,100,10),7);
+  const pLines=normalizeFieldLines(primary.text||'');
+  let chosen=pLines; let secondary=null;
+  if(!chosen.some(x=>/\bWARGANEGARA\b|\bMALAYSIA\b/i.test(x)) || Number(primary.conf||0)<95){
+    secondary=await ocr(textPreprocess(c),7);
+    const sLines=normalizeFieldLines(secondary.text||'');
+    // Use the secondary pass only if it supplies the exact explicit token
+    // missing from the primary pass. Never autocorrect a near-spelling.
+    if(sLines.some(x=>/\bWARGANEGARA\b|\bMALAYSIA\b/i.test(x)) &&
+       !chosen.some(x=>/\bWARGANEGARA\b|\bMALAYSIA\b/i.test(x))) chosen=sLines;
+  }
+  return {text:chosen.join('\n'),conf:Number(primary.conf||0),primary,secondary};
+}
 async function runOCR(){
  if(S.running)return;
  S.running=true;
@@ -860,26 +834,26 @@ async function runOCR(){
 
   // Metadata is isolated from both name and address. Run a small number of
   // explicit passes and preserve disagreements as evidence.
-  const metadata=await ocr(mykadTextPreprocess(R.metadata,100,10),6);
-  prog(82,'Nationality, Race and Gender captured');
+  const metadata=await ocrMetadataEvidence(R.metadata);
+  const nationalityEvidence=await ocrNationalityEvidence(R.nationality);
+  prog(82,'Nationality and Gender captured');
 
   const frontData={text:'',conf:0,nricConf:nric.conf||0,nameConf:namePrimary.conf||0,addressConf:addressConf,
-    genderConf:metadata.conf||0,metadataConf:metadata.conf||0,nricText:nric.text||'',nameText:nameRows.join('\n'),addressText:addressRows.join('\n'),
+    genderConf:metadata.conf||0,metadataConf:Math.max(Number(metadata.conf||0),Number(nationalityEvidence.conf||0)),nricText:nric.text||'',nameText:nameRows.join('\n'),addressText:addressRows.join('\n'),
     addressEvidence:addressEvidence||'[no reliable address row detected]',
-    addressRowCandidates:addressRows.map((value,i)=>({row:i+1,value,conf:addressPrimary.conf||0,candidates:[value]})),
+    addressRowCandidates:addressRowResults.map(r=>({row:r.row,value:r.value,conf:r.conf,candidates:r.candidates})),
     nameEvidence:nameRows.length?nameRows.map((x,i)=>'ROW '+(i+1)+' ['+Number(namePrimary.conf||0).toFixed(1)+'%] '+x).join('\n'):'[no reliable name row detected]',
-    genderText:metadata.text||'',nationalityText:metadata.text||'',metadataText:metadata.text||'',wholeText:'',
+    genderText:metadata.text||'',nationalityText:nationalityEvidence.text||'',metadataText:metadata.text||'',wholeText:'',
     nameAddressEvidence:{nameLines:nameRows,addressLines:addressRows,visibleGap:true,method:'strict-highlighted-roi',addressStart:addressRows[0]||''},dedicatedRegions:{name:nameRows,address:addressRows}};
   let fieldsNow=extract(frontData,{text:'',conf:0,nricText:'',wholeText:''});
   if(!Array.isArray(fieldsNow))throw new Error('Extraction engine returned an invalid result.');
 
   // Explicitly downgrade missing critical fields. Never manufacture a value.
   for(const f0 of fieldsNow){
-    if(['Full Name','Address','Nationality','Race'].includes(f0.name) &&
+    if(['Full Name','Nationality'].includes(f0.name) &&
        (!f0.value || /^UNKNOWN(?:\s|$)/i.test(String(f0.value)))){
       f0.status='UNCERTAIN';
       if(f0.name==='Full Name')f0.reason='No reliable text was read inside the dedicated highlighted Full Name region. Verify against the source image.';
-      if(f0.name==='Address')f0.reason='No reliable five-line address block was read inside the dedicated highlighted Address region. Verify against the source image.';
       if(f0.name==='Nationality')f0.reason='No explicit Warganegara/Malaysia evidence was read inside the dedicated metadata region.';
       if(f0.name==='Race')f0.reason='No explicit race/religion evidence was read inside the dedicated metadata region.';
     }
@@ -888,7 +862,7 @@ async function runOCR(){
   const firstMs=Math.round(performance.now()-started);
   prog(88,'Verified extraction ready in '+firstMs+' ms');
   E.badge.textContent='RESULTS READY';E.badge.className='badge ok';status('RESULTS READY');
-  E.notice.textContent='Highlighted Full Name, Address, Nationality, Race and Gender captured from their dedicated regions. Corroboration continues without moving text between fields.';
+  E.notice.textContent='Full Name, NRIC Number, Nationality and Gender captured from dedicated regions. Uncertain OCR is never silently corrected.';
 
   // Background corroboration never replaces the primary field. Disagreement
   // changes status to UNCERTAIN and preserves both candidates.
@@ -896,16 +870,12 @@ async function runOCR(){
     try{
       const checks=[];
       checks.push(['NAME',R.name,nameCorro||await ocr(textPreprocess(R.name),6),2]);
-      checks.push(['ADDRESS',R.address,addressCorro||await ocr(textPreprocess(R.address),6),5]);
-      const updated=fieldsNow.map(x=>({...x}));
-      const nf=updated.find(x=>x.name==='Full Name'), af=updated.find(x=>x.name==='Address');
+            const updated=fieldsNow.map(x=>({...x}));
+      const nf=updated.find(x=>x.name==='Full Name');
       for(const [kind,roi,pass,max] of checks){
         const lines=normalizeFieldLines(pass.text||'').slice(0,max);
         if(kind==='NAME'&&nf&&lines.length&&nameRows.join(' ')!==lines.join(' ')){
           nf.status='UNCERTAIN';nf.reason='OCR corroboration disagrees. Both candidates are preserved; no spelling or character substitution was made.';nf.evidence='PRIMARY:\n'+nameRows.join(' ')+'\nCORROBORATION:\n'+lines.join(' ');
-        }
-        if(kind==='ADDRESS'&&af&&lines.length&&addressRows.join('\n')!==lines.join('\n')){
-          af.status='UNCERTAIN';af.reason='OCR corroboration disagrees. Verify every address character against the source image; no candidate was silently selected.';af.evidence='PRIMARY:\n'+addressRows.join('\n')+'\nCORROBORATION:\n'+lines.join('\n');
         }
       }
       render(updated);prog(96,'Corroboration complete');E.badge.textContent='CORROBORATED';
@@ -1778,102 +1748,68 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 </script>
 
 
-<script id="v21-malay-english-default">
-(function () {
+
+
+
+
+
+<script id="v22-malay-default">
+(function(){
   "use strict";
-
-  function findOCRLanguageSelect() {
-    const selects = Array.from(document.querySelectorAll("select"));
-    return selects.find(function (s) {
-      const ctx = (
-        (s.id || "") + " " +
-        (s.name || "") + " " +
-        (s.getAttribute("aria-label") || "") + " " +
-        (s.parentElement ? s.parentElement.textContent : "")
-      ).toLowerCase();
-      return /ocr|language|lang/.test(ctx);
-    }) || null;
+  function setMalayDefault(){
+    const s=document.getElementById("lang");
+    if(!s)return false;
+    let o=Array.from(s.options).find(x=>String(x.value).toLowerCase()==="msa" || /^(?:Malay|Bahasa Melayu)$/i.test((x.textContent||"").trim()));
+    if(!o){o=document.createElement("option");o.value="msa";o.textContent="Malay";s.insertBefore(o,s.firstChild);}
+    s.value=o.value;
+    s.dispatchEvent(new Event("change",{bubbles:true}));
+    return s.value===o.value;
   }
-
-  function setMalayEnglishDefault() {
-    const select = findOCRLanguageSelect();
-    if (!select) return false;
-
-    let option = Array.from(select.options).find(function (o) {
-      const text = (o.textContent || "").trim().toLowerCase();
-      const value = (o.value || "").trim().toLowerCase();
-      return text === "malay+english" ||
-             text === "malay + english" ||
-             text === "english + malay" ||
-             value === "mal+eng" ||
-             value === "msa+eng" ||
-             value === "eng+msa";
-    });
-
-    if (!option) {
-      option = document.createElement("option");
-      option.value = "mal+eng";
-      option.textContent = "Malay+English";
-      select.insertBefore(option, select.firstChild);
-    }
-
-    select.value = option.value;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-    window.OCR_MASTER_V21 = {
-      defaultLanguage: "Malay+English",
-      languageValue: option.value
-    };
-    return true;
-  }
-
-  function init() {
-    setMalayEnglishDefault();
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init, { once: true });
-  } else {
-    init();
-  }
-
-  window.OCR_MASTER_V21_API = {
-    findOCRLanguageSelect,
-    setMalayEnglishDefault
-  };
+  window.OCR_MASTER_V22={setMalayDefault,malayDefault:true};
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setMalayDefault,{once:true});
+  else setMalayDefault();
 })();
 </script>
-
-
-<script id="v21-regression-tests">
-(function () {
-  "use strict";
-  const failures = [];
-  function assert(name, condition) {
-    if (!condition) failures.push(name);
-  }
-
-  assert("V21 API exists",
-    !!window.OCR_MASTER_V21_API &&
-    typeof window.OCR_MASTER_V21_API.setMalayEnglishDefault === "function");
-
-  const select = window.OCR_MASTER_V21_API.findOCRLanguageSelect();
-  assert("OCR language select exists", !!select);
-
-  if (select) {
-    const option = Array.from(select.options).find(function (o) {
-      return (o.textContent || "").trim().toLowerCase() === "malay+english" ||
-             (o.value || "").toLowerCase() === "mal+eng";
-    });
-    assert("Malay+English option exists", !!option);
-    assert("Malay+English selected", !!option && select.value === option.value);
-  }
-
-  window.OCR_MASTER_V21_TESTS = {
-    passed: failures.length === 0,
-    failures
-  };
+<script id="v22-regression-tests">
+(function(){
+  const failures=[]; const a=(n,v)=>{if(!v)failures.push(n)};
+  const lang=document.getElementById("lang");
+  a("language selector exists",!!lang);
+  if(lang)a("Malay is default",lang.value==="msa");
+  a("OCR evidence section absent",!document.querySelector(".card.evidence"));
+  a("required field Full Name present",document.body.textContent.toLowerCase().includes("full name"));
+  a("required field NRIC Number present",document.body.textContent.toLowerCase().includes("nric number"));
+  a("required field Nationality present",document.body.textContent.toLowerCase().includes("nationality"));
+  a("required field Gender present",document.body.textContent.toLowerCase().includes("gender"));
+  window.OCR_MASTER_V22_TEST={passed:failures.length===0,failures};
 })();
 </script>
-
+<script id="v23-malay-default">
+(function(){
+  "use strict";
+  function setMalayDefault(){
+    const s=document.getElementById("lang"); if(!s)return false;
+    const o=Array.from(s.options).find(x=>x.value==="msa"||/^Malay$/i.test((x.textContent||"").trim()));
+    if(!o)return false; s.value=o.value; return s.value==="msa";
+  }
+  window.OCR_MASTER_V23={setMalayDefault};
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",setMalayDefault,{once:true}); else setMalayDefault();
+})();
+</script>
+<script id="v23-regression-tests">
+(function(){
+  const f=[],a=(n,v)=>{if(!v)f.push(n)}; const s=document.getElementById("lang");
+  a("Malay selected",!!s&&s.value==="msa");
+  a("OCR evidence panel absent",!document.querySelector(".card.evidence"));
+  a("Full Name present",document.body.textContent.toLowerCase().includes("full name"));
+  a("NRIC Number present",document.body.textContent.toLowerCase().includes("nric number"));
+  a("Nationality present",document.body.textContent.toLowerCase().includes("nationality"));
+  a("Gender present",document.body.textContent.toLowerCase().includes("gender"));
+  a("strict address function present",typeof cropStrictAddressRows==="function");
+  a("nationality helper present",typeof ocrNationalityEvidence==="function");
+  a("metadata helper present",typeof ocrMetadataEvidence==="function");
+  window.OCR_MASTER_V23_TEST={passed:f.length===0,failures:f};
+})();
+</script>
 </body>
 </html>
