@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Verified Extraction — MAXIMUS ENERGY ENTERPRISE</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#edf3f7">
+<title>OCR MASTER — Verified Extraction</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <style>
 :root {
   --bg: #edf3f7;
@@ -12,733 +14,495 @@
   --cyan: #10c9c1;
   --violet: #7967f5;
   --ok: #13875f;
-  --ok-bg: #e6f6f0;
   --warn: #a76e00;
-  --warn-bg: #fdf6e7;
   --bad: #c43f56;
-  --bad-bg: #fde8eb;
-  --out: 8px 8px 18px #cbd5dc, -8px -8px 18px #ffffff;
-  --out-sm: 4px 4px 10px #cbd5dc, -4px -4px 10px #ffffff;
-  --in: inset 3px 3px 8px #cbd5dc, inset -3px -3px 8px #ffffff;
-  --radius: 16px;
+  --out: 10px 10px 22px #cbd5dc, -10px -10px 22px #fff;
+  --in: inset 5px 5px 12px #cbd5dc, inset -5px -5px 12px #fff;
+  --card-bg: rgba(255, 255, 255, 0.45);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
 body {
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--ink);
-  line-height: 1.5;
-  padding: 20px;
-  min-height: 100vh;
+  padding: 12px;
+  overflow: hidden;
 }
 
-.container {
-  max-width: 1400px;
-  margin: 0 auto;
+.app {
+  height: calc(100vh - 24px);
+  max-width: 1750px;
+  margin: auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 
-/* Header */
-header.top-header {
-  background: var(--bg);
-  padding: 18px 24px;
-  border-radius: var(--radius);
-  box-shadow: var(--out);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.logo-icon {
-  width: 48px;
+.top {
   height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.brand { display: flex; gap: 12px; align-items: center; }
+.logo {
+  width: 42px; height: 42px;
   border-radius: 14px;
-  background: var(--bg);
+  display: grid; place-items: center;
   box-shadow: var(--out);
-  display: grid;
-  place-items: center;
-  font-weight: 900;
-  font-size: 14px;
+  font-size: 11px; font-weight: 950;
   color: var(--cyan);
-  letter-spacing: 1px;
+  background: var(--bg);
 }
 
-.brand-text h1 {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--ink);
+h1 { font-size: 18px; margin: 0; letter-spacing: -0.02em; }
+.sub { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.status {
+  padding: 8px 14px; border-radius: 99px;
+  box-shadow: var(--out); font-size: 9px; font-weight: 900;
+  display: flex; align-items: center; background: var(--bg);
 }
-
-.brand-text .sub {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.header-badges {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: 99px;
-  font-size: 11px;
-  font-weight: 800;
-  box-shadow: var(--out-sm);
-  letter-spacing: 0.03em;
-}
-
-.badge-ok { color: var(--ok); background: var(--ok-bg); }
-.badge-violet { color: var(--violet); }
-.badge-cyan { color: var(--cyan); }
-
 .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  margin-right: 6px;
-  display: inline-block;
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; margin-right: 7px; background: var(--ok);
 }
 
-/* Overview Summary Card */
-.summary-bar {
+.grid {
+  flex: 1; min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.kpi-card {
-  background: var(--bg);
-  padding: 16px 20px;
-  border-radius: var(--radius);
-  box-shadow: var(--out);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.kpi-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  margin-bottom: 6px;
-}
-
-.kpi-value {
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--ink);
-  word-break: break-word;
-}
-
-/* Controls Bar */
-.controls-bar {
-  background: var(--bg);
-  padding: 14px 20px;
-  border-radius: var(--radius);
-  box-shadow: var(--out);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 15px;
-  flex-wrap: wrap;
-}
-
-.tab-group {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.btn {
-  background: var(--bg);
-  border: none;
-  padding: 8px 16px;
-  border-radius: 10px;
-  box-shadow: var(--out-sm);
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--ink);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-}
-
-.btn:active, .btn.active {
-  box-shadow: var(--in);
-  color: var(--violet);
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, var(--cyan), var(--violet));
-  color: #fff;
-  box-shadow: 4px 4px 10px rgba(16,201,193,0.3);
-}
-
-.btn-primary:active {
-  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.2);
-}
-
-.search-box {
-  position: relative;
-  flex: 1;
-  max-width: 320px;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 9px 14px;
-  border-radius: 10px;
-  border: none;
-  background: var(--bg);
-  box-shadow: var(--in);
-  font-size: 12px;
-  color: var(--ink);
-  outline: none;
-}
-
-/* Document Cards Grid */
-.doc-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 20px;
-}
-
-@media (max-width: 850px) {
-  .doc-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.doc-card {
-  background: var(--bg);
-  border-radius: var(--radius);
-  box-shadow: var(--out);
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  transition: opacity 0.2s;
-}
-
-.doc-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  grid-template-columns: 280px minmax(0, 1fr) 480px;
   gap: 12px;
-  border-bottom: 2px solid rgba(0,0,0,0.04);
-  padding-bottom: 12px;
 }
 
-.doc-title-area h2 {
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--ink);
+.card {
+  background: var(--bg); border-radius: 18px;
+  box-shadow: var(--out); padding: 14px;
+  min-width: 0; min-height: 0; display: flex; flex-direction: column;
 }
 
-.doc-title-area p {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 600;
-  margin-top: 2px;
+.left { overflow-y: auto; }
+.center { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; }
+.right { display: flex; flex-direction: column; overflow: hidden; }
+
+h2 { font-size: 12px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink); }
+.label { font-size: 8px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 900; margin: 12px 0 6px; }
+
+.drop {
+  border: 1.5px dashed rgba(16,201,193,.72); border-radius: 14px;
+  padding: 16px; text-align: center; box-shadow: var(--in);
+}
+.plus { font-size: 26px; color: var(--cyan); font-weight: 900; line-height: 1; }
+.drop strong { display: block; font-size: 11px; margin-top: 4px; }
+.drop small { display: block; color: var(--muted); font-size: 8px; line-height: 1.45; margin-top: 2px; }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+.pick, .btn {
+  min-height: 34px; border: 0; border-radius: 10px;
+  padding: 7px 10px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg); box-shadow: 5px 5px 10px #cbd5dc, -5px -5px 10px #fff;
+  font-size: 9px; font-weight: 900; cursor: pointer; color: var(--ink);
+}
+.pick { background: linear-gradient(135deg, var(--cyan), var(--violet)); color: #fff; }
+.pick:active, .btn:active { box-shadow: var(--in); }
+
+select {
+  width: 100%; border: 0; border-radius: 10px; padding: 9px;
+  background: var(--bg); box-shadow: var(--in); font-size: 9px; color: var(--ink); font-weight: 700;
 }
 
-/* Field Table / List */
-.field-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.mini { font-size: 8.5px; color: var(--muted); line-height: 1.45; }
+
+.workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.slot {
+  height: 130px; border-radius: 14px; box-shadow: var(--in);
+  display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;
+}
+.slot img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.slot span { font-size: 9px; color: var(--muted); font-weight: 900; }
+
+.process { margin-top: 10px; padding: 10px; border-radius: 12px; box-shadow: var(--in); }
+.bar { height: 7px; border-radius: 99px; background: #dbe3e8; overflow: hidden; }
+.bar i { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
+.process p { font-size: 8px; color: var(--muted); margin: 6px 0 0; font-weight: 700; }
+
+.evidence { min-height: 0; display: flex; flex-direction: column; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+
+.badge { padding: 4px 8px; border-radius: 99px; box-shadow: var(--in); font-size: 8px; font-weight: 950; }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+
+.raw {
+  flex: 1; min-height: 0; overflow: auto;
+  padding: 10px; border-radius: 12px; box-shadow: var(--in);
+  font: 8.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(255,255,255,0.2);
 }
 
-.field-row {
-  background: rgba(255, 255, 255, 0.45);
-  padding: 10px 14px;
-  border-radius: 12px;
-  box-shadow: var(--in);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  position: relative;
+/* Tab Navigation for Verified Extraction */
+.doc-tabs {
+  display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px;
+}
+.tab-btn {
+  padding: 6px 10px; border-radius: 8px; font-size: 8px; font-weight: 900;
+  border: 0; background: var(--bg); box-shadow: 3px 3px 6px #cbd5dc, -3px -3px 6px #fff;
+  cursor: pointer; white-space: nowrap; color: var(--muted); transition: all 0.2s;
+}
+.tab-btn.active {
+  color: #fff; background: linear-gradient(135deg, var(--cyan), var(--violet)); box-shadow: var(--in);
 }
 
-.field-name {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  font-weight: 800;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* Fields Layout */
+.fields-scroll {
+  flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 12px;
 }
 
-.field-val {
-  font-size: 13px;
-  font-weight: 750;
-  color: var(--ink);
-  white-space: pre-wrap;
-  word-break: break-word;
+.doc-section {
+  padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.35); box-shadow: var(--in);
 }
-
-.copy-btn {
-  background: none;
-  border: none;
-  font-size: 10px;
-  color: var(--violet);
-  cursor: pointer;
-  font-weight: 700;
-  opacity: 0.7;
+.doc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid rgba(112, 128, 138, 0.2); padding-bottom: 6px; margin-bottom: 8px;
 }
+.doc-title { font-size: 10px; font-weight: 950; color: var(--ink); }
 
-.copy-btn:hover {
-  opacity: 1;
-  text-decoration: underline;
+.field-grid { display: grid; gap: 6px; }
+.field { padding: 8px; border-radius: 10px; background: var(--card-bg); box-shadow: 3px 3px 8px #cbd5dc, -3px -3px 8px #fff; }
+.ftop { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.fname { font-size: 8.5px; font-weight: 900; color: var(--muted); text-transform: uppercase; }
+.fval { font-size: 10.5px; font-weight: 800; margin-top: 3px; color: var(--ink); white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
+
+@media(max-width: 1200px) {
+  body { overflow: auto; }
+  .app { height: auto; min-height: 100vh; }
+  .grid { grid-template-columns: 260px 1fr; }
+  .right { grid-column: 1 / -1; min-height: 450px; }
 }
-
-/* Special formatting for Grade/Category bullet lists */
-.special-tags {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.tag-item {
-  display: inline-flex;
-  align-items: center;
-  background: var(--bg);
-  padding: 6px 12px;
-  border-radius: 8px;
-  box-shadow: var(--out-sm);
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--ink);
-}
-
-.tag-item span {
-  color: var(--violet);
-  margin-right: 6px;
-}
-
-/* Notification Toast */
-#toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background: var(--ink);
-  color: #fff;
-  padding: 10px 18px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-  opacity: 0;
-  transform: translateY(10px);
-  transition: all 0.25s ease;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-#toast.show {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Print Styling */
-@media print {
-  body { background: #fff; color: #000; padding: 0; }
-  .controls-bar, .copy-btn, #toast { display: none !important; }
-  .doc-card, .kpi-card, header.top-header { box-shadow: none !important; border: 1px solid #ccc; }
-  .field-row { background: #f9f9f9 !important; box-shadow: none !important; border: 1px solid #eee; }
+@media(max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+  .right { grid-column: auto; }
+  .workspace { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
 
-<div class="container">
-
-  <!-- Header -->
-  <header class="top-header">
+<div class="app">
+  <header class="top">
     <div class="brand">
-      <div class="logo-icon">OCR</div>
-      <div class="brand-text">
-        <h1>Verified Extraction Registry</h1>
-        <div class="sub">Automated Extraction & Data Verification Portal</div>
+      <div class="logo">OCR</div>
+      <div>
+        <h1>OCR MASTER</h1>
+        <div class="sub">Structured Document Verification Engine · SSM & CIDB Extraction</div>
       </div>
     </div>
-    <div class="header-badges">
-      <div class="badge badge-ok"><span class="dot"></span>STATUS: VERIFIED</div>
-      <div class="badge badge-cyan">3 DOCUMENTS</div>
-      <div class="badge badge-violet">ENTITY ID: 001772726-T</div>
+    <div class="status">
+      <span class="dot"></span>
+      <span>SYSTEM READY — EXTRACTION VERIFIED</span>
     </div>
   </header>
 
-  <!-- Key Metrics Summary Bar -->
-  <section class="summary-bar">
-    <div class="kpi-card">
-      <div class="kpi-label">Business Name</div>
-      <div class="kpi-value">MAXIMUS ENERGY ENTERPRISE</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">SSM Registration No.</div>
-      <div class="kpi-value">001772726-T</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">CIDB Registration No.</div>
-      <div class="kpi-value">0120171207-SL081820</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Primary Business Address</div>
-      <div class="kpi-value" style="font-size: 11px;">PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN</div>
-    </div>
-  </section>
-
-  <!-- Controls Bar (Tabs, Search, Export) -->
-  <section class="controls-bar">
-    <div class="tab-group">
-      <button class="btn active" onclick="filterTab('all', this)">All Records (3)</button>
-      <button class="btn" onclick="filterTab('ssm-e', this)">SSM Borang E</button>
-      <button class="btn" onclick="filterTab('ssm-d', this)">SSM Borang D</button>
-      <button class="btn" onclick="filterTab('cidb', this)">CIDB Perakuan</button>
-    </div>
-
-    <div style="display: flex; gap: 10px; align-items: center; width: 100%; max-width: 500px; justify-content: flex-end; flex-wrap: wrap;">
-      <div class="search-box">
-        <input type="text" id="searchInput" oninput="searchFields()" placeholder="Search field or value...">
-      </div>
-      <button class="btn btn-primary" onclick="exportJSON()">Export JSON</button>
-      <button class="btn" onclick="exportCSV()">CSV</button>
-      <button class="btn" onclick="window.print()">Print</button>
-    </div>
-  </section>
-
-  <!-- Main Extracted Documents Grid -->
-  <main class="doc-grid" id="documentGrid">
-
-    <!-- Document 1: BORANG E -->
-    <article class="doc-card" data-doc="ssm-e">
-      <div class="doc-card-header">
-        <div class="doc-title-area">
-          <h2>1. BORANG E (SSM)</h2>
-          <p>Perakuan Pembaharuan Pendaftaran</p>
-        </div>
-        <span class="badge badge-ok">VERIFIED</span>
-      </div>
-      <div class="field-list">
-        <div class="field-row">
-          <div class="field-name">Document Form <button class="copy-btn" onclick="copyVal('Borang E (Kaedah 13)')">Copy</button></div>
-          <div class="field-val">Borang E (Kaedah 13)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Document Title <button class="copy-btn" onclick="copyVal('Perakuan Pembaharuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)')">Copy</button></div>
-          <div class="field-val">Perakuan Pembaharuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Issuing Authority <button class="copy-btn" onclick="copyVal('Suruhanjaya Syarikat Malaysia (SSM)')">Copy</button></div>
-          <div class="field-val">Suruhanjaya Syarikat Malaysia (SSM)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Business Name <button class="copy-btn" onclick="copyVal('MAXIMUS ENERGY ENTERPRISE')">Copy</button></div>
-          <div class="field-val">MAXIMUS ENERGY ENTERPRISE</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Registration Number <button class="copy-btn" onclick="copyVal('001772726-T')">Copy</button></div>
-          <div class="field-val">001772726-T</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Expiry Date <button class="copy-btn" onclick="copyVal('24 JUN 2021')">Copy</button></div>
-          <div class="field-val">24 JUN 2021</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Business Address <button class="copy-btn" onclick="copyVal('PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.')">Copy</button></div>
-          <div class="field-val">PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Number of Branches <button class="copy-btn" onclick="copyVal('TIADA')">Copy</button></div>
-          <div class="field-val">TIADA</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Issue Date <button class="copy-btn" onclick="copyVal('25 JUN 2019 (via SISTEM EZBIZ)')">Copy</button></div>
-          <div class="field-val">25 JUN 2019 (via SISTEM EZBIZ)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Registrar Signatory <button class="copy-btn" onclick="copyVal('DATO\' ZAHRAH ABD WAHAB FENNER (Pendaftar Perniagaan Semenanjung Malaysia)')">Copy</button></div>
-          <div class="field-val">DATO' ZAHRAH ABD WAHAB FENNER (Pendaftar Perniagaan Semenanjung Malaysia)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">System Audit Stamp <button class="copy-btn" onclick="copyVal('UserID: EZBIZ Date: Tue Jun 25 10:52:43 MYT 2019')">Copy</button></div>
-          <div class="field-val">UserID: EZBIZ Date: Tue Jun 25 10:52:43 MYT 2019</div>
+  <main class="grid">
+    <!-- Left Panel: Controls & Document Previews -->
+    <aside class="card left">
+      <h2>Document Processing</h2>
+      <div class="drop" id="drop">
+        <div class="plus">＋</div>
+        <strong>Upload Documents</strong>
+        <small>SSM Borang D/E · CIDB Certificates · JPG, PNG, PDF</small>
+        <div class="actions">
+          <label class="pick" for="files">Choose files</label>
+          <button class="btn" id="clear" type="button">Clear</button>
         </div>
       </div>
-    </article>
+      <input id="files" class="file-input" type="file" multiple accept="image/*,.pdf">
 
-    <!-- Document 2: BORANG D -->
-    <article class="doc-card" data-doc="ssm-d">
-      <div class="doc-card-header">
-        <div class="doc-title-area">
-          <h2>2. BORANG D (SSM)</h2>
-          <p>Perakuan Pendaftaran</p>
-        </div>
-        <span class="badge badge-ok">VERIFIED</span>
-      </div>
-      <div class="field-list">
-        <div class="field-row">
-          <div class="field-name">Document Form <button class="copy-btn" onclick="copyVal('Borang D (Kaedah 13)')">Copy</button></div>
-          <div class="field-val">Borang D (Kaedah 13)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Document Title <button class="copy-btn" onclick="copyVal('Perakuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)')">Copy</button></div>
-          <div class="field-val">Perakuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Issuing Authority <button class="copy-btn" onclick="copyVal('Suruhanjaya Syarikat Malaysia (SSM)')">Copy</button></div>
-          <div class="field-val">Suruhanjaya Syarikat Malaysia (SSM)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Business Name <button class="copy-btn" onclick="copyVal('MAXIMUS ENERGY ENTERPRISE')">Copy</button></div>
-          <div class="field-val">MAXIMUS ENERGY ENTERPRISE</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Registration Number <button class="copy-btn" onclick="copyVal('001772726-T')">Copy</button></div>
-          <div class="field-val">001772726-T</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Expiry Date <button class="copy-btn" onclick="copyVal('24 JUN 2018')">Copy</button></div>
-          <div class="field-val">24 JUN 2018</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Business Address <button class="copy-btn" onclick="copyVal('PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.')">Copy</button></div>
-          <div class="field-val">PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Number of Branches <button class="copy-btn" onclick="copyVal('TIADA')">Copy</button></div>
-          <div class="field-val">TIADA</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Issue Date <button class="copy-btn" onclick="copyVal('25 JUN 2017 (via SISTEM EZBIZ)')">Copy</button></div>
-          <div class="field-val">25 JUN 2017 (via SISTEM EZBIZ)</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Registrar Signatory <button class="copy-btn" onclick="copyVal('DATO\' ZAHRAH ABD WAHAB FENNER (Pendaftar Perniagaan Semenanjung Malaysia)')">Copy</button></div>
-          <div class="field-val">DATO' ZAHRAH ABD WAHAB FENNER (Pendaftar Perniagaan Semenanjung Malaysia)</div>
-        </div>
-      </div>
-    </article>
+      <div class="label">OCR Engine Language</div>
+      <select id="lang">
+        <option value="msa+eng" selected>Auto — Bahasa Melayu + English</option>
+        <option value="msa">Bahasa Melayu</option>
+        <option value="eng">English</option>
+      </select>
 
-    <!-- Document 3: CIDB -->
-    <article class="doc-card" data-doc="cidb">
-      <div class="doc-card-header">
-        <div class="doc-title-area">
-          <h2>3. CIDB PERAKUAN PENDAFTARAN</h2>
-          <p>Lembaga Pembangunan Industri Pembinaan Malaysia</p>
-        </div>
-        <span class="badge badge-ok">VERIFIED</span>
+      <div class="label">Processing Pipeline Status</div>
+      <div class="process">
+        <div class="bar"><i id="bar"></i></div>
+        <p id="progress">100% — Extraction complete & verified</p>
       </div>
-      <div class="field-list">
-        <div class="field-row">
-          <div class="field-name">Document Title <button class="copy-btn" onclick="copyVal('Perakuan Pendaftaran CIDB')">Copy</button></div>
-          <div class="field-val">Perakuan Pendaftaran CIDB</div>
+
+      <button class="btn" id="runOCR" type="button" style="width:100%; margin-top:10px; background:linear-gradient(135deg,var(--cyan),var(--violet)); color:#fff">
+        Re-Run OCR Parsing
+      </button>
+
+      <div class="label">Loaded Files</div>
+      <div class="mini">
+        • SSM_Borang_E_Perakuan_Pembaharuan.pdf<br>
+        • SSM_Borang_D_Perakuan_Pendaftaran.pdf<br>
+        • CIDB_Perakuan_Pendaftaran.pdf
+      </div>
+    </aside>
+
+    <!-- Center Panel: Workspace & Raw Text Evidence -->
+    <section class="center">
+      <div class="card">
+        <h2>Document Preview Workspace</h2>
+        <div class="workspace">
+          <div class="slot"><span>SSM BORANG E / D</span></div>
+          <div class="slot"><span>CIDB PERAKUAN</span></div>
         </div>
-        <div class="field-row">
-          <div class="field-name">Issuing Authority <button class="copy-btn" onclick="copyVal('Lembaga Pembangunan Industri Pembinaan Malaysia (CIDB)')">Copy</button></div>
-          <div class="field-val">Lembaga Pembangunan Industri Pembinaan Malaysia (CIDB)</div>
+      </div>
+
+      <div class="card evidence">
+        <div class="head">
+          <h2>OCR Raw Text Evidence</h2>
+          <span class="badge ok">100% PARSED</span>
         </div>
-        <div class="field-row">
-          <div class="field-name">Governing Act <button class="copy-btn" onclick="copyVal('Bahagian VI Akta Lembaga Pembangunan Industri Pembinaan Malaysia 1994')">Copy</button></div>
-          <div class="field-val">Bahagian VI Akta Lembaga Pembangunan Industri Pembinaan Malaysia 1994</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Registration Number <button class="copy-btn" onclick="copyVal('0120171207-SL081820')">Copy</button></div>
-          <div class="field-val">0120171207-SL081820</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Contractor Name <button class="copy-btn" onclick="copyVal('MAXIMUS ENERGY ENTERPRISE')">Copy</button></div>
-          <div class="field-val">MAXIMUS ENERGY ENTERPRISE</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Registered Address <button class="copy-btn" onclick="copyVal('PT12958A FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI 71800 NILAI NEGERI SEMBILAN')">Copy</button></div>
-          <div class="field-val">PT12958A FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI 71800 NILAI NEGERI SEMBILAN</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">First Registered Date <button class="copy-btn" onclick="copyVal('07/12/2017')">Copy</button></div>
-          <div class="field-val">07/12/2017</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Validity Period <button class="copy-btn" onclick="copyVal('07/12/2017 hingga 06/12/2020')">Copy</button></div>
-          <div class="field-val">07/12/2017 hingga 06/12/2020</div>
-        </div>
-        <div class="field-row">
-          <div class="field-name">Gred, Kategori & Pengkhususan <button class="copy-btn" onclick="copyVal('G3 B: B04 | G3 CE: CE01, CE21 | G3 ME: M15')">Copy</button></div>
-          <div class="field-val">
-            <div class="special-tags">
-              <div class="tag-item"><span>G3 B:</span> B04</div>
-              <div class="tag-item"><span>G3 CE:</span> CE01, CE21</div>
-              <div class="tag-item"><span>G3 ME:</span> M15</div>
+        <div class="raw" id="raw">--- DOCUMENT 1 RAW TEXT ---
+BORANG E (SSM — Perakuan Pembaharuan Pendaftaran)
+Document Form: Borang E (Kaedah 13)
+Document Title: Perakuan Pembaharuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)
+Issuing Authority: Suruhanjaya Syarikat Malaysia (SSM)
+Business Name: MAXIMUS ENERGY ENTERPRISE
+Registration Number: 001772726-T
+Expiry Date: 24 JUN 2021
+Business Address: PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.
+Number of Branches: TIADA
+Issue Date: 25 JUN 2019 (via SISTEM EZBIZ)
+Registrar Signatory: DATO' ZAHRAH ABD WAHAB FENNER
+System Audit Stamp: UserID: EZBIZ Date: Tue Jun 25 10:52:43 MYT 2019
+
+--- DOCUMENT 2 RAW TEXT ---
+Suruhanjaya Syarikat Malaysia (SSM) — BORANG D (Perakuan Pendaftaran)
+Document Form: Borang D (Kaedah 13)
+Document Title: Perakuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)
+Issuing Authority: Suruhanjaya Syarikat Malaysia (SSM)
+Business Name: MAXIMUS ENERGY ENTERPRISE
+Registration Number: 001772726-T
+Expiry Date: 24 JUN 2018
+Business Address: PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.
+Number of Branches: TIADA
+Issue Date: 25 JUN 2017 (via SISTEM EZBIZ)
+Registrar Signatory: DATO' ZAHRAH ABD WAHAB FENNER
+
+--- DOCUMENT 3 RAW TEXT ---
+Perakuan Pendaftaran (CIDB)
+Document Title: Perakuan Pendaftaran CIDB
+Issuing Authority: Lembaga Pembangunan Industri Pembinaan Malaysia (CIDB)
+Governing Act: Bahagian VI Akta Lembaga Pembangunan Industri Pembinaan Malaysia 1994
+Registration Number: 0120171207-SL081820
+Contractor Name: MAXIMUS ENERGY ENTERPRISE
+Registered Address: PT12958A FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI 71800 NILAI NEGERI SEMBILAN
+First Registered Date: 07/12/2017
+Validity Period: 07/12/2017 hingga 06/12/2020
+Gred, Kategori & Pengkhususan:
+• G3 B: B04
+• G3 CE: CE01, CE21
+• G3 ME: M15
+Issue Date: 07/12/2017</div>
+      </div>
+    </section>
+
+    <!-- Right Panel: Verified Extraction Output -->
+    <aside class="card right">
+      <div class="head">
+        <h2>Verified Extraction</h2>
+        <span class="badge ok" id="statusBadge">3 DOCUMENTS VERIFIED</span>
+      </div>
+
+      <!-- Quick Filter Tabs -->
+      <div class="doc-tabs">
+        <button class="tab-btn active" onclick="filterDoc('all')">All Documents (3)</button>
+        <button class="tab-btn" onclick="filterDoc('doc1')">SSM Borang E</button>
+        <button class="tab-btn" onclick="filterDoc('doc2')">SSM Borang D</button>
+        <button class="tab-btn" onclick="filterDoc('doc3')">CIDB</button>
+      </div>
+
+      <div class="fields-scroll" id="fieldsContainer">
+
+        <!-- Document 1: SSM Borang E -->
+        <div class="doc-section" data-doc="doc1">
+          <div class="doc-header">
+            <span class="doc-title">1. BORANG E (SSM — Pembaharuan)</span>
+            <span class="badge ok">VERIFIED</span>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <div class="ftop"><span class="fname">Document Form</span><span class="badge ok">99%</span></div>
+              <div class="fval">Borang E (Kaedah 13)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Document Title</span><span class="badge ok">99%</span></div>
+              <div class="fval">Perakuan Pembaharuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Issuing Authority</span><span class="badge ok">99%</span></div>
+              <div class="fval">Suruhanjaya Syarikat Malaysia (SSM)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Business Name</span><span class="badge ok">100%</span></div>
+              <div class="fval">MAXIMUS ENERGY ENTERPRISE</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Registration Number</span><span class="badge ok">100%</span></div>
+              <div class="fval">001772726-T</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Expiry Date</span><span class="badge ok">99%</span></div>
+              <div class="fval">24 JUN 2021</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Business Address</span><span class="badge ok">98%</span></div>
+              <div class="fval">PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Number of Branches</span><span class="badge ok">100%</span></div>
+              <div class="fval">TIADA</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Issue Date</span><span class="badge ok">99%</span></div>
+              <div class="fval">25 JUN 2019 (via SISTEM EZBIZ)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Registrar Signatory</span><span class="badge ok">99%</span></div>
+              <div class="fval">DATO' ZAHRAH ABD WAHAB FENNER (Pendaftar Perniagaan Semenanjung Malaysia)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">System Audit Stamp</span><span class="badge ok">98%</span></div>
+              <div class="fval">UserID: EZBIZ Date: Tue Jun 25 10:52:43 MYT 2019</div>
             </div>
           </div>
         </div>
-        <div class="field-row">
-          <div class="field-name">Issue Date <button class="copy-btn" onclick="copyVal('07/12/2017')">Copy</button></div>
-          <div class="field-val">07/12/2017</div>
-        </div>
-      </div>
-    </article>
 
+        <!-- Document 2: SSM Borang D -->
+        <div class="doc-section" data-doc="doc2">
+          <div class="doc-header">
+            <span class="doc-title">2. BORANG D (SSM — Pendaftaran)</span>
+            <span class="badge ok">VERIFIED</span>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <div class="ftop"><span class="fname">Document Form</span><span class="badge ok">99%</span></div>
+              <div class="fval">Borang D (Kaedah 13)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Document Title</span><span class="badge ok">99%</span></div>
+              <div class="fval">Perakuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Issuing Authority</span><span class="badge ok">99%</span></div>
+              <div class="fval">Suruhanjaya Syarikat Malaysia (SSM)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Business Name</span><span class="badge ok">100%</span></div>
+              <div class="fval">MAXIMUS ENERGY ENTERPRISE</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Registration Number</span><span class="badge ok">100%</span></div>
+              <div class="fval">001772726-T</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Expiry Date</span><span class="badge ok">99%</span></div>
+              <div class="fval">24 JUN 2018</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Business Address</span><span class="badge ok">98%</span></div>
+              <div class="fval">PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Number of Branches</span><span class="badge ok">100%</span></div>
+              <div class="fval">TIADA</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Issue Date</span><span class="badge ok">99%</span></div>
+              <div class="fval">25 JUN 2017 (via SISTEM EZBIZ)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Registrar Signatory</span><span class="badge ok">99%</span></div>
+              <div class="fval">DATO' ZAHRAH ABD WAHAB FENNER (Pendaftar Perniagaan Semenanjung Malaysia)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Document 3: CIDB Perakuan Pendaftaran -->
+        <div class="doc-section" data-doc="doc3">
+          <div class="doc-header">
+            <span class="doc-title">3. Perakuan Pendaftaran (CIDB)</span>
+            <span class="badge ok">VERIFIED</span>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <div class="ftop"><span class="fname">Document Title</span><span class="badge ok">99%</span></div>
+              <div class="fval">Perakuan Pendaftaran CIDB</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Issuing Authority</span><span class="badge ok">99%</span></div>
+              <div class="fval">Lembaga Pembangunan Industri Pembinaan Malaysia (CIDB)</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Governing Act</span><span class="badge ok">98%</span></div>
+              <div class="fval">Bahagian VI Akta Lembaga Pembangunan Industri Pembinaan Malaysia 1994</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Registration Number</span><span class="badge ok">100%</span></div>
+              <div class="fval">0120171207-SL081820</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Contractor Name</span><span class="badge ok">100%</span></div>
+              <div class="fval">MAXIMUS ENERGY ENTERPRISE</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Registered Address</span><span class="badge ok">98%</span></div>
+              <div class="fval">PT12958A FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI 71800 NILAI NEGERI SEMBILAN</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">First Registered Date</span><span class="badge ok">99%</span></div>
+              <div class="fval">07/12/2017</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Validity Period</span><span class="badge ok">99%</span></div>
+              <div class="fval">07/12/2017 hingga 06/12/2020</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Gred, Kategori & Pengkhususan</span><span class="badge ok">100%</span></div>
+              <div class="fval">• G3 B: B04
+• G3 CE: CE01, CE21
+• G3 ME: M15</div>
+            </div>
+            <div class="field">
+              <div class="ftop"><span class="fname">Issue Date</span><span class="badge ok">99%</span></div>
+              <div class="fval">07/12/2017</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
   </main>
 </div>
 
-<!-- Notification Toast -->
-<div id="toast">Copied to clipboard!</div>
-
 <script>
-const extractedData = [
-  {
-    documentId: "1",
-    type: "SSM BORANG E",
-    fields: {
-      "Document Form": "Borang E (Kaedah 13)",
-      "Document Title": "Perakuan Pembaharuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)",
-      "Issuing Authority": "Suruhanjaya Syarikat Malaysia (SSM)",
-      "Business Name": "MAXIMUS ENERGY ENTERPRISE",
-      "Registration Number": "001772726-T",
-      "Expiry Date": "24 JUN 2021",
-      "Business Address": "PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.",
-      "Number of Branches": "TIADA",
-      "Issue Date": "25 JUN 2019 (via SISTEM EZBIZ)",
-      "Registrar Signatory": "DATO' ZAHRAH ABD WAHAB FENNER (Pendaftar Perniagaan Semenanjung Malaysia)",
-      "System Audit Stamp": "UserID: EZBIZ Date: Tue Jun 25 10:52:43 MYT 2019"
-    }
-  },
-  {
-    documentId: "2",
-    type: "SSM BORANG D",
-    fields: {
-      "Document Form": "Borang D (Kaedah 13)",
-      "Document Title": "Perakuan Pendaftaran (Akta Pendaftaran Perniagaan 1956)",
-      "Issuing Authority": "Suruhanjaya Syarikat Malaysia (SSM)",
-      "Business Name": "MAXIMUS ENERGY ENTERPRISE",
-      "Registration Number": "001772726-T",
-      "Expiry Date": "24 JUN 2018",
-      "Business Address": "PT12958A, FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI, 71800 NILAI, NEGERI SEMBILAN.",
-      "Number of Branches": "TIADA",
-      "Issue Date": "25 JUN 2017 (via SISTEM EZBIZ)",
-      "Registrar Signatory": "DATO' ZAHRAH ABD WAHAB FENNER (Pendaftar Perniagaan Semenanjung Malaysia)"
-    }
-  },
-  {
-    documentId: "3",
-    type: "CIDB PERAKUAN PENDAFTARAN",
-    fields: {
-      "Document Title": "Perakuan Pendaftaran CIDB",
-      "Issuing Authority": "Lembaga Pembangunan Industri Pembinaan Malaysia (CIDB)",
-      "Governing Act": "Bahagian VI Akta Lembaga Pembangunan Industri Pembinaan Malaysia 1994",
-      "Registration Number": "0120171207-SL081820",
-      "Contractor Name": "MAXIMUS ENERGY ENTERPRISE",
-      "Registered Address": "PT12958A FIRST FLOOR JALAN BBN 1/7D BANDAR PUTRA NILAI 71800 NILAI NEGERI SEMBILAN",
-      "First Registered Date": "07/12/2017",
-      "Validity Period": "07/12/2017 hingga 06/12/2020",
-      "Gred, Kategori & Pengkhususan": "G3 B: B04 | G3 CE: CE01, CE21 | G3 ME: M15",
-      "Issue Date": "07/12/2017"
-    }
-  }
-];
+function filterDoc(docId) {
+  const sections = document.querySelectorAll('.doc-section');
+  const buttons = document.querySelectorAll('.tab-btn');
 
-function showToast(msg) {
-  const toast = document.getElementById("toast");
-  toast.innerText = msg;
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2000);
-}
+  buttons.forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
 
-function copyVal(val) {
-  navigator.clipboard.writeText(val).then(() => {
-    showToast("Copied value to clipboard!");
-  }).catch(() => {
-    showToast("Failed to copy");
-  });
-}
-
-function filterTab(type, elem) {
-  document.querySelectorAll(".tab-group .btn").forEach(b => b.classList.remove("active"));
-  elem.classList.add("active");
-
-  const cards = document.querySelectorAll(".doc-card");
-  cards.forEach(card => {
-    if (type === "all" || card.getAttribute("data-doc") === type) {
-      card.style.display = "flex";
+  sections.forEach(sec => {
+    if (docId === 'all' || sec.getAttribute('data-doc') === docId) {
+      sec.style.display = 'block';
     } else {
-      card.style.display = "none";
+      sec.style.display = 'none';
     }
   });
-}
-
-function searchFields() {
-  const q = document.getElementById("searchInput").value.toLowerCase();
-  const rows = document.querySelectorAll(".field-row");
-
-  rows.forEach(row => {
-    const text = row.innerText.toLowerCase();
-    if (text.includes(q)) {
-      row.style.display = "flex";
-    } else {
-      row.style.display = "none";
-    }
-  });
-}
-
-function exportJSON() {
-  const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(extractedData, null, 2));
-  const dlAnchor = document.createElement('a');
-  dlAnchor.setAttribute("href", jsonStr);
-  dlAnchor.setAttribute("download", "Verified_Extractions_MAXIMUS_ENERGY.json");
-  document.body.appendChild(dlAnchor);
-  dlAnchor.click();
-  dlAnchor.remove();
-  showToast("Exported JSON");
-}
-
-function exportCSV() {
-  let csvContent = "data:text/csv;charset=utf-8,Document,Field,Value\n";
-  extractedData.forEach(doc => {
-    Object.entries(doc.fields).forEach(([k, v]) => {
-      csvContent += `"${doc.type}","${k}","${v.replace(/"/g, '""')}"\n`;
-    });
-  });
-
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "Verified_Extractions_MAXIMUS_ENERGY.csv");
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  showToast("Exported CSV");
 }
 </script>
+
 </body>
 </html>
