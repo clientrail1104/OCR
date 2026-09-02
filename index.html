@@ -243,7 +243,7 @@ window.extractFrontPhotoSideFields = function(lines) {
 <h2>Upload documents</h2>
 <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose document files"><div class="plus">＋</div><strong>Drop files here</strong><small>Front + back images · JPG · PNG · WEBP · TIFF</small><div class="actions"><label class="pick" for="files">Choose files</label><button class="btn" id="clear" type="button">Clear</button></div></div>
 <input id="files" class="file-input" type="file" multiple accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff">
-<div class="label">OCR language</div><select id="lang"><option value="eng+msa">Auto — English + Malay</option><option value="eng+msa+ind">Auto — English + Malay + Indonesian</option><option value="eng+msa+tam">English + Malay + Tamil</option><option value="eng+msa+chi_sim">English + Malay + Chinese</option><option value="eng">English</option><option value="msa">Malay</option></select>
+<div class="label">OCR language</div><select id="lang"><option value="msa" selected>Malay</option><option value="eng+msa">Auto — English + Malay</option><option value="eng+msa+ind">Auto — English + Malay + Indonesian</option><option value="eng+msa+tam">English + Malay + Tamil</option><option value="eng+msa+chi_sim">English + Malay + Chinese</option><option value="eng">English</option></select>
 <div class="label">Instant processing</div><div class="mini">Upload only prepares the document. The OCR engine may preload in the background, but it never reads the document until Run OCR is clicked. The gold/yellow chip area is excluded. Numeric fields require an exact pattern; ambiguous characters are flagged, never repaired.</div>
 <div class="process"><div class="bar"><i id="bar"></i></div><p id="progress">Upload ready. Click Run OCR to begin.</p></div>
 <button class="btn run" id="runOCR" type="button" style="width:100%;margin-top:7px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff">Run OCR</button>
@@ -707,11 +707,24 @@ function extract(front,back){
   out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state, address, race, name, or photograph is never converted into nationality.'));
  }
 
+ const raceText=(front.metadataText||'')+'\n'+(front.genderText||'');
+ const race=extractRace(raceText);
+
+ out.push(mk('Race',race||'UNKNOWN',race?Math.min(front.metadataConf||front.conf,100):0,race?fieldStatus(front.metadataConf||front.conf):'UNKNOWN',race||'No explicit race/religion value detected.','Only explicitly printed race/religion evidence is accepted; no inference from name, nationality, photograph, or address.','If the printed value is unreadable or competing values are detected, verify against the source image.'));
+
+ const address=extractAddress(front.addressText||'');
+ const addressEvidence=front.addressEvidence||address.join('\n');
+ const addressCandidates=[...new Set(addressEvidence.split(/\n+/).map(x=>x.replace(/^\[[^\]]+%\]$/,'').trim()).filter(x=>x && !/^\[[^\]]+%\]$/.test(x)))];
+ const addressConflict=false;
+ const addressStatus=address.length===5 && !addressConflict?fieldStatus(front.addressConf||0):'UNCERTAIN';
+ const addressDisplay=address.join(' ')||'UNKNOWN';
+ out.push(mk('Address',addressDisplay,address.length?Math.min(front.addressConf||0,100):0,addressStatus,addressEvidence||'No reliable five-line address block detected.','Address is captured only from the dedicated left-side five-line address ROI. Multiple preprocessing passes are corroboration only; no spelling, digit, postcode, town, state, word or character is silently corrected.',addressConflict?'OCR passes disagree on one or more address characters/numbers. All pass evidence is preserved; no candidate is silently selected.':(address.length===5?'Verify every address character against the source image.':'The address region did not yield all five lines reliably; no missing line is guessed.')));
  // Verified Extraction display order is intentional: Full Name must appear above NRIC Number.
  const nameIndex=out.findIndex(f=>f.name==='Full Name');
  const nricIndex=out.findIndex(f=>f.name==='NRIC Number');
  if(nameIndex>nricIndex && nameIndex>=0 && nricIndex>=0){ const nameField=out.splice(nameIndex,1)[0]; out.splice(nricIndex,0,nameField); }
- return out;
+ // Verified Extraction intentionally excludes Race and Address.
+ return out.filter(f => f.name !== 'Race' && f.name !== 'Address');
 }
 function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
 async function runOCR(){
