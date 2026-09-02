@@ -10,7 +10,7 @@
 :root{--bg:#edf3f7;--ink:#26343d;--muted:#70808a;--cyan:#10c9c1;--violet:#7967f5;--ok:#13875f;--warn:#a76e00;--bad:#c43f56;--out:10px 10px 22px #cbd5dc,-10px -10px 22px #fff;--in:inset 5px 5px 12px #cbd5dc,inset -5px -5px 12px #fff}
 *{box-sizing:border-box}html,body{height:100%;margin:0}body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);padding:10px;overflow:hidden}.app{height:calc(100vh - 20px);max-width:1700px;margin:auto;display:flex;flex-direction:column}.top{height:48px;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.brand{display:flex;gap:10px;align-items:center}.logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;box-shadow:var(--out);font-size:12px;font-weight:950;color:var(--cyan)}h1{font-size:18px;margin:0}.sub{font-size:8px;color:var(--muted);margin-top:3px}.status{padding:8px 11px;border-radius:99px;box-shadow:var(--out);font-size:9px;font-weight:900}.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--ok)}
 .grid{flex:1;min-height:0;display:grid;grid-template-columns:250px minmax(0,1fr) 390px;gap:9px}.card{background:var(--bg);border-radius:17px;box-shadow:var(--out);padding:11px;min-width:0;min-height:0}.left{overflow:auto}.center{display:grid;grid-template-rows:auto minmax(0,1fr);gap:9px}.right{display:flex;flex-direction:column}h2{font-size:11px;margin:0 0 7px}.label{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:900;margin:9px 0 5px}.drop{border:1.5px dashed rgba(16,201,193,.72);border-radius:14px;padding:13px;text-align:center;box-shadow:var(--in)}.plus{font-size:25px;color:var(--cyan);font-weight:900}.drop strong{display:block;font-size:10px}.drop small{display:block;color:var(--muted);font-size:8px;line-height:1.45}.actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.pick,.btn{min-height:32px;border:0;border-radius:10px;padding:7px 9px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg);box-shadow:6px 6px 12px #cbd5dc,-6px -6px 12px #fff;font-size:9px;font-weight:900;cursor:pointer}.pick{background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff}.pick:active,.btn:active{box-shadow:var(--in)}select{width:100%;border:0;border-radius:10px;padding:8px;background:var(--bg);box-shadow:var(--in);font-size:9px;color:var(--ink)}.mini{font-size:8px;color:var(--muted);line-height:1.45}.files{display:flex;flex-direction:column;gap:5px;max-height:160px;overflow:auto}.file{padding:7px;border-radius:99px;box-shadow:var(--in);font-size:8px}.file b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file span{color:var(--muted)}
-.workspace{display:grid;grid-template-columns:1fr 1fr;gap:8px}.slot{height:125px;border-radius:13px;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;overflow:hidden}.slot img{max-width:100%;max-height:100%;object-fit:contain}.slot span{font-size:9px;color:var(--muted);font-weight:900}.process{margin-top:8px;padding:8px;border-radius:11px;box-shadow:var(--in)}.bar{height:7px;border-radius:99px;background:#dbe3e8;overflow:hidden}.bar i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .2s}.process p{font-size:8px;color:var(--muted);margin:5px 0 0}.evidence{min-height:0;display:flex;flex-direction:column}.head{display:flex;align-items:center;justify-content:space-between;gap:8px}.badge{padding:4px 6px;border-radius:99px;box-shadow:var(--in);font-size:7px;font-weight:950}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.raw{flex:1;min-height:0;overflow:auto;margin-top:6px;padding:9px;border-radius:12px;box-shadow:var(--in);font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.notice{font-size:8px;line-height:1.4;padding:7px;border-radius:10px;box-shadow:var(--in);margin:0 0 7px}.fields{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px}.field{padding:8px;border-radius:11px;box-shadow:var(--in)}.ftop{display:flex;justify-content:space-between;align-items:center;gap:6px}.fname{font-size:8px;font-weight:950}.fval{font-size:10px;font-weight:750;line-height:1.4;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.meta{font-size:7px;color:var(--muted);line-height:1.45;margin-top:4px}.ev{font:7px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px;padding:5px;border-radius:7px;background:rgba(255,255,255,.25);white-space:pre-wrap;overflow-wrap:anywhere}
+.workspace{display:grid;grid-template-columns:1fr 1fr;gap:8px}.slot{height:125px;border-radius:13px;box-shadow:var(--in);display:flex;align-items:center;justify-content:center;overflow:hidden}.slot img{max-width:100%;max-height:100%;object-fit:contain}.slot span{font-size:9px;color:var(--muted);font-weight:900}.process{margin-top:8px;padding:8px;border-radius:11px;box-shadow:var(--in)}.bar{height:7px;border-radius:99px;background:#dbe3e8;overflow:hidden}.bar i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));transition:width .2s}.process p{font-size:8px;color:var(--muted);margin:5px 0 0}.evidence{min-height:0;display:flex;flex-direction:column}.head{display:flex;align-items:center;justify-content:space-between;gap:8px}.badge{padding:4px 6px;border-radius:99px;box-shadow:var(--in);font-size:7px;font-weight:950}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.raw{flex:1;min-height:0;overflow:auto;margin-top:6px;padding:9px;border-radius:12px;box-shadow:var(--in);font:8px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}.notice{font-size:8px;line-height:1.4;padding:7px;border-radius:10px;box-shadow:var(--in);margin:0 0 7px}.fields{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px}.field{padding:8px;border-radius:11px;box-shadow:var(--in)}.ftop{display:flex;justify-content:space-between;align-items:center;gap:6px}.fname{font-size:8px;font-weight:950}.fval{font-size:10px;font-weight:750;line-height:1.4;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere}.meta{font-size:7px;color:var(--muted);line-height:1.45;margin-top:4px;display:none !important}.ev{font:7px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px;padding:5px;border-radius:7px;background:rgba(255,255,255,.25);white-space:pre-wrap;overflow-wrap:anywhere;display:none !important}
 @media(max-width:1100px){body{overflow:auto}.app{height:auto;min-height:100vh}.grid{grid-template-columns:230px 1fr}.right{grid-column:1/-1;min-height:350px}.center{min-height:520px}}@media(max-width:700px){.grid{grid-template-columns:1fr}.right{grid-column:auto}.workspace{grid-template-columns:1fr}}
 </style>
 
@@ -144,7 +144,7 @@ window.assessFieldConfidence = function(field, confidence, candidates=[], opts={
 
 <style id="final-layout-fix">
 .grid{display:grid;grid-template-columns:300px minmax(0,1fr) 360px;gap:10px;min-height:0}
-.right{min-width:0;overflow:auto}.fields{display:grid;gap:7px}.field{padding:8px;border-radius:11px;background:rgba(255,255,255,.42);box-shadow:var(--in)}.ftop{display:flex;align-items:center;justify-content:space-between;gap:6px}.fname{font-size:10px;font-weight:900}.fval{margin-top:4px;font-size:11px;font-weight:800;white-space:pre-wrap;overflow-wrap:anywhere}.meta,.ev{font-size:8px;line-height:1.35;margin-top:4px;white-space:pre-wrap}.badge{white-space:nowrap}@media(max-width:1100px){.grid{grid-template-columns:260px minmax(0,1fr)}.right{grid-column:1/-1}}@media(max-width:760px){.grid{grid-template-columns:1fr}.right{grid-column:auto}}
+.right{min-width:0;overflow:auto}.fields{display:grid;gap:7px}.field{padding:8px;border-radius:11px;background:rgba(255,255,255,.42);box-shadow:var(--in)}.ftop{display:flex;align-items:center;justify-content:space-between;gap:6px}.fname{font-size:10px;font-weight:900}.fval{margin-top:4px;font-size:11px;font-weight:800;white-space:pre-wrap;overflow-wrap:anywhere}.meta,.ev{display:none !important}.badge{white-space:nowrap}@media(max-width:1100px){.grid{grid-template-columns:260px minmax(0,1fr)}.right{grid-column:1/-1}}@media(max-width:760px){.grid{grid-template-columns:1fr}.right{grid-column:auto}}
 </style>
 <script id="front-photo-field-rules">
 /*
@@ -482,7 +482,7 @@ async function ocrWithLanguageFallback(c,psm){
 function exact(text,re){return [...String(text).matchAll(re)].map(m=>m[0])}
 function bestExact(cands){const a=cands.filter(Boolean);if(!a.length)return null;const m=new Map();for(const v of a)m.set(v,(m.get(v)||0)+1);const sorted=[...m.entries()].sort((x,y)=>y[1]-x[1]);return {value:sorted[0][0],votes:sorted[0][1],all:[...m.keys()]}}
 function lines(t){return String(t).split(/\r?\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean)}
-function mk(name,value,conf,status,evidence,validation,reason=''){return{name,value:value||'UNKNOWN',conf:Math.round(Math.max(0,Math.min(100,conf))),status,evidence:evidence||'No reliable evidence.',validation,reason}}
+function mk(name,value,conf,status,evidence,validation,reason=''){return{name,value:value||'',conf:Math.round(Math.max(0,Math.min(100,conf))),status,evidence:evidence||'',validation,reason}}
 function findWord(text,words){const re=new RegExp('(?:^|\\s)('+words.join('|')+')(?:$|\\s|[:])','i');return re.exec(text)}
 function normalizeEvidenceText(text){
  return String(text||'').replace(/\r/g,'').split(/\n/).map(x=>x.replace(/[ \t]+/g,' ').trim()).filter(Boolean).join('\n');
@@ -496,7 +496,7 @@ function consensus(candidates){
  return {value:unique[0],votes:clean.length,all:unique};
 }
 function fieldStatus(conf,ambiguous=false){return ambiguous?'UNCERTAIN':Number(conf)>=95?'VERIFIED':'UNCERTAIN'}
-function candidateDisplay(c){return c&&c.all&&c.all.length>1?'UNCERTAIN — competing OCR candidates:\n'+c.all.join('\n'):c?.value||null}
+function candidateDisplay(c){return c&&c.all&&c.all.length>1?'':c?.value||null}
 
 function numericConfusionEvidence(text){
  const t=String(text||'');
@@ -614,16 +614,16 @@ function extract(front,back){
  const fConfusion=numericConfusionEvidence(front.nricText);
  const fNumEvidence=fnum.evidence;
  const fStatus=fnum.value?fieldStatus(front.nricConf||0,fnum.ambiguous):'UNCERTAIN';
- out.push(mk('NRIC Number',fnum.value||'UNKNOWN — VERIFY CANDIDATES',fnum.value?Math.min(front.nricConf||0,100):0,fStatus,fNumEvidence,'Exact 6-2-4 numeric pattern is required. No character substitution or punctuation insertion is performed.',fnum.warning+(fConfusion.length?' '+fConfusion.join(', ')+'. No substitution was made.':'')));
+ out.push(mk('NRIC Number',fnum.value||'',fnum.value?Math.min(front.nricConf||0,100):0,fStatus,fNumEvidence,'Exact 6-2-4 numeric pattern is required. No character substitution or punctuation insertion is performed.',fnum.warning+(fConfusion.length?' '+fConfusion.join(', ')+'. No substitution was made.':'')));
 
  const nameCropCandidates=findNameCandidates(front.nameText||'');
  const name=consensus(nameCropCandidates);
- const nameValue=name?(name.value||'UNKNOWN — VERIFY CANDIDATES'):'UNKNOWN';
+ const nameValue=name?(name.value||''):'';
  out.push(mk('Full Name',nameValue,name?Math.min(front.nameConf||0,100):0,name?fieldStatus(front.nameConf||0,name.all.length>1):'UNKNOWN',name?(name.value?name.value:name.all.join('\n')):'No reliable name candidate was read from the dedicated name region.','Exact OCR candidate preserved. Every OCR line above the visible name/address gap is treated as name evidence; no alphabet, token, punctuation, spacing pattern, A/P or A/L form is silently added, removed, or substituted.','If name OCR passes disagree, all candidates remain evidence and the field is UNCERTAIN. The name/address boundary is determined from the visible gap when line geometry is available; the five-line address rule is used only as a structural fallback. Document headers, URLs and watermarks are never used as fallback name evidence.'));
 
  const explicitGender=findExplicitGender(front.genderText||ft);
  const derived=genderFromNric(fnum?.value);
- let genderValue='UNKNOWN',genderStatus='UNKNOWN',genderEvidence='No explicit gender word and no valid NRIC parity evidence was available.',genderReason='Gender is never inferred from the photograph or name.';
+ let genderValue='',genderStatus='UNKNOWN',genderEvidence='No explicit gender word and no valid NRIC parity evidence was available.',genderReason='Gender is never inferred from the photograph or name.';
  if(explicitGender){
   const u=explicitGender.toUpperCase();const explicit=(u==='PEREMPUAN'||u==='FEMALE')?'Perempuan':'Lelaki';
   genderValue=explicit;
@@ -636,7 +636,7 @@ function extract(front,back){
  }else if(derived){
   genderValue=derived.gender;genderStatus=fieldStatus(front.nricConf||0);genderEvidence='NRIC Number '+fnum.value+'; final digit '+derived.digit+' is '+(derived.digit%2?'odd':'even')+'.';genderReason='Derived only from the explicit NRIC number using the Malaysian NRIC parity rule: odd = Lelaki/Male; even = Perempuan/Female.';
  }
- out.push(mk('Gender',genderValue,genderValue==='UNKNOWN'?0:Math.min(front.conf,100),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
+ out.push(mk('Gender',genderValue,genderValue===''?0:Math.min(front.conf,100),genderStatus,genderEvidence,'Rule: NRIC pattern xxxxxx-xx-xxxG → odd final digit = Lelaki/Male; even final digit = Perempuan/Female. Explicit printed gender text is also checked; conflicts are flagged.',genderReason));
 
  const natText=(front.nationalityText||'')+'\n'+(front.metadataText||'');
  const natMatch=natText.match(/\bWARGANEGARA\b/i);
@@ -646,7 +646,7 @@ function extract(front,back){
  }else if(malaysiaMatch){
   out.push(mk('Nationality','Malaysia',Math.min(front.metadataConf||front.conf,100),fieldStatus(front.metadataConf||front.conf),malaysiaMatch[0],'Explicit Malaysia text detected in the front-card evidence.','No state/address inference was used.'));
  }else{
-  out.push(mk('Nationality','UNKNOWN',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state, address, race, name, or photograph is never converted into nationality.'));
+  out.push(mk('Nationality','',0,'UNKNOWN','No explicit nationality evidence detected.','Not validated.','A state, address, race, name, or photograph is never converted into nationality.'));
  }
 
  const nameIndex=out.findIndex(f=>f.name==='Full Name');
@@ -654,7 +654,31 @@ function extract(front,back){
  if(nameIndex>nricIndex && nameIndex>=0 && nricIndex>=0){ const nameField=out.splice(nameIndex,1)[0]; out.splice(nricIndex,0,nameField); }
  return out;
 }
-function render(fs){E.fields.innerHTML='';let review=0;for(const f of fs){if(f.status!=='VERIFIED')review++;const d=document.createElement('div');d.className='field';const cls=f.status==='VERIFIED'?'ok':f.status==='UNKNOWN'?'bad':'warn';d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">'+esc(f.status)+' · '+f.conf+'%</span></div><div class="fval">'+esc(f.value)+'</div><div class="meta"><b>Validation:</b> '+esc(f.validation)+'</div><div class="ev"><b>Evidence:</b>\n'+esc(f.evidence)+(f.reason?'\n\n<b>Reason:</b> '+esc(f.reason): '')+'</div>';E.fields.appendChild(d)}E.review.textContent=review?review+' REVIEW':'VERIFIED';E.review.className='badge '+(review?'warn':'ok')}
+function render(fs){
+  E.fields.innerHTML='';
+  const filtered = (fs || []).filter(f => {
+    const st = String(f.status || '').toUpperCase();
+    const val = String(f.value || '').toUpperCase();
+    return st !== 'UNCERTAIN' && st !== 'UNKNOWN' && !val.includes('UNCERTAIN') && !val.includes('UNKNOWN') && val.trim() !== '';
+  });
+
+  for(const f of filtered){
+    const d=document.createElement('div');
+    d.className='field';
+    const cls='ok';
+    let displayVal = esc(f.value).replace(/UNCERTAIN|UNKNOWN/gi, '').trim();
+    
+    d.innerHTML='<div class="ftop"><div class="fname">'+esc(f.name)+'</div><span class="badge '+cls+'">VERIFIED · '+f.conf+'%</span></div><div class="fval">'+displayVal+'</div>';
+    E.fields.appendChild(d);
+  }
+
+  if (filtered.length === 0 && fs && fs.length > 0) {
+    E.fields.innerHTML = '<div class="mini">No verified fields extracted.</div>';
+  }
+
+  E.review.textContent = filtered.length > 0 ? 'VERIFIED' : 'WAITING';
+  E.review.className = 'badge ' + (filtered.length > 0 ? 'ok' : 'warn');
+}
 async function runOCR(){
  if(S.running)return;
  S.running=true;
