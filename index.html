@@ -1119,6 +1119,7 @@
               <input id="customOcrLanguage" class="control" type="text"
                 placeholder="e.g. eng+msa+chi_sim+jpn+kor" style="display:none;margin-top:6px"
                 autocomplete="off" spellcheck="false" />
+              <small class="field-help"></small>
             </div>
 
             <div class="field">
@@ -1493,7 +1494,9 @@
       html: ""
     },
 
-    activeTab: "markdown"
+    activeTab: "markdown",
+    ocrMetrics: [],
+    errors: []
   };
 
   const fileInput =
@@ -2430,6 +2433,7 @@
 
     state.pages =
       [];
+    state.errors = [];
 
     if (!state.files.length) {
       emptyPreview
@@ -2485,6 +2489,12 @@
         error
       ) {
         console.error(error);
+        state.errors.push({
+          file: file.name,
+          stage: "preview",
+          message: error?.message || String(error)
+        });
+        log(`Preview failed for ${file.name}: ${error?.message || error}`);
       }
     }
 
@@ -2701,7 +2711,9 @@
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-    const qrCount = maskQrCodes(canvas, context);
+    const qrCount = (typeof excludeQR !== "undefined" && excludeQR?.checked)
+      ? maskQrCodes(canvas, context)
+      : 0;
     const enhanced = preprocessCanvasForOcr(canvas);
 
     return {
@@ -3404,15 +3416,14 @@
           .toLowerCase();
 
       /*
-        Images are intentionally omitted.
-        This prevents QR graphics and handwritten
-        signatures embedded as images from being exported.
+        Do not silently delete DOCX images. Their visual contents cannot be
+        represented as verbatim text by Mammoth. Preserve available alt text
+        and an explicit non-text marker so content is not silently lost.
       */
 
-      if (
-        tag === "img"
-      ) {
-        return "";
+      if (tag === "img") {
+        const alt = String(node.getAttribute("alt") || "").trim();
+        return alt ? `[Image: ${alt}]` : "[Image content present; visual OCR required]";
       }
 
       if (
@@ -3469,8 +3480,13 @@
           return `- ${content.trim()}\n`;
 
         case "ul":
-        case "ol":
           return `${content}\n`;
+
+        case "ol": {
+          let n = 0;
+          const items = [...node.children].filter(child => child.tagName?.toLowerCase() === "li");
+          return items.map(child => `${++n}. ${walk(child).replace(/^[-*]\s+/, "").trim()}\n`).join("") + "\n";
+        }
 
         default:
           return content;
@@ -3726,72 +3742,274 @@
     }
 
     log(`OCR input ${prepared.width}×${prepared.height}px`);
-    log(`Primary recognition: multilingual/document layout analysis`);
+    log(`ULTRA mode: independent multi-pass visual consensus`);
+    log(`Languages: ${language}`);
 
-    const commonOptions = {
-      logger: message => {
-        if (typeof message.progress === "number") {
-          const overall = ((pageIndex + message.progress) / totalPages) * 100;
-          setProgress(overall, `OCR page ${pageIndex + 1} of ${totalPages}`);
-        }
-        if (message.status) progressLabel.textContent = message.status;
+    const progressLogger = message => {
+      if (typeof message.progress === "number") {
+        const overall = ((pageIndex + message.progress) / totalPages) * 100;
+        setProgress(overall, `OCR page ${pageIndex + 1} of ${totalPages}`);
       }
+      if (message.status) progressLabel.textContent = message.status;
     };
 
-    // Pass 1: general document layout. This is the authoritative baseline.
-    const primary = await Tesseract.recognize(
-      prepared.dataUrl,
-      language,
-      {
-        ...commonOptions,
-        config: {
-          tessedit_pageseg_mode: "6",
-          preserve_interword_spaces: "1"
-        }
-      }
-    );
+    const configs = [
+      { name: "layout", psm: "6" },
+      { name: "sparse", psm: "11" },
+      { name: "single_block", psm: "4" },
+      { name: "uniform", psm: "3" }
+    ];
 
-    let parsed;
-
-    if (contextVerification?.checked) {
-      log("Verification pass: independently checking word/line/sentence readings");
-
-      // Pass 2: sparse/irregular layout. Useful for forms, labels, cards,
-      // columns and documents where pass 1 may join neighbouring regions.
-      const secondary = await Tesseract.recognize(
-        prepared.dataUrl,
-        language,
-        {
-          ...commonOptions,
-          config: {
-            tessedit_pageseg_mode: "11",
-            preserve_interword_spaces: "1"
+    const results = [];
+    for (let i = 0; i < configs.length; i++) {
+      const cfg = configs[i];
+      log(`Visual pass ${i + 1}/${configs.length}: ${cfg.name}`);
+      try {
+        const result = await Tesseract.recognize(
+          prepared.dataUrl,
+          language,
+          {
+            logger: progressLogger,
+            config: {
+              tessedit_pageseg_mode: cfg.psm,
+              preserve_interword_spaces: "1"
+            }
           }
-        }
-      );
-
-      parsed = verifyOcrPasses(primary, secondary);
-
-      if (parsed.conflicts?.length) {
-        log(`${parsed.conflicts.length} OCR disagreement(s) retained for human verification`);
-      } else {
-        log("Independent OCR passes agree on detected lines where matched");
+        );
+        results.push(result);
+      } catch (error) {
+        log(`Pass ${cfg.name} unavailable: ${error?.message || error}`);
       }
-    } else {
-      parsed = rebuildOcrLines(primary);
     }
 
+    if (!results.length) {
+      throw new Error("All OCR passes failed. No text was extracted.");
+    }
+
+    const parsed = consensusOcrPasses(results);
     state.ocrMetrics.push({
       confidence: parsed.confidence,
       lowConfidenceLines: parsed.lowConfidenceLines.length,
-      conflicts: parsed.conflicts?.length || 0
+      conflicts: parsed.conflicts?.length || 0,
+      passes: results.length
     });
 
+    if (parsed.conflicts?.length) {
+      log(`${parsed.conflicts.length} disagreement(s) retained as verification flags`);
+    }
     if (parsed.lowConfidenceLines.length) {
-      log(`${parsed.lowConfidenceLines.length} line(s) require verification — no automatic guessing applied`);
+      log(`${parsed.lowConfidenceLines.length} line(s) require verification — no guessing applied`);
+    } else {
+      log("No low-confidence lines detected by the OCR engine");
     }
 
     return parsed.text;
+  }
+
+  /* ======================================================
+     ULTRA OCR CONSENSUS
+     ======================================================
+
+     This layer is deliberately evidence-first. It may select a reading only
+     when independent OCR passes provide supporting evidence. It never builds
+     a new word from fragments, never spell-corrects, and never uses a
+     dictionary to manufacture missing characters.
+  */
+
+  function tokenisePreservingText(value) {
+    return String(value || "").match(/\S+|\s+/gu) || [];
+  }
+
+  function levenshteinDistance(a, b) {
+    const x = String(a || "");
+    const y = String(b || "");
+    if (x === y) return 0;
+    if (!x.length) return y.length;
+    if (!y.length) return x.length;
+    let prev = Array.from({ length: y.length + 1 }, (_, i) => i);
+    for (let i = 0; i < x.length; i++) {
+      const cur = [i + 1];
+      for (let j = 0; j < y.length; j++) {
+        cur[j + 1] = Math.min(
+          cur[j] + 1,
+          prev[j + 1] + 1,
+          prev[j] + (x[i] === y[j] ? 0 : 1)
+        );
+      }
+      prev = cur;
+    }
+    return prev[y.length];
+  }
+
+  function similarity(a, b) {
+    const x = normalizeForComparison(a);
+    const y = normalizeForComparison(b);
+    if (!x && !y) return 1;
+    const max = Math.max(x.length, y.length);
+    return max ? 1 - (levenshteinDistance(x, y) / max) : 0;
+  }
+
+  function scriptProfile(text) {
+    const value = String(text || "");
+    const profile = {
+      latin: (value.match(/\p{Script=Latin}/gu) || []).length,
+      cyrillic: (value.match(/\p{Script=Cyrillic}/gu) || []).length,
+      arabic: (value.match(/\p{Script=Arabic}/gu) || []).length,
+      devanagari: (value.match(/\p{Script=Devanagari}/gu) || []).length,
+      bengali: (value.match(/\p{Script=Bengali}/gu) || []).length,
+      tamil: (value.match(/\p{Script=Tamil}/gu) || []).length,
+      telugu: (value.match(/\p{Script=Telugu}/gu) || []).length,
+      thai: (value.match(/\p{Script=Thai}/gu) || []).length,
+      han: (value.match(/\p{Script=Han}/gu) || []).length,
+      hiragana: (value.match(/\p{Script=Hiragana}/gu) || []).length,
+      katakana: (value.match(/\p{Script=Katakana}/gu) || []).length,
+      hangul: (value.match(/\p{Script=Hangul}/gu) || []).length,
+      hebrew: (value.match(/\p{Script=Hebrew}/gu) || []).length
+    };
+    return profile;
+  }
+
+  function lineEvidenceScore(candidate, allLines) {
+    const norm = normalizeForComparison(candidate.text);
+    let agreement = 0;
+    let bestSimilarity = 0;
+    for (const other of allLines) {
+      if (other === candidate) continue;
+      const sim = similarity(candidate.text, other.text);
+      if (sim >= 0.96) agreement++;
+      bestSimilarity = Math.max(bestSimilarity, sim);
+    }
+    const confidence = Number(candidate.confidence || 0);
+    const scriptCount = Object.values(scriptProfile(candidate.text)).reduce((a,b)=>a+b,0);
+    const scriptBonus = scriptCount > 0 ? 2 : 0;
+    return agreement * 25 + bestSimilarity * 20 + confidence * 0.55 + scriptBonus + (norm ? 2 : 0);
+  }
+
+  function matchLineCandidates(lines, reference) {
+    const ry = Number(reference.bbox?.y0 ?? reference.bbox?.top ?? 0);
+    const rx = Number(reference.bbox?.x0 ?? reference.bbox?.left ?? 0);
+    return lines
+      .map((line, index) => {
+        const y = Number(line.bbox?.y0 ?? line.bbox?.top ?? 0);
+        const x = Number(line.bbox?.x0 ?? line.bbox?.left ?? 0);
+        const distance = Math.abs(y - ry);
+        const horizontal = Math.abs(x - rx);
+        return { line, index, distance, horizontal };
+      })
+      .filter(x => x.distance <= 55)
+      .sort((a,b) => a.distance - b.distance || a.horizontal - b.horizontal)
+      .slice(0, 5);
+  }
+
+  function consensusOcrPasses(results) {
+    const all = results.map(lineObjectsFromResult);
+    const flattened = all.flat();
+    if (!flattened.length) return rebuildOcrLines(results[0]);
+
+    const anchors = [];
+    for (const line of all[0]) {
+      const candidates = [line];
+      for (let pass = 1; pass < all.length; pass++) {
+        const match = matchLineCandidates(all[pass], line)[0];
+        if (match) candidates.push(match.line);
+      }
+      anchors.push(candidates);
+    }
+
+    // Add lines visible only in later passes.
+    const covered = new Set(anchors.flat().map(x => x.text + "|" + (x.bbox?.y0 ?? "")));
+    for (let pass = 1; pass < all.length; pass++) {
+      for (const line of all[pass]) {
+        const key = line.text + "|" + (line.bbox?.y0 ?? "");
+        if (!covered.has(key)) anchors.push([line]);
+      }
+    }
+
+    const merged = [];
+    const conflicts = [];
+
+    for (const candidates of anchors) {
+      const nonEmpty = candidates.filter(x => x.text.trim());
+      if (!nonEmpty.length) continue;
+
+      const exactGroups = [];
+      for (const candidate of nonEmpty) {
+        const norm = normalizeForComparison(candidate.text);
+        let group = exactGroups.find(g => g.norm === norm);
+        if (!group) {
+          group = { norm, items: [] };
+          exactGroups.push(group);
+        }
+        group.items.push(candidate);
+      }
+
+      exactGroups.sort((a,b) => {
+        const scoreA = a.items.length * 100 + Math.max(...a.items.map(x => Number(x.confidence || 0)));
+        const scoreB = b.items.length * 100 + Math.max(...b.items.map(x => Number(x.confidence || 0)));
+        return scoreB - scoreA;
+      });
+
+      const winnerGroup = exactGroups[0];
+      const winner = [...winnerGroup.items].sort((a,b) => Number(b.confidence||0) - Number(a.confidence||0))[0];
+      const agreement = winnerGroup.items.length;
+      const disagreement = exactGroups.length > 1;
+
+      let verified = agreement >= 2;
+      let reason = verified ? "multi-pass-exact-agreement" : "single/unique-reading";
+
+      // If no exact agreement exists, do NOT create a hybrid. Retain the
+      // strongest visual candidate and explicitly flag the disagreement.
+      if (!verified && disagreement) {
+        const ranked = nonEmpty
+          .map(x => ({ x, score: lineEvidenceScore(x, nonEmpty) }))
+          .sort((a,b) => b.score - a.score);
+        const best = ranked[0]?.x || winner;
+        merged.push({
+          ...best,
+          verified: false,
+          reason: "multi-pass-conflict",
+          alternate: ranked[1]?.x?.text || ""
+        });
+        conflicts.push({
+          readings: nonEmpty.map(x => ({ text:x.text, confidence:x.confidence })),
+          selected: best.text
+        });
+        continue;
+      }
+
+      merged.push({
+        ...winner,
+        verified,
+        reason
+      });
+    }
+
+    merged.sort((a,b) => {
+      const ay = Number(a.bbox?.y0 ?? a.bbox?.top ?? 0);
+      const by = Number(b.bbox?.y0 ?? b.bbox?.top ?? 0);
+      const ax = Number(a.bbox?.x0 ?? a.bbox?.left ?? 0);
+      const bx = Number(b.bbox?.x0 ?? b.bbox?.left ?? 0);
+      if (Math.abs(ay - by) > 5) return ay - by;
+      return ax - bx;
+    });
+
+    const values = merged.map(x => Number(x.confidence)).filter(Number.isFinite);
+    const confidence = values.length ? values.reduce((a,b)=>a+b,0)/values.length : 0;
+    const lowConfidenceLines = merged
+      .filter(x => Number(x.confidence || 0) < 72 || x.verified === false)
+      .map(x => ({
+        text:x.text,
+        confidence:Number(x.confidence || 0),
+        reason:x.reason,
+        alternate:x.alternate || ""
+      }));
+
+    return {
+      text: cleanExtractedText(merged.map(x => x.text).join("\n")),
+      confidence,
+      lowConfidenceLines,
+      conflicts
+    };
   }
 
   /* ======================================================
@@ -4076,6 +4294,14 @@ ${bodyHtml}
 
     const totalPages =
       state.pages.length || 1;
+
+    if (!state.pages.length) {
+      state.busy = false;
+      extractBtn.disabled = false;
+      setProgress(0, "No readable pages available");
+      showToast("No pages are available for extraction.");
+      return;
+    }
 
     try {
       for (
