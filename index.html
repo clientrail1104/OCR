@@ -1235,6 +1235,18 @@
               </label>
             </div>
 
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>Context verification</strong>
+                <span>Cross-check words + sentences</span>
+              </div>
+
+              <label class="switch">
+                <input id="contextVerification" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
           </div>
 
           <div class="strict-note">
@@ -1591,6 +1603,9 @@
 
   const preserveLines =
     document.getElementById("preserveLines");
+
+  const contextVerification =
+    document.getElementById("contextVerification");
 
   const detectHeadings =
     document.getElementById("detectHeadings");
@@ -3555,46 +3570,226 @@
     };
   }
 
+  /* ======================================================
+     OCR VERIFICATION / CONSENSUS
+     ======================================================
+
+     Important fidelity rule:
+     The application may compare OCR passes, but it MUST NOT invent a
+     replacement word merely because it looks more natural. A value is
+     automatically promoted only when independent OCR passes agree. When
+     they disagree, the higher-confidence reading is retained and the line
+     is explicitly flagged for verification.
+  */
+
+  function normalizeForComparison(text) {
+    return String(text || "")
+      .normalize("NFKC")
+      .replace(/[ \t]+/g, " ")
+      .trim()
+      .toLocaleLowerCase();
+  }
+
+  function lineObjectsFromResult(result) {
+    const lines = Array.isArray(result?.data?.lines)
+      ? result.data.lines
+      : [];
+
+    return lines
+      .map((line, index) => ({
+        index,
+        text: String(line.text ?? ""),
+        confidence: Number(line.confidence ?? 0),
+        bbox: line.bbox || {}
+      }))
+      .filter(line => line.text.trim() !== "")
+      .sort((a, b) => {
+        const ay = Number(a.bbox.y0 ?? a.bbox.top ?? 0);
+        const by = Number(b.bbox.y0 ?? b.bbox.top ?? 0);
+        const ax = Number(a.bbox.x0 ?? a.bbox.left ?? 0);
+        const bx = Number(b.bbox.x0 ?? b.bbox.left ?? 0);
+        if (Math.abs(ay - by) > 5) return ay - by;
+        return ax - bx;
+      });
+  }
+
+  function verifyOcrPasses(primary, secondary) {
+    const a = lineObjectsFromResult(primary);
+    const b = lineObjectsFromResult(secondary);
+
+    if (!a.length) {
+      return rebuildOcrLines(secondary);
+    }
+    if (!b.length) {
+      return rebuildOcrLines(primary);
+    }
+
+    const used = new Set();
+    const merged = [];
+    const conflicts = [];
+
+    // Match nearby lines by vertical position first, then compare their text.
+    for (const lineA of a) {
+      const ay = Number(lineA.bbox.y0 ?? 0);
+      let bestIndex = -1;
+      let bestDistance = Infinity;
+
+      for (let i = 0; i < b.length; i++) {
+        if (used.has(i)) continue;
+        const by = Number(b[i].bbox.y0 ?? 0);
+        const distance = Math.abs(ay - by);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = i;
+        }
+      }
+
+      const match = bestIndex >= 0 && bestDistance <= 45 ? b[bestIndex] : null;
+      if (match) used.add(bestIndex);
+
+      if (!match) {
+        merged.push({ ...lineA, verified: false, reason: "single-pass" });
+        continue;
+      }
+
+      const same = normalizeForComparison(lineA.text) === normalizeForComparison(match.text);
+
+      if (same) {
+        // Preserve the exact spelling/case/punctuation from the higher-confidence pass.
+        const winner = lineA.confidence >= match.confidence ? lineA : match;
+        merged.push({ ...winner, verified: true, reason: "independent-pass-agreement" });
+      } else {
+        // NEVER manufacture a hybrid sentence. Keep the higher-confidence OCR reading.
+        const winner = lineA.confidence >= match.confidence ? lineA : match;
+        merged.push({
+          ...winner,
+          verified: false,
+          reason: "pass-conflict",
+          alternate: winner === lineA ? match.text : lineA.text
+        });
+        conflicts.push({
+          primary: lineA.text,
+          secondary: match.text,
+          confidenceA: lineA.confidence,
+          confidenceB: match.confidence
+        });
+      }
+    }
+
+    // Preserve lines detected only by the second pass rather than dropping them.
+    for (let i = 0; i < b.length; i++) {
+      if (!used.has(i)) {
+        merged.push({ ...b[i], verified: false, reason: "secondary-only" });
+      }
+    }
+
+    merged.sort((x, y) => {
+      const ay = Number(x.bbox.y0 ?? 0);
+      const by = Number(y.bbox.y0 ?? 0);
+      const ax = Number(x.bbox.x0 ?? 0);
+      const bx = Number(y.bbox.x0 ?? 0);
+      if (Math.abs(ay - by) > 5) return ay - by;
+      return ax - bx;
+    });
+
+    const confidenceValues = merged.map(x => x.confidence).filter(Number.isFinite);
+    const confidence = confidenceValues.length
+      ? confidenceValues.reduce((sum, x) => sum + x, 0) / confidenceValues.length
+      : 0;
+
+    const lowConfidenceLines = merged
+      .filter(x => x.confidence < 72 || x.verified === false)
+      .map(x => ({
+        text: x.text,
+        confidence: x.confidence,
+        reason: x.reason,
+        alternate: x.alternate || ""
+      }));
+
+    return {
+      text: cleanExtractedText(merged.map(x => x.text).join("\n")),
+      confidence,
+      lowConfidenceLines,
+      conflicts
+    };
+  }
+
   async function recognizeImage(
     dataUrl,
     pageIndex,
     totalPages
   ) {
     const prepared = await prepareImageForOcr(dataUrl);
+    const language = resolveOcrLanguage();
 
     if (prepared.qrCount > 0) {
       log(`${prepared.qrCount} QR region(s) masked before OCR`);
     }
 
     log(`OCR input ${prepared.width}×${prepared.height}px`);
+    log(`Primary recognition: multilingual/document layout analysis`);
 
-    const result = await Tesseract.recognize(
+    const commonOptions = {
+      logger: message => {
+        if (typeof message.progress === "number") {
+          const overall = ((pageIndex + message.progress) / totalPages) * 100;
+          setProgress(overall, `OCR page ${pageIndex + 1} of ${totalPages}`);
+        }
+        if (message.status) progressLabel.textContent = message.status;
+      }
+    };
+
+    // Pass 1: general document layout. This is the authoritative baseline.
+    const primary = await Tesseract.recognize(
       prepared.dataUrl,
-      resolveOcrLanguage(),
+      language,
       {
-        logger: message => {
-          if (typeof message.progress === "number") {
-            const overall = ((pageIndex + message.progress) / totalPages) * 100;
-            setProgress(
-              overall,
-              `OCR page ${pageIndex + 1} of ${totalPages}`
-            );
-          }
-          if (message.status) {
-            progressLabel.textContent = message.status;
-          }
+        ...commonOptions,
+        config: {
+          tessedit_pageseg_mode: "6",
+          preserve_interword_spaces: "1"
         }
       }
     );
 
-    const parsed = rebuildOcrLines(result);
+    let parsed;
+
+    if (contextVerification?.checked) {
+      log("Verification pass: independently checking word/line/sentence readings");
+
+      // Pass 2: sparse/irregular layout. Useful for forms, labels, cards,
+      // columns and documents where pass 1 may join neighbouring regions.
+      const secondary = await Tesseract.recognize(
+        prepared.dataUrl,
+        language,
+        {
+          ...commonOptions,
+          config: {
+            tessedit_pageseg_mode: "11",
+            preserve_interword_spaces: "1"
+          }
+        }
+      );
+
+      parsed = verifyOcrPasses(primary, secondary);
+
+      if (parsed.conflicts?.length) {
+        log(`${parsed.conflicts.length} OCR disagreement(s) retained for human verification`);
+      } else {
+        log("Independent OCR passes agree on detected lines where matched");
+      }
+    } else {
+      parsed = rebuildOcrLines(primary);
+    }
+
     state.ocrMetrics.push({
       confidence: parsed.confidence,
-      lowConfidenceLines: parsed.lowConfidenceLines.length
+      lowConfidenceLines: parsed.lowConfidenceLines.length,
+      conflicts: parsed.conflicts?.length || 0
     });
 
     if (parsed.lowConfidenceLines.length) {
-      log(`${parsed.lowConfidenceLines.length} low-confidence line(s) flagged for review`);
+      log(`${parsed.lowConfidenceLines.length} line(s) require verification — no automatic guessing applied`);
     }
 
     return parsed.text;
