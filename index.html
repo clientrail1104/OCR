@@ -1502,6 +1502,91 @@
     errors: []
   };
 
+  /* ======================================================
+     LOW-LATENCY OCR ENGINE
+     ======================================================
+     Tesseract.recognize() creates/tears down OCR workers repeatedly. That is
+     expensive because trained-data must be initialized again. NeuroOCR keeps
+     dedicated FAST and DEEP workers alive and serializes work per worker.
+     FAST jobs never wait behind background verification.
+  */
+  let fastOcrWorker = null;
+  let fastOcrLanguage = "";
+  let fastOcrWorkerPromise = null;
+  let deepOcrWorker = null;
+  let deepOcrLanguage = "";
+  let deepOcrWorkerPromise = null;
+  let fastQueue = Promise.resolve();
+  let deepQueue = Promise.resolve();
+  let activeOcrLogger = null;
+
+  async function getPersistentOcrWorker(language, kind = "fast") {
+    const lang = String(language || "eng").trim();
+    const isFast = kind === "fast";
+    const worker = isFast ? fastOcrWorker : deepOcrWorker;
+    const currentLang = isFast ? fastOcrLanguage : deepOcrLanguage;
+    const pending = isFast ? fastOcrWorkerPromise : deepOcrWorkerPromise;
+
+    if (worker && currentLang === lang) return worker;
+    if (pending) return pending;
+
+    const promise = Tesseract.createWorker(lang, 1, {
+      logger: message => {
+        if (typeof activeOcrLogger === "function") activeOcrLogger(message);
+      }
+    }).then(created => {
+      if (isFast) {
+        fastOcrWorker = created;
+        fastOcrLanguage = lang;
+      } else {
+        deepOcrWorker = created;
+        deepOcrLanguage = lang;
+      }
+      return created;
+    }).finally(() => {
+      if (isFast) fastOcrWorkerPromise = null;
+      else deepOcrWorkerPromise = null;
+    });
+
+    if (isFast) fastOcrWorkerPromise = promise;
+    else deepOcrWorkerPromise = promise;
+    return promise;
+  }
+
+  function queuedWorkerRecognize(image, language, options = {}, kind = "fast") {
+    const run = async () => {
+      const previousLogger = activeOcrLogger;
+      activeOcrLogger = options.logger || null;
+      try {
+        const worker = await getPersistentOcrWorker(language, kind);
+        return await worker.recognize(image, {
+          config: options.config || {}
+        });
+      } finally {
+        activeOcrLogger = previousLogger;
+      }
+    };
+
+    if (kind === "fast") {
+      const job = fastQueue.then(run, run);
+      fastQueue = job.catch(() => {});
+      return job;
+    }
+
+    const job = deepQueue.then(run, run);
+    deepQueue = job.catch(() => {});
+    return job;
+  }
+
+  async function terminateOcrWorkers() {
+    const workers = [fastOcrWorker, deepOcrWorker].filter(Boolean);
+    fastOcrWorker = deepOcrWorker = null;
+    fastOcrLanguage = deepOcrLanguage = "";
+    for (const worker of workers) {
+      try { await worker.terminate(); } catch (_) {}
+    }
+  }
+
   const fileInput =
     document.getElementById("fileInput");
 
@@ -4052,10 +4137,10 @@
           const psms = Array.isArray(def.psm) ? def.psm : [def.psm];
           for (const psm of psms) {
             try {
-              const result = await Tesseract.recognize(variants[i], "eng+msa", {
+              const result = await queuedWorkerRecognize(variants[i], "eng+msa", {
                 logger: progressLogger,
                 config: { tessedit_pageseg_mode:psm, preserve_interword_spaces:"1" }
-              });
+              }, "deep");
               const text = String(result?.data?.text || "").trim();
               if (text) readings.push(text);
             } catch (e) {
@@ -4148,7 +4233,7 @@
 
     let fastResult;
     try {
-      fastResult = await Tesseract.recognize(
+      fastResult = await queuedWorkerRecognize(
         prepared.originalDataUrl || prepared.dataUrl,
         language,
         {
@@ -4157,7 +4242,8 @@
             tessedit_pageseg_mode: "3",
             preserve_interword_spaces: "1"
           }
-        }
+        },
+        "fast"
       );
     } catch (error) {
       throw new Error(`Fast OCR failed: ${error?.message || error}`);
@@ -4223,7 +4309,7 @@
     // variant through every PSM is much slower and usually duplicates evidence.
     for (const cfg of configs) {
       try {
-        const result = await Tesseract.recognize(
+        const result = await queuedWorkerRecognize(
           prepared.originalDataUrl || prepared.dataUrl,
           language,
           {
@@ -4232,7 +4318,8 @@
               tessedit_pageseg_mode: cfg.psm,
               preserve_interword_spaces: "1"
             }
-          }
+          },
+          "deep"
         );
         results.push(result);
       } catch (error) {
@@ -5235,6 +5322,10 @@ ${bodyHtml}
         return;
       }
 
+      await terminateOcrWorkers();
+      fastQueue = Promise.resolve();
+      deepQueue = Promise.resolve();
+
       state.files =
         [];
 
@@ -5326,6 +5417,12 @@ ${bodyHtml}
   updateFileUI();
   updateAccuracySummary();
   updateStats();
+
+  // Warm the common Malaysian OCR model in the background so the first user
+  // extraction does not pay the worker-startup cost. This never blocks the UI.
+  setTimeout(() => {
+    getPersistentOcrWorker("eng+msa", "fast").catch(() => {});
+  }, 0);
 </script>
 
 </body>
