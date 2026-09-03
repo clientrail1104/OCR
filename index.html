@@ -4514,13 +4514,40 @@
   }
 
   function sanitizeStructuredLine(value) {
-    return String(value || "")
+    let line = String(value || "")
       // Remove OCR transport/control artefacts, not real letters or punctuation.
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u034F\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
       .replace(/�/g, "")
       .replace(/[\uE000-\uF8FF]/g, "")
       .replace(/[ \t]+/g, " ")
       .trim();
+
+    // Never expose OCR/file-transport metadata in structured extraction.
+    // These are application artifacts, not document content.
+    line = line
+      .replace(/^<!--[\s\S]*?-->$/g, "")
+      .replace(/^\s*(?:FILE|FILENAME|SOURCE|IMAGE|PICTURE|PAGE)\s*:\s*.+$/i, "")
+      .replace(/^\s*<!--.*(?:FILE|PAGE|IMAGE|PICTURE).*(?:-->)*\s*$/i, "")
+      .trim();
+
+    return line;
+  }
+
+  function isStructuredArtifactLine(value) {
+    const line = String(value || "").trim();
+    if (!line) return true;
+
+    // HTML comments, generated file/page markers and OCR transport labels.
+    if (/^<!--[\s\S]*?-->$/i.test(line)) return true;
+    if (/^\s*(?:FILE|FILENAME|SOURCE|IMAGE|PICTURE|PAGE)\s*:/i.test(line)) return true;
+    if (/\b(?:FILE|FILENAME|SOURCE|IMAGE|PICTURE)\s*:\s*[^|]+\|\s*PAGE\s*:/i.test(line)) return true;
+
+    // Lines made only of layout glyphs / isolated punctuation are not useful
+    // document text. Keep normal punctuation inside real words/identifiers.
+    if (!/[\p{L}\p{N}]/u.test(line)) return true;
+    if (/^[\p{P}\p{S}\s]+$/u.test(line)) return true;
+
+    return false;
   }
 
   function structuredLineScriptCount(line) {
@@ -4532,13 +4559,23 @@
     const value = sanitizeStructuredLine(line);
     if (!value) return false;
 
+    if (isStructuredArtifactLine(value)) return false;
+
     const profile = scriptProfile(value);
     const totalLetters = Object.values(profile).reduce((a,b) => a + b, 0);
     const digitCount = (value.match(/\p{N}/gu) || []).length;
 
-    // Pure numeric identifiers/dates are language-neutral and must be kept.
+    // Pure numeric identifiers/dates are language-neutral, but only ASCII
+    // digits are admitted for Latin Malay/English structured output. This
+    // prevents stray Arabic-Indic/other-script OCR numerals from appearing.
     if (totalLetters === 0) {
-      return digitCount > 0 && /\p{N}/u.test(value);
+      if (!digitCount) return false;
+      if (allowedScripts.size === 1 && allowedScripts.has("latin") && /[^0-9\s.,:/()#%+\-]/u.test(value)) return false;
+      const asciiDigits = (value.match(/[0-9]/g) || []).length;
+      // Very short numeric fragments (e.g. "6", "11") are overwhelmingly
+      // page/layout OCR noise in the structured stream. Keep real numbers,
+      // dates and identifiers with at least 3 digits.
+      return asciiDigits >= 3;
     }
 
     const scriptsPresent = Object.entries(profile).filter(([,n]) => n > 0).map(([s]) => s);
@@ -4564,7 +4601,23 @@
     // Mixed-script OCR noise is rejected unless every script is explicitly
     // supported by the detected document language profile.
     const dominant = Math.max(...Object.values(profile));
-    if (scriptsPresent.length > 1 && dominant / totalLetters < 0.55) return false;
+    if (scriptsPresent.length > 1 && dominant / totalLetters < 0.70) return false;
+
+    // In Malay/English (Latin) structured output, reject tiny isolated OCR
+    // fragments that have no numeric/document signal. This prevents lines such
+    // as "O", "c", "11" and stray punctuation from becoming fake fields while
+    // retaining real words, IDs, dates and addresses.
+    if (allowedScripts.size === 1 && allowedScripts.has("latin")) {
+      const latinLetters = profile.latin || 0;
+      const asciiDigits = (value.match(/[0-9]/g) || []).length;
+      const words = value.split(/\s+/).filter(Boolean);
+      if (latinLetters <= 1 && asciiDigits === 0) {
+        // Preserve legitimate one-letter document codes (for example a class
+        // or category "B"), but reject the most common isolated OCR glyphs.
+        if (!/^[A-Z]$/.test(value) || /^[OIL]$/.test(value)) return false;
+      }
+      if (latinLetters <= 3 && asciiDigits === 0 && words.length <= 2 && value.length <= 6 && !/^[A-Z]{1,3}$/.test(value)) return false;
+    }
 
     return true;
   }
@@ -4572,7 +4625,8 @@
   function filterStructuredLines(lines, languageCodes = structuredLanguageCodes()) {
     const normalized = (lines || [])
       .map(sanitizeStructuredLine)
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter(line => !isStructuredArtifactLine(line));
     const allowed = structuredAllowedScripts(languageCodes, normalized);
 
     return normalized.filter(line => isStructuredLanguageCompatible(line, allowed));
