@@ -3374,10 +3374,7 @@
     const nameCandidates = [
       ...(evidenceLines.nameCandidates || []),
       ...cleanLines.filter(isLikelyPersonName)
-    ]
-      .map(normalizeFieldText)
-      .filter(v => !isWatermarkOrStampLine(v))
-      .filter(isLikelyPersonName);
+    ].map(normalizeFieldText).filter(isLikelyPersonName);
     const nameEvidence = consensusCandidate(nameCandidates, isLikelyPersonName, 0.90) || exactCandidate(nameCandidates, isLikelyPersonName);
     const name = nameEvidence?.value || "";
 
@@ -3402,9 +3399,7 @@
 
     const authority = (evidenceLines.authorityLines || [])
       .map(normalizeFieldText)
-      .filter(Boolean)
-      .filter(v => !isWatermarkOrStampLine(v))
-      .filter(v => !isSignatureCueLine(v));
+      .filter(Boolean);
 
     if (!frontId && !backId && !name && !address.length && !gender && !nationalityText && !authority.length) return null;
 
@@ -4231,12 +4226,15 @@
     pageIndex,
     totalPages
   ) {
-    const prepared = await prepareImageForOcr(dataUrl);
-    const language = resolveOcrLanguage();
+    // Critical-path optimization: FAST OCR starts from the source image immediately.
+    // Upscaling/enhancement is prepared concurrently for later verification.
+    const preparedPromise = prepareImageForOcr(dataUrl);
+    const isAuto = ocrLanguage.value === "AUTO_BROAD";
+    const language = isAuto ? "eng+msa" : resolveOcrLanguage();
+    const deepLanguage = resolveOcrLanguage();
 
-    log(`OCR input ${prepared.width}×${prepared.height}px`);
-    log(`FAST-FIRST mode: first OCR result is shown immediately`);
-    log(`Background verification will continue without blocking the result`);
+    log(`FAST OCR starts immediately on source image`);
+    log(`Enhanced image preparation runs in parallel`);
 
     const progressLogger = message => {
       if (typeof message.progress === "number") {
@@ -4278,14 +4276,18 @@
       latency fix. The result is available to the UI as soon as this first
       OCR pass finishes.
     */
-    state.deepJobs[pageIndex] = runBackgroundVerification(
-      prepared,
-      fastResult,
-      fastParsed,
-      pageIndex,
-      totalPages,
-      language
-    ).catch(error => {
+    state.deepJobs[pageIndex] = (async () => {
+      const prepared = await preparedPromise;
+      log(`Enhanced image ready: ${prepared.width}×${prepared.height}px`);
+      return runBackgroundVerification(
+        prepared,
+        fastResult,
+        fastParsed,
+        pageIndex,
+        totalPages,
+        deepLanguage
+      );
+    })().catch(error => {
       log(`Background verification stopped: ${error?.message || error}`);
       return null;
     });
@@ -4519,40 +4521,13 @@
   }
 
   function sanitizeStructuredLine(value) {
-    let line = String(value || "")
+    return String(value || "")
       // Remove OCR transport/control artefacts, not real letters or punctuation.
       .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u034F\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
       .replace(/�/g, "")
       .replace(/[\uE000-\uF8FF]/g, "")
       .replace(/[ \t]+/g, " ")
       .trim();
-
-    // Never expose OCR/file-transport metadata in structured extraction.
-    // These are application artifacts, not document content.
-    line = line
-      .replace(/^<!--[\s\S]*?-->$/g, "")
-      .replace(/^\s*(?:FILE|FILENAME|SOURCE|IMAGE|PICTURE|PAGE)\s*:\s*.+$/i, "")
-      .replace(/^\s*<!--.*(?:FILE|PAGE|IMAGE|PICTURE).*(?:-->)*\s*$/i, "")
-      .trim();
-
-    return line;
-  }
-
-  function isStructuredArtifactLine(value) {
-    const line = String(value || "").trim();
-    if (!line) return true;
-
-    // HTML comments, generated file/page markers and OCR transport labels.
-    if (/^<!--[\s\S]*?-->$/i.test(line)) return true;
-    if (/^\s*(?:FILE|FILENAME|SOURCE|IMAGE|PICTURE|PAGE)\s*:/i.test(line)) return true;
-    if (/\b(?:FILE|FILENAME|SOURCE|IMAGE|PICTURE)\s*:\s*[^|]+\|\s*PAGE\s*:/i.test(line)) return true;
-
-    // Lines made only of layout glyphs / isolated punctuation are not useful
-    // document text. Keep normal punctuation inside real words/identifiers.
-    if (!/[\p{L}\p{N}]/u.test(line)) return true;
-    if (/^[\p{P}\p{S}\s]+$/u.test(line)) return true;
-
-    return false;
   }
 
   function structuredLineScriptCount(line) {
@@ -4564,23 +4539,13 @@
     const value = sanitizeStructuredLine(line);
     if (!value) return false;
 
-    if (isStructuredArtifactLine(value)) return false;
-
     const profile = scriptProfile(value);
     const totalLetters = Object.values(profile).reduce((a,b) => a + b, 0);
     const digitCount = (value.match(/\p{N}/gu) || []).length;
 
-    // Pure numeric identifiers/dates are language-neutral, but only ASCII
-    // digits are admitted for Latin Malay/English structured output. This
-    // prevents stray Arabic-Indic/other-script OCR numerals from appearing.
+    // Pure numeric identifiers/dates are language-neutral and must be kept.
     if (totalLetters === 0) {
-      if (!digitCount) return false;
-      if (allowedScripts.size === 1 && allowedScripts.has("latin") && /[^0-9\s.,:/()#%+\-]/u.test(value)) return false;
-      const asciiDigits = (value.match(/[0-9]/g) || []).length;
-      // Very short numeric fragments (e.g. "6", "11") are overwhelmingly
-      // page/layout OCR noise in the structured stream. Keep real numbers,
-      // dates and identifiers with at least 3 digits.
-      return asciiDigits >= 3;
+      return digitCount > 0 && /\p{N}/u.test(value);
     }
 
     const scriptsPresent = Object.entries(profile).filter(([,n]) => n > 0).map(([s]) => s);
@@ -4606,125 +4571,15 @@
     // Mixed-script OCR noise is rejected unless every script is explicitly
     // supported by the detected document language profile.
     const dominant = Math.max(...Object.values(profile));
-    if (scriptsPresent.length > 1 && dominant / totalLetters < 0.70) return false;
-
-    // In Malay/English (Latin) structured output, reject tiny isolated OCR
-    // fragments that have no numeric/document signal. This prevents lines such
-    // as "O", "c", "11" and stray punctuation from becoming fake fields while
-    // retaining real words, IDs, dates and addresses.
-    if (allowedScripts.size === 1 && allowedScripts.has("latin")) {
-      const latinLetters = profile.latin || 0;
-      const asciiDigits = (value.match(/[0-9]/g) || []).length;
-      const words = value.split(/\s+/).filter(Boolean);
-      if (latinLetters <= 1 && asciiDigits === 0) {
-        // Preserve legitimate one-letter document codes (for example a class
-        // or category "B"), but reject the most common isolated OCR glyphs.
-        if (!/^[A-Z]$/.test(value) || /^[OIL]$/.test(value)) return false;
-      }
-      if (latinLetters <= 3 && asciiDigits === 0 && words.length <= 2 && value.length <= 6 && !/^[A-Z]{1,3}$/.test(value)) return false;
-    }
+    if (scriptsPresent.length > 1 && dominant / totalLetters < 0.55) return false;
 
     return true;
-  }
-
-  /* ======================================================
-     DOCUMENT-ONLY VISUAL ARTIFACT FILTER
-     ======================================================
-     Ultra Structured Extraction must NOT promote non-document artifacts:
-       - watermarks / specimen overlays
-       - stamp / seal text
-       - signatures and names belonging to a signature block
-       - QR/barcode payloads and scanner/app marks
-     This is deliberately applied only to the structured view. It does not
-     rewrite the source text and it never removes a legitimate person's name
-     merely because it looks like a name. Signature names are removed only
-     when their surrounding lines identify a signature/authority block.
-  */
-
-  function isWatermarkOrStampLine(value) {
-    const v = normalizeFieldText(value);
-    if (!v) return true;
-
-    // Common specimen / watermark / scanner / source-overlay markings.
-    if (/\b(?:SPECIMEN|SAMPLE|WATERMARK|CONFIDENTIAL|DRAFT|COPY)\b/i.test(v)) return true;
-    if (/\b(?:SCANNED\s+WITH|CAMS?CANNER|SCAN(?:NED)?\s+BY|DIGITAL\s+STAMP|E-?STAMP)\b/i.test(v)) return true;
-    if (/\b(?:WWW\.|HTTP:\/\/|HTTPS:\/\/)/i.test(v)) return true;
-    if (/\b(?:GOTEMPL|DATEMPL|AXTEMPL|OXTEMPL|SHOTEMPL|CETAK\s*SSM|CETAKSSM)\b/i.test(v)) return true;
-    if (/\b(?:MYDATA\s*SSM|SSM\.COM|SSM\s+ONLINE)\b/i.test(v)) return true;
-
-    // Typical stamp/seal wording. Only remove when the line itself is an
-    // artifact marker, not when the same word occurs inside a real sentence.
-    if (/^(?:COP|SALINAN|SEAL|STAMP|OFFICIAL\s+STAMP|COP\s+RASMI|METERAI|CAP\s+RASMI)$/i.test(v)) return true;
-
-    return false;
-  }
-
-  function isSignatureCueLine(value) {
-    const v = normalizeFieldText(value);
-    if (!v) return false;
-    return /\b(?:SIGNATURE|SIGNED|SIGNATORY|SIGNATORI|TANDATANGAN|DITANDATANGANI|MENANDATANGANI|KETUA\s+PENGARAH|PENDAFTAR|PENGARAH|PEGAWAI\s+YANG|AUTHORI[ZS]ED\s+SIGNATORY|AUTHORI[ZS]ED\s+OFFICER|b\.p\.|on\s+behalf\s+of)\b/i.test(v);
-  }
-
-  function looksLikeSignatureName(value) {
-    const v = normalizeFieldText(value);
-    if (!v || /\d/.test(v)) return false;
-    if (!isLikelyPersonName(v)) return false;
-    // Signature names are handled by surrounding context; this function only
-    // recognizes a plausible human-name line and never removes it alone.
-    return true;
-  }
-
-  function removeSignatureBlocks(lines) {
-    const src = (lines || []).map(normalizeFieldText).filter(Boolean);
-    const out = [];
-    let signatureWindow = 0;
-
-    for (let i = 0; i < src.length; i++) {
-      const line = src[i];
-
-      if (isSignatureCueLine(line)) {
-        // The cue itself is also non-field metadata when it describes a
-        // signature/authority area. Do not leak it into structured extraction.
-        signatureWindow = 4;
-        continue;
-      }
-
-      if (signatureWindow > 0) {
-        // Skip names immediately below/above the signature cue, job titles,
-        // authority descriptors, and isolated signature strokes converted to OCR.
-        if (looksLikeSignatureName(line) ||
-            /^(?:PENDAFTAR(?:\s+PERNIAGAAN)?|PENGARAH|KETUA\s+PENGARAH|PENDAFTARAN\s+NEGARA|PENDAFTAR\s+PERNIAGAAN|SEMPENANJUNG\s+MALAYSIA|SEMENANJUNG\s+MALAYSIA|PERBENDAHARAAN\s+MALAYSIA(?:\s+SEMENANJUNG)?|KEMENTERIAN\s+.+)$/i.test(line)) {
-          signatureWindow--;
-          continue;
-        }
-        // Stop the window when a substantial ordinary field/document sentence
-        // begins. This avoids deleting unrelated content after a signature block.
-        if (/[:]/.test(line) || /\d/.test(line) || line.length > 45) {
-          signatureWindow = 0;
-          out.push(line);
-          continue;
-        }
-        signatureWindow--;
-        continue;
-      }
-
-      out.push(line);
-    }
-    return out;
-  }
-
-  function removeWatermarkAndSignatureArtifacts(lines) {
-    const noWatermarks = (lines || [])
-      .map(sanitizeStructuredLine)
-      .filter(Boolean)
-      .filter(line => !isWatermarkOrStampLine(line));
-    return removeSignatureBlocks(noWatermarks);
   }
 
   function filterStructuredLines(lines, languageCodes = structuredLanguageCodes()) {
-    const normalized = removeWatermarkAndSignatureArtifacts(lines || [])
-      .filter(Boolean)
-      .filter(line => !isStructuredArtifactLine(line));
+    const normalized = (lines || [])
+      .map(sanitizeStructuredLine)
+      .filter(Boolean);
     const allowed = structuredAllowedScripts(languageCodes, normalized);
 
     return normalized.filter(line => isStructuredLanguageCompatible(line, allowed));
