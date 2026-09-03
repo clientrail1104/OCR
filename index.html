@@ -1119,7 +1119,7 @@
               <input id="customOcrLanguage" class="control" type="text"
                 placeholder="e.g. eng+msa+chi_sim+jpn+kor" style="display:none;margin-top:6px"
                 autocomplete="off" spellcheck="false" />
-              <small class="field-help"></small>
+              
             </div>
 
             <div class="field">
@@ -3343,7 +3343,9 @@
   }
 
   function extractMyKadStructured(lines, evidence = null) {
-    const cleanLines = (lines || []).map(normalizeFieldText).filter(Boolean);
+    // Ultra Structured Extraction must not display phantom readings from
+    // unrelated OCR language packs. Filter before field detection.
+    const cleanLines = filterStructuredLines(lines || []).map(normalizeFieldText).filter(Boolean);
     const upper = cleanLines.map(x => x.toUpperCase());
     const evidenceLines = evidence || {};
 
@@ -3458,7 +3460,15 @@
       return "";
     }
 
-    const sourceLinesForProfile = cleaned.split("\n").map(normalizeFieldText).filter(Boolean);
+    // Literal mode remains verbatim. The structured view is deliberately
+    // language-filtered so AUTO_BROAD cannot leak unrelated Tamil/Cyrillic/
+    // Thai/Hangul/etc. hallucination-like OCR lines into the final fields.
+    const structuredCleaned = outputMode.value === "literal"
+      ? cleaned
+      : cleanStructuredText(cleaned);
+    if (!structuredCleaned) return "";
+
+    const sourceLinesForProfile = structuredCleaned.split("\n").map(normalizeFieldText).filter(Boolean);
     const profile = detectDocumentProfile(sourceLinesForProfile);
     if (outputMode.value !== "literal" && profile === "MYKAD") {
       const structuredMyKad = extractMyKadStructured(sourceLinesForProfile, evidence);
@@ -3473,7 +3483,7 @@
     }
 
     const lines =
-      cleaned.split("\n");
+      structuredCleaned.split("\n");
 
     const output = [];
 
@@ -4427,9 +4437,152 @@
       hiragana: (value.match(/\p{Script=Hiragana}/gu) || []).length,
       katakana: (value.match(/\p{Script=Katakana}/gu) || []).length,
       hangul: (value.match(/\p{Script=Hangul}/gu) || []).length,
+      greek: (value.match(/\p{Script=Greek}/gu) || []).length,
       hebrew: (value.match(/\p{Script=Hebrew}/gu) || []).length
     };
     return profile;
+  }
+
+  /* ======================================================
+     STRUCTURED-LANGUAGE FIDELITY FILTER
+     ======================================================
+     AUTO OCR may return phantom readings from unrelated trained-data packs.
+     The structured view must contain only text written in the document's
+     actual script/language family. This filter NEVER translates or rewrites
+     text; it only rejects a line when its character/script evidence is
+     incompatible with the detected document language profile.
+  */
+
+  const STRUCTURED_SCRIPT_MAP = {
+    eng: ["latin"], msa: ["latin"], ind: ["latin"], fil: ["latin"],
+    deu: ["latin"], fra: ["latin"], spa: ["latin"], ita: ["latin"], por: ["latin"], nld: ["latin"],
+    tur: ["latin"], vie: ["latin"], pol: ["latin"], ces: ["latin"], slk: ["latin"], ron: ["latin"], hun: ["latin"],
+    swe: ["latin"], dan: ["latin"], nor: ["latin"], fin: ["latin"],
+    ell: ["greek"], bul: ["cyrillic"], srp: ["cyrillic"], rus: ["cyrillic"], ukr: ["cyrillic"], hrv: ["latin"],
+    ara: ["arabic"], fas: ["arabic"], urd: ["arabic"], heb: ["hebrew"],
+    hin: ["devanagari"], ben: ["bengali"], tam: ["tamil"], tel: ["telugu"], tha: ["thai"],
+    chi_sim: ["han"], chi_tra: ["han"], jpn: ["han", "hiragana", "katakana"], kor: ["hangul"]
+  };
+
+  function structuredLanguageCodes() {
+    try {
+      return String(resolveOcrLanguage() || "eng")
+        .split("+").map(x => x.trim().toLowerCase()).filter(Boolean);
+    } catch (_) {
+      return ["eng"];
+    }
+  }
+
+  function structuredAllowedScripts(languageCodes, lines) {
+    const codes = languageCodes || structuredLanguageCodes();
+    const explicit = new Set();
+    for (const code of codes) {
+      for (const script of (STRUCTURED_SCRIPT_MAP[code] || [])) explicit.add(script);
+    }
+
+    // AUTO_BROAD contains many packs. In that mode, infer the document's
+    // dominant script instead of allowing every script returned by OCR.
+    if (ocrLanguage.value === "AUTO_BROAD" || explicit.size > 3) {
+      const totals = {};
+      for (const line of lines || []) {
+        const p = scriptProfile(line);
+        for (const [script, count] of Object.entries(p)) totals[script] = (totals[script] || 0) + count;
+      }
+      const ranked = Object.entries(totals).sort((a,b) => b[1] - a[1]);
+      if (!ranked.length || ranked[0][1] < 3) return new Set(["latin"]);
+
+      const primary = ranked[0][0];
+      const max = ranked[0][1];
+      const allowed = new Set([primary]);
+
+      // AUTO_BROAD must NOT mean "show every script that Tesseract happens
+      // to return". A Malay/English document is Latin; stray Tamil, Cyrillic,
+      // Thai, Hangul, etc. readings are rejected. Additional scripts are
+      // admitted only when there is strong document-level evidence.
+      if (primary === "han") {
+        for (const script of ["hiragana", "katakana"]) {
+          if ((totals[script] || 0) >= Math.max(3, max * 0.05)) allowed.add(script);
+        }
+        if ((totals.latin || 0) >= max * 0.20) allowed.add("latin");
+      } else if (["arabic", "cyrillic", "hebrew", "devanagari", "bengali", "tamil", "telugu", "thai", "hangul", "greek"].includes(primary)) {
+        if ((totals.latin || 0) >= max * 0.20) allowed.add("latin");
+      }
+
+      return allowed;
+    }
+    return explicit.size ? explicit : new Set(["latin"]);
+  }
+
+  function sanitizeStructuredLine(value) {
+    return String(value || "")
+      // Remove OCR transport/control artefacts, not real letters or punctuation.
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u034F\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
+      .replace(/�/g, "")
+      .replace(/[\uE000-\uF8FF]/g, "")
+      .replace(/[ \t]+/g, " ")
+      .trim();
+  }
+
+  function structuredLineScriptCount(line) {
+    const p = scriptProfile(line);
+    return Object.values(p).reduce((a,b) => a + b, 0);
+  }
+
+  function isStructuredLanguageCompatible(line, allowedScripts) {
+    const value = sanitizeStructuredLine(line);
+    if (!value) return false;
+
+    const profile = scriptProfile(value);
+    const totalLetters = Object.values(profile).reduce((a,b) => a + b, 0);
+    const digitCount = (value.match(/\p{N}/gu) || []).length;
+
+    // Pure numeric identifiers/dates are language-neutral and must be kept.
+    if (totalLetters === 0) {
+      return digitCount > 0 && /\p{N}/u.test(value);
+    }
+
+    const scriptsPresent = Object.entries(profile).filter(([,n]) => n > 0).map(([s]) => s);
+    if (scriptsPresent.some(script => !allowedScripts.has(script))) return false;
+
+    // Latin-only structured output is intended for Malay/English documents.
+    // Reject lines dominated by punctuation/symbol noise, but never rewrite
+    // legitimate names, IDs, addresses, abbreviations or legal text.
+    if (allowedScripts.size === 1 && allowedScripts.has("latin")) {
+      const nonAlphaNumeric = (value.match(/[^\p{L}\p{N}\s]/gu) || []).length;
+      if (nonAlphaNumeric > Math.max(12, value.length * 0.25)) return false;
+
+      // Obvious OCR word-fragment noise is rejected only when it lacks common
+      // document-language anchors. This is a filter, never a correction.
+      const words = value.split(/\s+/).filter(Boolean);
+      if (words.length >= 4 && !/\d/.test(value)) {
+        const anchors = /\b(?:and|or|of|the|for|with|bin|binti|a\/p|sdn|bhd|jalan|kampung|malaysia|perakuan|pendaftaran|nama|alamat|tarikh|no|nombor|kelas|tempoh|syarikat|perniagaan|daftar|registered|address|company|name|date|validity|nationality|identity|licence|license|passport|information|status|pengesahan|pendaftaran|kementerian|kerajaan)\b/i;
+        const vowelWords = words.filter(w => /[aeiou]/i.test(w) || w.length <= 2).length;
+        if (!anchors.test(value) && vowelWords / words.length < 0.35) return false;
+      }
+    }
+
+    // Mixed-script OCR noise is rejected unless every script is explicitly
+    // supported by the detected document language profile.
+    const dominant = Math.max(...Object.values(profile));
+    if (scriptsPresent.length > 1 && dominant / totalLetters < 0.55) return false;
+
+    return true;
+  }
+
+  function filterStructuredLines(lines, languageCodes = structuredLanguageCodes()) {
+    const normalized = (lines || [])
+      .map(sanitizeStructuredLine)
+      .filter(Boolean);
+    const allowed = structuredAllowedScripts(languageCodes, normalized);
+
+    return normalized.filter(line => isStructuredLanguageCompatible(line, allowed));
+  }
+
+  function cleanStructuredText(rawText, languageCodes = structuredLanguageCodes()) {
+    const lines = String(rawText || "")
+      .replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+      .split("\n");
+    return filterStructuredLines(lines, languageCodes).join("\n");
   }
 
   function lineEvidenceScore(candidate, allLines) {
