@@ -3,39 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroOCR — Ultra Structured Document Extraction</title>
 
-  <title>NAIKER Ultra OCR</title>
-
-  <!-- Tesseract OCR -->
+  <!-- OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-  <!-- PDF.js -->
+  <!-- PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <!-- DOCX -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 
-  <!-- QR Detection -->
+  <!-- QR detection -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
   <style>
     :root {
       --bg: #edf2f5;
       --panel: #edf2f5;
+      --text: #26343c;
+      --muted: #73828b;
+      --accent: #279aa2;
+      --accent-dark: #17757b;
+      --accent-soft: #d9f1f2;
+      --success: #3f9b76;
+      --danger: #c95d68;
 
-      --text: #24343d;
-      --muted: #71818a;
-
-      --accent: #239aa2;
-      --accent-dark: #17757c;
-      --accent-soft: #d8f1f2;
-
-      --success: #37936c;
-      --warning: #c58d3e;
-      --danger: #c85b66;
-
-      --shadow-dark: rgba(159, 174, 193, 0.46);
-      --shadow-light: rgba(255, 255, 255, 0.92);
+      --shadow-dark: rgba(163,177,198,.46);
+      --shadow-light: rgba(255,255,255,.92);
 
       --neu:
         8px 8px 20px var(--shadow-dark),
@@ -46,8 +41,8 @@
         -4px -4px 10px var(--shadow-light);
 
       --neu-inset:
-        inset 4px 4px 10px rgba(159, 174, 193, 0.34),
-        inset -4px -4px 10px rgba(255, 255, 255, 0.94);
+        inset 4px 4px 10px rgba(163,177,198,.34),
+        inset -4px -4px 10px rgba(255,255,255,.95);
 
       --radius-xl: 22px;
       --radius-lg: 16px;
@@ -79,14 +74,14 @@
 
       background:
         radial-gradient(
-          circle at top left,
-          rgba(255,255,255,.82),
-          transparent 32%
+          circle at 10% 10%,
+          rgba(255,255,255,.8),
+          transparent 30%
         ),
         radial-gradient(
-          circle at bottom right,
-          rgba(207,238,240,.48),
-          transparent 34%
+          circle at 90% 90%,
+          rgba(205,235,237,.45),
+          transparent 35%
         ),
         var(--bg);
     }
@@ -106,29 +101,22 @@
       width: calc(100vw - 16px);
       height: calc(100vh - 16px);
       margin: 8px;
-
       display: flex;
       flex-direction: column;
-
       overflow: hidden;
     }
 
-    /* =====================================================
-       HEADER
-       ===================================================== */
+    /* HEADER */
 
     .topbar {
-      flex: 0 0 62px;
-
+      flex: 0 0 60px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-
+      gap: 16px;
       padding: 8px 16px;
       margin-bottom: 10px;
-
       border-radius: 20px;
-
       background: var(--panel);
       box-shadow: var(--neu);
     }
@@ -136,187 +124,155 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 11px;
+      min-width: 0;
     }
 
-    .brand-logo {
+    .brand-mark {
       width: 42px;
       height: 42px;
-
+      flex: 0 0 42px;
       display: grid;
       place-items: center;
-
       border-radius: 13px;
-
       color: var(--accent);
-      font-weight: 900;
-      font-size: 17px;
-
       background: var(--panel);
       box-shadow: var(--neu-small);
+      font-size: 17px;
+      font-weight: 900;
     }
 
-    .brand h1 {
-      margin: 0;
+    .brand-text {
+      min-width: 0;
+    }
 
-      font-size: 15px;
+    .brand-text h1 {
+      margin: 0;
+      font-size: 14px;
       line-height: 1.1;
     }
 
-    .brand p {
+    .brand-text p {
       margin: 3px 0 0;
-
       color: var(--muted);
-      font-size: 9px;
+      font-size: 8px;
     }
 
-    .status-group {
+    .top-status {
       display: flex;
       align-items: center;
-      gap: 8px;
-    }
-
-    .status-pill {
-      display: flex;
-      align-items: center;
+      justify-content: flex-end;
       gap: 7px;
+      flex-wrap: wrap;
+    }
 
-      min-height: 31px;
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 30px;
       padding: 5px 10px;
-
       border-radius: 999px;
-
       color: var(--muted);
-
       background: var(--panel);
       box-shadow: var(--neu-small);
-
-      font-size: 9px;
+      font-size: 8px;
       font-weight: 800;
     }
 
-    .status-dot {
+    .dot {
       width: 8px;
       height: 8px;
-
-      border-radius: 50%;
-
+      border-radius: 999px;
       background: var(--success);
-
-      box-shadow:
-        0 0 0 4px rgba(55,147,108,.12);
+      box-shadow: 0 0 0 4px rgba(63,155,118,.12);
     }
 
-    /* =====================================================
-       WORKSPACE
-       ===================================================== */
+    /* WORKSPACE */
 
     .workspace {
       flex: 1;
       min-height: 0;
-
       display: grid;
-
       grid-template-columns:
-        minmax(260px, .72fr)
-        minmax(390px, 1.12fr)
-        minmax(430px, 1.22fr);
-
+        minmax(265px,.72fr)
+        minmax(390px,1.12fr)
+        minmax(430px,1.22fr);
       gap: 10px;
-
       overflow: hidden;
     }
 
     .panel {
       min-width: 0;
       min-height: 0;
-
+      height: 100%;
       display: flex;
       flex-direction: column;
-
       border-radius: var(--radius-xl);
-
       background: var(--panel);
       box-shadow: var(--neu);
-
       overflow: hidden;
     }
 
-    .panel-header {
+    .panel-head {
       flex: 0 0 50px;
-
+      min-height: 50px;
+      padding: 9px 14px 6px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-
       gap: 10px;
+    }
 
-      padding: 9px 14px 6px;
+    .panel-title {
+      min-width: 0;
     }
 
     .panel-title h2 {
       margin: 0;
-
       font-size: 12px;
     }
 
     .panel-title span {
       display: block;
-
       margin-top: 2px;
-
       color: var(--muted);
-      font-size: 8px;
+      font-size: 7.5px;
     }
 
     .panel-body {
       flex: 1;
       min-height: 0;
-
       padding: 5px 14px 13px;
-
       overflow: hidden;
     }
 
-    /* =====================================================
-       INPUT
-       ===================================================== */
+    /* LEFT */
 
     .input-body {
       height: 100%;
-
       display: flex;
       flex-direction: column;
-
-      gap: 8px;
+      gap: 7px;
     }
 
     .upload-zone {
       position: relative;
-
-      flex: 0 0 115px;
-
+      flex: 0 0 112px;
+      min-height: 112px;
       display: grid;
       place-items: center;
-
-      padding: 10px;
-
-      text-align: center;
-
+      padding: 9px;
       border-radius: 15px;
-
-      box-shadow: var(--neu-inset);
-
+      text-align: center;
       cursor: pointer;
-
+      box-shadow: var(--neu-inset);
       transition: .18s ease;
     }
 
-    .upload-zone:hover,
     .upload-zone.dragover {
-      background: rgba(216,241,242,.44);
-
-      outline: 2px dashed rgba(35,154,162,.55);
+      background: rgba(217,241,242,.42);
+      outline: 2px dashed rgba(39,154,162,.55);
       outline-offset: -7px;
     }
 
@@ -327,102 +283,73 @@
     }
 
     .upload-icon {
-      width: 38px;
-      height: 38px;
-
+      width: 37px;
+      height: 37px;
       display: grid;
       place-items: center;
-
-      margin: 0 auto 6px;
-
-      border-radius: 12px;
-
+      margin: 0 auto 5px;
+      border-radius: 11px;
       color: var(--accent);
-
       background: var(--panel);
       box-shadow: var(--neu-small);
     }
 
     .upload-icon svg {
-      width: 20px;
-      height: 20px;
+      width: 19px;
+      height: 19px;
     }
 
     .upload-zone h3 {
       margin: 0;
-
-      font-size: 11px;
+      font-size: 10.5px;
     }
 
     .upload-zone p {
-      margin: 3px auto 0;
-
       max-width: 260px;
-
+      margin: 3px auto 0;
       color: var(--muted);
-      font-size: 7.5px;
+      font-size: 7px;
       line-height: 1.35;
     }
 
     .upload-types {
       margin-top: 4px;
-
       color: var(--accent-dark);
-
-      font-size: 7px;
+      font-size: 6.5px;
       font-weight: 900;
       letter-spacing: .08em;
     }
 
-    /* =====================================================
-       FILE LIST
-       ===================================================== */
+    /* FILE LIST */
 
     .file-list {
-      flex: 0 1 90px;
-
+      flex: 0 1 82px;
       min-height: 0;
-
       display: grid;
       gap: 5px;
-
       padding: 2px;
-
       overflow: auto;
     }
 
     .file-item {
       display: grid;
-
-      grid-template-columns:
-        29px minmax(0,1fr) 23px;
-
+      grid-template-columns: 29px minmax(0,1fr) 23px;
       align-items: center;
-
       gap: 7px;
-
       padding: 5px 7px;
-
       border-radius: 10px;
-
-      background: var(--panel);
       box-shadow: var(--neu-small);
     }
 
     .file-icon {
       width: 29px;
       height: 29px;
-
       display: grid;
       place-items: center;
-
       border-radius: 8px;
-
       color: var(--accent-dark);
-
       box-shadow: var(--neu-inset);
-
-      font-size: 7px;
+      font-size: 6.5px;
       font-weight: 900;
     }
 
@@ -432,128 +359,98 @@
 
     .file-name {
       overflow: hidden;
-
       text-overflow: ellipsis;
       white-space: nowrap;
-
-      font-size: 8px;
+      font-size: 7.5px;
       font-weight: 800;
     }
 
-    .file-size {
+    .file-info {
       margin-top: 2px;
-
       color: var(--muted);
-      font-size: 6.5px;
+      font-size: 6px;
     }
 
-    .remove-btn {
+    .remove-file {
       width: 23px;
       height: 23px;
-
       border-radius: 7px;
-
       color: var(--danger);
-
       background: var(--panel);
       box-shadow: var(--neu-small);
-
       cursor: pointer;
     }
 
-    /* =====================================================
-       SETTINGS
-       ===================================================== */
+    /* SETTINGS */
 
     .settings {
       display: grid;
       gap: 6px;
+      min-height: 0;
     }
 
-    .form-row {
+    .field-grid {
       display: grid;
-
       grid-template-columns: 1fr 1fr;
-
       gap: 6px;
     }
 
     .field label {
       display: block;
-
       margin: 0 0 3px 2px;
-
       color: var(--muted);
-
-      font-size: 7px;
+      font-size: 6.5px;
       font-weight: 900;
     }
 
     .control {
       width: 100%;
-      height: 31px;
-
-      padding: 0 9px;
-
+      height: 30px;
+      min-height: 30px;
+      padding: 0 8px;
       border: 0;
       outline: 0;
-
       border-radius: 9px;
-
       color: var(--text);
-
       background: var(--panel);
       box-shadow: var(--neu-inset);
-
-      font-size: 8px;
+      font-size: 7.5px;
     }
 
     .switch-grid {
       display: grid;
-
       grid-template-columns: 1fr 1fr;
-
       gap: 6px;
     }
 
-    .switch-box {
+    .switch-row {
       min-height: 34px;
-
       display: flex;
       align-items: center;
       justify-content: space-between;
-
-      gap: 5px;
-
+      gap: 6px;
       padding: 5px 7px;
-
       border-radius: 9px;
-
       box-shadow: var(--neu-inset);
     }
 
-    .switch-copy strong {
+    .switch-label strong {
       display: block;
-
-      font-size: 7.5px;
+      font-size: 7px;
     }
 
-    .switch-copy span {
+    .switch-label span {
       display: block;
-
       margin-top: 1px;
-
       color: var(--muted);
-      font-size: 6px;
+      font-size: 5.8px;
     }
 
     .switch {
       position: relative;
-
-      flex: 0 0 auto;
-
       width: 34px;
       height: 19px;
+      flex: 0 0 auto;
     }
 
     .switch input {
@@ -563,101 +460,72 @@
     .slider {
       position: absolute;
       inset: 0;
-
       border-radius: 999px;
-
       background: #d9e0e4;
       box-shadow: var(--neu-inset);
-
       cursor: pointer;
     }
 
     .slider::before {
       content: "";
-
       position: absolute;
-
       width: 13px;
       height: 13px;
-
       top: 3px;
       left: 3px;
-
       border-radius: 50%;
-
       background: #f8fbfc;
-
-      box-shadow:
-        1px 1px 4px rgba(100,120,130,.35);
-
+      box-shadow: 1px 1px 4px rgba(100,120,130,.35);
       transition: .18s ease;
     }
 
     .switch input:checked + .slider {
-      background: rgba(35,154,162,.3);
+      background: rgba(39,154,162,.3);
     }
 
     .switch input:checked + .slider::before {
       transform: translateX(15px);
-
       background: var(--accent);
     }
 
-    .strict-rule {
-      padding: 7px 8px;
-
-      border-radius: 10px;
-
+    .strict-note {
+      padding: 6px 8px;
+      border-radius: 9px;
       color: var(--muted);
-
       box-shadow: var(--neu-inset);
-
-      font-size: 6.8px;
+      font-size: 6px;
       line-height: 1.35;
     }
 
-    .strict-rule strong {
+    .strict-note strong {
       color: var(--text);
     }
 
-    /* =====================================================
-       BUTTONS
-       ===================================================== */
+    /* BUTTONS */
 
     .primary-btn,
     .neu-btn {
-      height: 32px;
-
-      border-radius: 10px;
-
-      font-size: 8px;
+      height: 31px;
+      min-height: 31px;
+      padding: 0 10px;
+      border-radius: 9px;
+      font-size: 7.5px;
       font-weight: 900;
-
       cursor: pointer;
-
       transition: transform .15s ease;
     }
 
     .primary-btn {
+      width: 100%;
       color: white;
-
-      background:
-        linear-gradient(
-          145deg,
-          #2aa7af,
-          #218c94
-        );
-
+      background: linear-gradient(145deg,#2aa7af,#238d94);
       box-shadow:
-        4px 4px 10px rgba(147,164,181,.55),
-        -4px -4px 10px rgba(255,255,255,.82);
+        4px 4px 10px rgba(148,165,179,.55),
+        -4px -4px 10px rgba(255,255,255,.85);
     }
 
     .neu-btn {
-      padding: 0 10px;
-
       color: var(--text);
-
       background: var(--panel);
       box-shadow: var(--neu-small);
     }
@@ -667,100 +535,68 @@
       transform: translateY(-1px);
     }
 
-    .primary-btn:active,
-    .neu-btn:active {
-      transform: translateY(1px);
-    }
-
     .primary-btn:disabled {
       opacity: .45;
-
       cursor: not-allowed;
       transform: none;
     }
 
-    /* =====================================================
-       PROGRESS
-       ===================================================== */
+    /* PROGRESS */
 
-    .progress-section {
+    .progress-wrap {
       display: none;
+      min-height: 0;
     }
 
     .progress-head {
       display: flex;
       justify-content: space-between;
-
       margin-bottom: 4px;
-
       color: var(--muted);
-
-      font-size: 7px;
+      font-size: 6.5px;
       font-weight: 800;
     }
 
     .progress-track {
       height: 7px;
-
       padding: 2px;
-
       border-radius: 999px;
-
       box-shadow: var(--neu-inset);
     }
 
     .progress-bar {
       width: 0%;
       height: 100%;
-
-      border-radius: inherit;
-
-      background:
-        linear-gradient(
-          90deg,
-          var(--accent),
-          #57bdc0
-        );
-
-      transition: width .15s ease;
+      border-radius: 999px;
+      background: linear-gradient(90deg,#279aa2,#54bdbe);
+      transition: width .18s ease;
     }
 
     .ocr-log {
-      max-height: 35px;
-
+      max-height: 36px;
       margin-top: 4px;
-
       overflow: auto;
-
       color: var(--muted);
-
-      font-family: monospace;
-      font-size: 6px;
-      line-height: 1.3;
-
       white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 5.8px;
+      line-height: 1.3;
     }
 
-    /* =====================================================
-       PREVIEW
-       ===================================================== */
+    /* PREVIEW */
 
-    .preview-tools {
+    .preview-toolbar {
       display: flex;
       align-items: center;
       gap: 5px;
     }
 
-    .page-pill {
+    .page-badge {
       padding: 5px 8px;
-
       border-radius: 999px;
-
       color: var(--muted);
-
       box-shadow: var(--neu-inset);
-
-      font-size: 7px;
+      font-size: 6.5px;
       font-weight: 900;
     }
 
@@ -771,36 +607,27 @@
     .preview-shell {
       width: 100%;
       height: 100%;
-
+      min-height: 0;
       padding: 9px;
-
       border-radius: 14px;
-
       box-shadow: var(--neu-inset);
-
       overflow: auto;
     }
 
     .empty-preview {
       width: 100%;
       height: 100%;
-
       display: grid;
       place-items: center;
-
       text-align: center;
-
       color: var(--muted);
-
-      font-size: 9px;
+      font-size: 8px;
     }
 
     .empty-preview svg {
-      width: 52px;
-      height: 52px;
-
-      margin-bottom: 8px;
-
+      width: 50px;
+      height: 50px;
+      margin-bottom: 7px;
       opacity: .3;
     }
 
@@ -811,221 +638,194 @@
 
     .preview-page {
       position: relative;
-
       width: fit-content;
       max-width: 100%;
-
       margin: auto;
-
       overflow: hidden;
-
       border-radius: 5px;
-
       background: white;
-
-      box-shadow:
-        0 7px 20px rgba(52,71,81,.16);
+      box-shadow: 0 7px 20px rgba(52,71,81,.16);
     }
 
     .preview-page img,
     .preview-page canvas {
       display: block;
-
       max-width: 100%;
-      max-height: calc(100vh - 155px);
-
       width: auto;
       height: auto;
-
+      max-height: calc(100vh - 145px);
       object-fit: contain;
     }
 
-    .page-label {
+    .page-number {
       position: absolute;
-
       top: 6px;
       right: 6px;
-
       padding: 4px 7px;
-
       border-radius: 999px;
-
       color: white;
-
-      background: rgba(30,40,46,.7);
-
+      background: rgba(28,40,47,.72);
       backdrop-filter: blur(4px);
-
-      font-size: 6.5px;
-      font-weight: 800;
-    }
-
-    .qr-mask-info {
-      position: absolute;
-
-      bottom: 6px;
-      left: 6px;
-
-      padding: 3px 6px;
-
-      border-radius: 999px;
-
-      color: white;
-
-      background: rgba(35,154,162,.8);
-
       font-size: 6px;
       font-weight: 800;
     }
 
     .docx-preview {
       width: min(100%,760px);
-
-      min-height: 800px;
-
+      min-height: 780px;
       padding: 35px 40px;
-
       color: #111;
-
       background: white;
-
-      font-family:
-        Georgia,
-        "Times New Roman",
-        serif;
-
-      font-size: 10px;
+      font-family: Georgia,"Times New Roman",serif;
+      font-size: 9px;
       line-height: 1.45;
     }
 
     .docx-preview table {
       width: 100%;
-
       border-collapse: collapse;
     }
 
     .docx-preview th,
     .docx-preview td {
       padding: 4px;
-
       border: 1px solid #222;
     }
 
-    /* =====================================================
-       OUTPUT
-       ===================================================== */
+    /* OUTPUT */
+
+    .tabs {
+      display: inline-flex;
+      gap: 3px;
+      padding: 3px;
+      border-radius: 10px;
+      box-shadow: var(--neu-inset);
+    }
+
+    .tab {
+      min-height: 25px;
+      padding: 0 8px;
+      border-radius: 7px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-size: 6.5px;
+      font-weight: 900;
+    }
+
+    .tab.active {
+      color: var(--accent-dark);
+      background: var(--panel);
+      box-shadow: var(--neu-small);
+    }
 
     .output-body {
       height: 100%;
-
       display: flex;
       flex-direction: column;
+      min-height: 0;
     }
 
-    .output-toolbar {
+    .output-tools {
       flex: 0 0 auto;
-
       display: flex;
       align-items: center;
       gap: 5px;
-
       margin-bottom: 7px;
+      flex-wrap: wrap;
     }
 
-    .output-toolbar .spacer {
-      flex: 1;
-    }
-
-    .format-badge {
+    .mode-badge {
+      margin-left: auto;
       padding: 5px 8px;
-
       border-radius: 999px;
-
       color: var(--accent-dark);
-
       background: var(--accent-soft);
-
-      font-size: 6.5px;
+      font-size: 6px;
       font-weight: 900;
-      letter-spacing: .05em;
     }
 
     .editor {
       flex: 1;
-
       width: 100%;
+      height: auto;
       min-height: 0;
-
       padding: 11px;
-
-      resize: none;
-
       border: 0;
       outline: 0;
-
+      resize: none;
       border-radius: 13px;
-
-      color: #23343d;
-
+      color: #26343c;
       background: var(--panel);
       box-shadow: var(--neu-inset);
-
       font-family:
         "SFMono-Regular",
         Consolas,
         "Liberation Mono",
         Menlo,
         monospace;
-
-      font-size: 8.5px;
-      line-height: 1.45;
-
+      font-size: 8px;
+      line-height: 1.48;
       tab-size: 2;
     }
 
     .stats {
       flex: 0 0 auto;
-
       display: grid;
-
-      grid-template-columns:
-        repeat(4,1fr);
-
+      grid-template-columns: repeat(4,1fr);
       gap: 6px;
-
       margin-top: 7px;
     }
 
     .stat {
       padding: 6px;
-
-      text-align: center;
-
       border-radius: 9px;
-
+      text-align: center;
       box-shadow: var(--neu-small);
     }
 
     .stat strong {
       display: block;
-
-      font-size: 10px;
+      font-size: 9.5px;
     }
 
     .stat span {
       display: block;
-
       margin-top: 1px;
-
       color: var(--muted);
-
-      font-size: 5.8px;
+      font-size: 5.5px;
       font-weight: 900;
     }
 
-    /* =====================================================
-       SCROLLBAR
-       ===================================================== */
+    .hidden {
+      display: none !important;
+    }
+
+    /* TOAST */
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: 330px;
+      padding: 10px 13px;
+      border-radius: 12px;
+      color: var(--text);
+      background: var(--panel);
+      box-shadow: var(--neu);
+      font-size: 8px;
+      font-weight: 800;
+      opacity: 0;
+      transform: translateY(15px);
+      pointer-events: none;
+      transition: .2s ease;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
 
     * {
       scrollbar-width: thin;
@@ -1039,65 +839,17 @@
 
     *::-webkit-scrollbar-thumb {
       border-radius: 999px;
-
       background: #b6c5cc;
     }
 
-    /* =====================================================
-       TOAST
-       ===================================================== */
-
-    .toast {
-      position: fixed;
-
-      right: 18px;
-      bottom: 18px;
-
-      max-width: 330px;
-
-      padding: 10px 13px;
-
-      border-radius: 12px;
-
-      color: var(--text);
-
-      background: var(--panel);
-      box-shadow: var(--neu);
-
-      font-size: 8px;
-      font-weight: 800;
-
-      opacity: 0;
-      transform: translateY(15px);
-
-      pointer-events: none;
-
-      transition: .2s ease;
-
-      z-index: 1000;
-    }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    /* =====================================================
-       SHORT LAPTOP
-       ===================================================== */
-
     @media (max-height: 760px) and (min-width: 1051px) {
-
       .topbar {
-        flex-basis: 54px;
+        flex-basis: 52px;
       }
 
       .upload-zone {
-        flex-basis: 93px;
+        flex-basis: 88px;
+        min-height: 88px;
       }
 
       .upload-zone p {
@@ -1108,25 +860,21 @@
         flex-basis: 55px;
       }
 
-      .strict-rule {
+      .strict-note {
         display: none;
       }
 
       .control {
-        height: 28px;
+        height: 27px;
+        min-height: 27px;
       }
 
-      .switch-box {
-        min-height: 30px;
+      .switch-row {
+        min-height: 29px;
       }
     }
 
-    /* =====================================================
-       TABLET
-       ===================================================== */
-
     @media (max-width: 1050px) {
-
       html,
       body {
         overflow: auto;
@@ -1135,15 +883,13 @@
       .app {
         width: calc(100% - 12px);
         height: auto;
-
         min-height: 100vh;
-
         margin: 6px;
+        overflow: visible;
       }
 
       .workspace {
         grid-template-columns: 1fr 1fr;
-
         overflow: visible;
       }
 
@@ -1156,13 +902,8 @@
       }
     }
 
-    /* =====================================================
-       MOBILE
-       ===================================================== */
-
     @media (max-width: 720px) {
-
-      .status-group {
+      .top-status {
         display: none;
       }
 
@@ -1183,1363 +924,1187 @@
 
 <body>
 
-  <main class="app">
+<main class="app">
 
-    <!-- ===================================================
-         HEADER
-         =================================================== -->
+  <header class="topbar">
 
-    <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">N</div>
 
-      <div class="brand">
+      <div class="brand-text">
+        <h1>NeuroOCR</h1>
+        <p>
+          Ultra structured extraction · exact PDF text when available · OCR fallback for scans
+        </p>
+      </div>
+    </div>
 
-        <div class="brand-logo">
-          N
-        </div>
+    <div class="top-status">
 
-        <div>
-          <h1>NAIKER Ultra OCR</h1>
-
-          <p>
-            Literal extraction · Ultra structured Markdown · QR exclusion
-          </p>
-        </div>
-
+      <div class="pill">
+        <span class="dot"></span>
+        Ready
       </div>
 
-      <div class="status-group">
-
-        <div class="status-pill">
-          <span class="status-dot"></span>
-          OCR Ready
-        </div>
-
-        <div
-          class="status-pill"
-          id="fileStatus"
-        >
-          0 documents
-        </div>
-
-        <div class="status-pill">
-          QR + Signature Exclusion
-        </div>
-
+      <div class="pill" id="topFileStatus">
+        0 documents
       </div>
 
-    </header>
+      <div class="pill">
+        QR + signature artifacts omitted
+      </div>
 
-    <!-- ===================================================
-         WORKSPACE
-         =================================================== -->
+    </div>
 
-    <section class="workspace">
+  </header>
 
-      <!-- =================================================
-           LEFT
-           ================================================= -->
+  <section class="workspace">
 
-      <aside class="panel">
+    <!-- INPUT -->
 
-        <div class="panel-header">
+    <aside class="panel">
 
-          <div class="panel-title">
-            <h2>Document Input</h2>
-            <span>Source files and extraction rules</span>
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>Document Input</h2>
+          <span>Upload source documents</span>
+        </div>
+      </div>
+
+      <div class="panel-body input-body">
+
+        <label class="upload-zone" id="uploadZone">
+
+          <input
+            id="fileInput"
+            type="file"
+            multiple
+            accept=".png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.pdf,.docx"
+          />
+
+          <div>
+
+            <div class="upload-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+              >
+                <path d="M12 16V4"></path>
+                <path d="m7 9 5-5 5 5"></path>
+                <path d="M5 14v5h14v-5"></path>
+              </svg>
+            </div>
+
+            <h3>Drop documents here</h3>
+
+            <p>
+              CIDB, SSM, certificates, identity documents,
+              passports, forms, scanned records, PDF or DOCX.
+            </p>
+
+            <div class="upload-types">
+              JPG · PNG · WEBP · PDF · DOCX
+            </div>
+
           </div>
 
+        </label>
+
+        <div class="file-list" id="fileList"></div>
+
+        <div class="settings">
+
+          <div class="field-grid">
+
+            <div class="field">
+              <label for="ocrLanguage">OCR LANGUAGE</label>
+
+              <select id="ocrLanguage" class="control">
+                <option value="eng+msa" selected>
+                  English + Bahasa Melayu
+                </option>
+                <option value="eng">English</option>
+                <option value="msa">Bahasa Melayu</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="outputMode">OUTPUT STRUCTURE</label>
+
+              <select id="outputMode" class="control">
+                <option value="ultra" selected>
+                  Ultra Structured Markdown
+                </option>
+                <option value="literal">
+                  Literal Text
+                </option>
+              </select>
+            </div>
+
+          </div>
+
+          <div class="switch-grid">
+
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>Preserve wording</strong>
+                <span>No spelling correction</span>
+              </div>
+
+              <label class="switch">
+                <input id="preserveLiteral" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>Exclude QR</strong>
+                <span>Mask before OCR</span>
+              </div>
+
+              <label class="switch">
+                <input id="excludeQR" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>Ignore signatures</strong>
+                <span>Remove visual noise</span>
+              </div>
+
+              <label class="switch">
+                <input id="excludeSignatures" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>PDF text layer</strong>
+                <span>Prefer exact text</span>
+              </div>
+
+              <label class="switch">
+                <input id="preferPdfText" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>Detect headings</strong>
+                <span>Markdown hierarchy</span>
+              </div>
+
+              <label class="switch">
+                <input id="detectHeadings" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>Detect tables</strong>
+                <span>Markdown tables</span>
+              </div>
+
+              <label class="switch">
+                <input id="detectTables" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>Key-value fields</strong>
+                <span>Preserve form layout</span>
+              </div>
+
+              <label class="switch">
+                <input id="detectKeyValues" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="switch-row">
+              <div class="switch-label">
+                <strong>Preserve lines</strong>
+                <span>Keep visual order</span>
+              </div>
+
+              <label class="switch">
+                <input id="preserveLines" type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+          </div>
+
+          <div class="strict-note">
+            <strong>Strict mode:</strong>
+            extract visible text in source order without summarising,
+            rewriting or correcting wording. QR content and handwritten
+            signature strokes are omitted. Completely unreadable content
+            may be marked <strong>[Illegible]</strong>.
+          </div>
+
+          <button
+            class="primary-btn"
+            id="extractBtn"
+            type="button"
+            disabled
+          >
+            EXTRACT DOCUMENT
+          </button>
+
         </div>
 
-        <div class="panel-body input-body">
+        <div class="progress-wrap" id="progressWrap">
 
-          <label
-            class="upload-zone"
-            id="uploadZone"
+          <div class="progress-head">
+            <span id="progressLabel">Preparing...</span>
+            <span id="progressPercent">0%</span>
+          </div>
+
+          <div class="progress-track">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+
+          <div class="ocr-log" id="ocrLog"></div>
+
+        </div>
+
+      </div>
+
+    </aside>
+
+    <!-- PREVIEW -->
+
+    <section class="panel">
+
+      <div class="panel-head">
+
+        <div class="panel-title">
+          <h2>Source Preview</h2>
+          <span>Original document rendering</span>
+        </div>
+
+        <div class="preview-toolbar">
+
+          <span class="page-badge" id="previewCount">
+            0 pages
+          </span>
+
+          <button
+            class="neu-btn"
+            type="button"
+            id="clearBtn"
           >
+            Clear
+          </button>
 
-            <input
-              id="fileInput"
-              type="file"
-              multiple
-              accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.pdf,.docx"
-            />
+        </div>
+
+      </div>
+
+      <div class="panel-body preview-body">
+
+        <div class="preview-shell">
+
+          <div class="empty-preview" id="emptyPreview">
 
             <div>
 
-              <div class="upload-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.3"
+              >
+                <rect x="4" y="3" width="16" height="18" rx="2"></rect>
+                <path d="M8 8h8"></path>
+                <path d="M8 12h8"></path>
+                <path d="M8 16h5"></path>
+              </svg>
 
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                >
-                  <path d="M12 16V4"></path>
-                  <path d="m7 9 5-5 5 5"></path>
-                  <path d="M5 14v5h14v-5"></path>
-                </svg>
-
-              </div>
-
-              <h3>Drop document here</h3>
-
-              <p>
-                Certificates, CIDB forms, SSM documents,
-                identity documents, passports and scanned records.
-              </p>
-
-              <div class="upload-types">
-                JPG · PNG · PDF · DOCX
-              </div>
+              <div>No document loaded</div>
 
             </div>
 
-          </label>
+          </div>
 
           <div
-            class="file-list"
-            id="fileList"
+            class="preview-pages hidden"
+            id="previewPages"
           ></div>
 
-          <div class="settings">
-
-            <div class="form-row">
-
-              <div class="field">
-
-                <label>
-                  OCR LANGUAGE
-                </label>
-
-                <select
-                  id="ocrLanguage"
-                  class="control"
-                >
-                  <option
-                    value="eng+msa"
-                    selected
-                  >
-                    English + Bahasa Melayu
-                  </option>
-
-                  <option value="eng">
-                    English
-                  </option>
-
-                  <option value="msa">
-                    Bahasa Melayu
-                  </option>
-                </select>
-
-              </div>
-
-              <div class="field">
-
-                <label>
-                  OUTPUT
-                </label>
-
-                <select
-                  id="outputMode"
-                  class="control"
-                >
-                  <option
-                    value="ultra"
-                    selected
-                  >
-                    Ultra Structured Markdown
-                  </option>
-
-                  <option value="literal">
-                    Literal Text
-                  </option>
-                </select>
-
-              </div>
-
-            </div>
-
-            <div class="switch-grid">
-
-              <div class="switch-box">
-
-                <div class="switch-copy">
-                  <strong>Preserve wording</strong>
-                  <span>No autocorrection</span>
-                </div>
-
-                <label class="switch">
-                  <input
-                    id="preserveLiteral"
-                    type="checkbox"
-                    checked
-                  />
-                  <span class="slider"></span>
-                </label>
-
-              </div>
-
-              <div class="switch-box">
-
-                <div class="switch-copy">
-                  <strong>Exclude QR</strong>
-                  <span>Mask before OCR</span>
-                </div>
-
-                <label class="switch">
-                  <input
-                    id="excludeQR"
-                    type="checkbox"
-                    checked
-                  />
-                  <span class="slider"></span>
-                </label>
-
-              </div>
-
-              <div class="switch-box">
-
-                <div class="switch-copy">
-                  <strong>Ignore signatures</strong>
-                  <span>Remove scribble artifacts</span>
-                </div>
-
-                <label class="switch">
-                  <input
-                    id="excludeSignature"
-                    type="checkbox"
-                    checked
-                  />
-                  <span class="slider"></span>
-                </label>
-
-              </div>
-
-              <div class="switch-box">
-
-                <div class="switch-copy">
-                  <strong>Detect tables</strong>
-                  <span>Markdown tables</span>
-                </div>
-
-                <label class="switch">
-                  <input
-                    id="detectTables"
-                    type="checkbox"
-                    checked
-                  />
-                  <span class="slider"></span>
-                </label>
-
-              </div>
-
-              <div class="switch-box">
-
-                <div class="switch-copy">
-                  <strong>Key-value fields</strong>
-                  <span>Form structure</span>
-                </div>
-
-                <label class="switch">
-                  <input
-                    id="detectKV"
-                    type="checkbox"
-                    checked
-                  />
-                  <span class="slider"></span>
-                </label>
-
-              </div>
-
-              <div class="switch-box">
-
-                <div class="switch-copy">
-                  <strong>Headings</strong>
-                  <span>Preserve hierarchy</span>
-                </div>
-
-                <label class="switch">
-                  <input
-                    id="detectHeadings"
-                    type="checkbox"
-                    checked
-                  />
-                  <span class="slider"></span>
-                </label>
-
-              </div>
-
-            </div>
-
-            <div class="strict-rule">
-
-              <strong>Strict extraction:</strong>
-              retain literal visible wording, spelling, numbers,
-              punctuation and document order. Do not invent missing
-              information. Completely unreadable text becomes
-              <strong>[Illegible]</strong>. QR codes and signatures
-              are excluded.
-
-            </div>
-
-            <button
-              class="primary-btn"
-              id="extractBtn"
-              type="button"
-              disabled
-            >
-              EXTRACT DOCUMENT
-            </button>
-
-          </div>
-
-          <div
-            class="progress-section"
-            id="progressSection"
-          >
-
-            <div class="progress-head">
-
-              <span id="progressLabel">
-                Preparing
-              </span>
-
-              <span id="progressPercent">
-                0%
-              </span>
-
-            </div>
-
-            <div class="progress-track">
-              <div
-                class="progress-bar"
-                id="progressBar"
-              ></div>
-            </div>
-
-            <div
-              class="ocr-log"
-              id="ocrLog"
-            ></div>
-
-          </div>
-
         </div>
 
-      </aside>
-
-      <!-- =================================================
-           CENTER PREVIEW
-           ================================================= -->
-
-      <section class="panel">
-
-        <div class="panel-header">
-
-          <div class="panel-title">
-            <h2>Source Document</h2>
-            <span>Original file preview</span>
-          </div>
-
-          <div class="preview-tools">
-
-            <span
-              class="page-pill"
-              id="pageCount"
-            >
-              0 pages
-            </span>
-
-            <button
-              class="neu-btn"
-              id="clearBtn"
-              type="button"
-            >
-              Clear
-            </button>
-
-          </div>
-
-        </div>
-
-        <div class="panel-body preview-body">
-
-          <div
-            class="preview-shell"
-            id="previewShell"
-          >
-
-            <div
-              class="empty-preview"
-              id="emptyPreview"
-            >
-
-              <div>
-
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.3"
-                >
-                  <rect
-                    x="4"
-                    y="3"
-                    width="16"
-                    height="18"
-                    rx="2"
-                  ></rect>
-
-                  <path d="M8 8h8"></path>
-                  <path d="M8 12h8"></path>
-                  <path d="M8 16h5"></path>
-                </svg>
-
-                <div>
-                  No document loaded
-                </div>
-
-              </div>
-
-            </div>
-
-            <div
-              class="preview-pages hidden"
-              id="previewPages"
-            ></div>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      <!-- =================================================
-           RIGHT OUTPUT
-           ================================================= -->
-
-      <section class="panel output-panel">
-
-        <div class="panel-header">
-
-          <div class="panel-title">
-            <h2>Ultra Structured Extraction</h2>
-            <span>Literal document transcription</span>
-          </div>
-
-          <div class="format-badge">
-            MARKDOWN
-          </div>
-
-        </div>
-
-        <div class="panel-body output-body">
-
-          <div class="output-toolbar">
-
-            <button
-              class="neu-btn"
-              id="copyBtn"
-              type="button"
-            >
-              Copy
-            </button>
-
-            <button
-              class="neu-btn"
-              id="downloadBtn"
-              type="button"
-            >
-              Download .md
-            </button>
-
-            <button
-              class="neu-btn"
-              id="insertIllegibleBtn"
-              type="button"
-            >
-              [Illegible]
-            </button>
-
-            <div class="spacer"></div>
-
-            <span class="format-badge">
-              QR + SIGNATURES OMITTED
-            </span>
-
-          </div>
-
-          <textarea
-            id="editor"
-            class="editor"
-            spellcheck="false"
-            placeholder="# DOCUMENT
-
-## PAGE 1
-
-Extracted document content will appear here..."
-          ></textarea>
-
-          <div class="stats">
-
-            <div class="stat">
-              <strong id="statDocuments">
-                0
-              </strong>
-              <span>DOCUMENTS</span>
-            </div>
-
-            <div class="stat">
-              <strong id="statPages">
-                0
-              </strong>
-              <span>PAGES</span>
-            </div>
-
-            <div class="stat">
-              <strong id="statWords">
-                0
-              </strong>
-              <span>WORDS</span>
-            </div>
-
-            <div class="stat">
-              <strong id="statChars">
-                0
-              </strong>
-              <span>CHARACTERS</span>
-            </div>
-
-          </div>
-
-        </div>
-
-      </section>
+      </div>
 
     </section>
 
-  </main>
+    <!-- OUTPUT -->
 
-  <div
-    class="toast"
-    id="toast"
-  ></div>
+    <section class="panel output-panel">
 
-  <script>
-    /* =====================================================
-       PDF
-       ===================================================== */
+      <div class="panel-head">
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        <div class="panel-title">
+          <h2>Ultra Structured Extraction</h2>
+          <span>Editable document transcription</span>
+        </div>
 
-    /* =====================================================
-       STATE
-       ===================================================== */
+        <div class="tabs">
 
-    const state = {
-      files: [],
-      pages: [],
-      busy: false
-    };
+          <button
+            class="tab active"
+            data-tab="markdown"
+            type="button"
+          >
+            MARKDOWN
+          </button>
 
-    /* =====================================================
-       ELEMENTS
-       ===================================================== */
+          <button
+            class="tab"
+            data-tab="text"
+            type="button"
+          >
+            TEXT
+          </button>
 
-    const fileInput =
-      document.getElementById("fileInput");
+          <button
+            class="tab"
+            data-tab="html"
+            type="button"
+          >
+            HTML
+          </button>
 
-    const uploadZone =
-      document.getElementById("uploadZone");
+        </div>
 
-    const fileList =
-      document.getElementById("fileList");
+      </div>
 
-    const extractBtn =
-      document.getElementById("extractBtn");
+      <div class="panel-body output-body">
 
-    const clearBtn =
-      document.getElementById("clearBtn");
+        <div class="output-tools">
 
-    const previewPages =
-      document.getElementById("previewPages");
+          <button
+            class="neu-btn"
+            id="copyBtn"
+            type="button"
+          >
+            Copy
+          </button>
 
-    const emptyPreview =
-      document.getElementById("emptyPreview");
+          <button
+            class="neu-btn"
+            id="downloadBtn"
+            type="button"
+          >
+            Download
+          </button>
 
-    const pageCount =
-      document.getElementById("pageCount");
+          <button
+            class="neu-btn"
+            id="markIllegibleBtn"
+            type="button"
+          >
+            [Illegible]
+          </button>
 
-    const fileStatus =
-      document.getElementById("fileStatus");
+          <span class="mode-badge">
+            QR + SIGNATURE CONTENT OMITTED
+          </span>
 
-    const editor =
-      document.getElementById("editor");
+        </div>
 
-    const copyBtn =
-      document.getElementById("copyBtn");
+        <textarea
+          id="outputEditor"
+          class="editor"
+          spellcheck="false"
+          placeholder="Ultra structured extraction will appear here..."
+        ></textarea>
 
-    const downloadBtn =
-      document.getElementById("downloadBtn");
+        <div class="stats">
 
-    const insertIllegibleBtn =
-      document.getElementById("insertIllegibleBtn");
+          <div class="stat">
+            <strong id="statDocuments">0</strong>
+            <span>DOCUMENTS</span>
+          </div>
 
-    const progressSection =
-      document.getElementById("progressSection");
+          <div class="stat">
+            <strong id="statPages">0</strong>
+            <span>PAGES</span>
+          </div>
 
-    const progressLabel =
-      document.getElementById("progressLabel");
+          <div class="stat">
+            <strong id="statWords">0</strong>
+            <span>WORDS</span>
+          </div>
 
-    const progressPercent =
-      document.getElementById("progressPercent");
+          <div class="stat">
+            <strong id="statChars">0</strong>
+            <span>CHARACTERS</span>
+          </div>
 
-    const progressBar =
-      document.getElementById("progressBar");
+        </div>
 
-    const ocrLog =
-      document.getElementById("ocrLog");
+      </div>
 
-    const ocrLanguage =
-      document.getElementById("ocrLanguage");
+    </section>
 
-    const outputMode =
-      document.getElementById("outputMode");
+  </section>
 
-    const excludeQR =
-      document.getElementById("excludeQR");
+</main>
 
-    const excludeSignature =
-      document.getElementById("excludeSignature");
+<div class="toast" id="toast"></div>
 
-    const detectTables =
-      document.getElementById("detectTables");
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-    const detectKV =
-      document.getElementById("detectKV");
+  const state = {
+    files: [],
+    pages: [],
+    busy: false,
 
-    const detectHeadings =
-      document.getElementById("detectHeadings");
+    extracted: {
+      markdown: "",
+      text: "",
+      html: ""
+    },
 
-    const statDocuments =
-      document.getElementById("statDocuments");
+    activeTab: "markdown"
+  };
 
-    const statPages =
-      document.getElementById("statPages");
+  const fileInput =
+    document.getElementById("fileInput");
 
-    const statWords =
-      document.getElementById("statWords");
+  const uploadZone =
+    document.getElementById("uploadZone");
 
-    const statChars =
-      document.getElementById("statChars");
+  const fileList =
+    document.getElementById("fileList");
 
-    const toast =
-      document.getElementById("toast");
+  const extractBtn =
+    document.getElementById("extractBtn");
 
-    /* =====================================================
-       UTILITIES
-       ===================================================== */
+  const clearBtn =
+    document.getElementById("clearBtn");
 
-    function extensionOf(name) {
-      return (
-        name
-          .split(".")
-          .pop()
-          ?.toLowerCase() || ""
-      );
+  const previewPages =
+    document.getElementById("previewPages");
+
+  const emptyPreview =
+    document.getElementById("emptyPreview");
+
+  const previewCount =
+    document.getElementById("previewCount");
+
+  const outputEditor =
+    document.getElementById("outputEditor");
+
+  const copyBtn =
+    document.getElementById("copyBtn");
+
+  const downloadBtn =
+    document.getElementById("downloadBtn");
+
+  const markIllegibleBtn =
+    document.getElementById("markIllegibleBtn");
+
+  const progressWrap =
+    document.getElementById("progressWrap");
+
+  const progressBar =
+    document.getElementById("progressBar");
+
+  const progressLabel =
+    document.getElementById("progressLabel");
+
+  const progressPercent =
+    document.getElementById("progressPercent");
+
+  const ocrLog =
+    document.getElementById("ocrLog");
+
+  const topFileStatus =
+    document.getElementById("topFileStatus");
+
+  const statDocuments =
+    document.getElementById("statDocuments");
+
+  const statPages =
+    document.getElementById("statPages");
+
+  const statWords =
+    document.getElementById("statWords");
+
+  const statChars =
+    document.getElementById("statChars");
+
+  const tabs =
+    [...document.querySelectorAll(".tab")];
+
+  const ocrLanguage =
+    document.getElementById("ocrLanguage");
+
+  const outputMode =
+    document.getElementById("outputMode");
+
+  const preserveLiteral =
+    document.getElementById("preserveLiteral");
+
+  const preserveLines =
+    document.getElementById("preserveLines");
+
+  const detectHeadings =
+    document.getElementById("detectHeadings");
+
+  const detectTables =
+    document.getElementById("detectTables");
+
+  const detectKeyValues =
+    document.getElementById("detectKeyValues");
+
+  const excludeQR =
+    document.getElementById("excludeQR");
+
+  const excludeSignatures =
+    document.getElementById("excludeSignatures");
+
+  const preferPdfText =
+    document.getElementById("preferPdfText");
+
+  const toast =
+    document.getElementById("toast");
+
+  /* ======================================================
+     BASIC UTILITIES
+     ====================================================== */
+
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add("show");
+
+    clearTimeout(showToast.timer);
+
+    showToast.timer = setTimeout(() => {
+      toast.classList.remove("show");
+    }, 1900);
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes) {
+      return "0 B";
     }
 
-    function isImage(file) {
-      return (
-        file.type.startsWith("image/") ||
-        [
-          "jpg",
-          "jpeg",
-          "png",
-          "webp",
-          "bmp",
-          "tif",
-          "tiff"
-        ].includes(extensionOf(file.name))
+    const units = [
+      "B",
+      "KB",
+      "MB",
+      "GB"
+    ];
+
+    const index =
+      Math.min(
+        Math.floor(
+          Math.log(bytes) /
+          Math.log(1024)
+        ),
+        units.length - 1
       );
-    }
 
-    function isPdf(file) {
-      return (
-        file.type === "application/pdf" ||
-        extensionOf(file.name) === "pdf"
-      );
-    }
+    return (
+      (
+        bytes /
+        Math.pow(1024, index)
+      ).toFixed(index ? 1 : 0) +
+      " " +
+      units[index]
+    );
+  }
 
-    function isDocx(file) {
-      return (
-        extensionOf(file.name) === "docx"
-      );
-    }
+  function extensionOf(name) {
+    return (
+      name
+        .split(".")
+        .pop()
+        ?.toLowerCase() || ""
+    );
+  }
 
-    function formatBytes(bytes) {
+  function isImage(file) {
+    return (
+      file.type.startsWith("image/") ||
+      [
+        "jpg",
+        "jpeg",
+        "png",
+        "webp",
+        "bmp",
+        "tif",
+        "tiff"
+      ].includes(
+        extensionOf(file.name)
+      )
+    );
+  }
 
-      if (!bytes) {
-        return "0 B";
+  function isPdf(file) {
+    return (
+      file.type === "application/pdf" ||
+      extensionOf(file.name) === "pdf"
+    );
+  }
+
+  function isDocx(file) {
+    return (
+      extensionOf(file.name) === "docx" ||
+      file.type.includes(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      )
+    );
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise(
+      (resolve, reject) => {
+        const reader =
+          new FileReader();
+
+        reader.onload =
+          () => resolve(reader.result);
+
+        reader.onerror =
+          reject;
+
+        reader.readAsDataURL(file);
       }
+    );
+  }
 
-      const units = [
-        "B",
-        "KB",
-        "MB",
-        "GB"
-      ];
+  function loadImage(dataUrl) {
+    return new Promise(
+      (resolve, reject) => {
+        const image =
+          new Image();
 
-      const index =
+        image.onload =
+          () => resolve(image);
+
+        image.onerror =
+          reject;
+
+        image.src =
+          dataUrl;
+      }
+    );
+  }
+
+  function log(message) {
+    const time =
+      new Date()
+        .toLocaleTimeString();
+
+    ocrLog.textContent +=
+      `[${time}] ${message}\n`;
+
+    ocrLog.scrollTop =
+      ocrLog.scrollHeight;
+  }
+
+  function setProgress(
+    value,
+    label
+  ) {
+    const percent =
+      Math.max(
+        0,
         Math.min(
-          Math.floor(
-            Math.log(bytes) /
-            Math.log(1024)
-          ),
-          units.length - 1
-        );
-
-      return (
-        (
-          bytes /
-          Math.pow(1024, index)
-        ).toFixed(index ? 1 : 0) +
-        " " +
-        units[index]
-      );
-    }
-
-    function escapeHtml(value) {
-
-      return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    }
-
-    function showToast(message) {
-
-      toast.textContent =
-        message;
-
-      toast.classList.add("show");
-
-      clearTimeout(
-        showToast.timer
-      );
-
-      showToast.timer =
-        setTimeout(
-          () => {
-            toast.classList.remove("show");
-          },
-          1800
-        );
-    }
-
-    function log(message) {
-
-      const time =
-        new Date()
-          .toLocaleTimeString();
-
-      ocrLog.textContent +=
-        `[${time}] ${message}\n`;
-
-      ocrLog.scrollTop =
-        ocrLog.scrollHeight;
-    }
-
-    function setProgress(
-      percent,
-      message
-    ) {
-
-      const value =
-        Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(percent)
-          )
-        );
-
-      progressBar.style.width =
-        `${value}%`;
-
-      progressPercent.textContent =
-        `${value}%`;
-
-      if (message) {
-        progressLabel.textContent =
-          message;
-      }
-    }
-
-    function fileToDataUrl(file) {
-
-      return new Promise(
-        (resolve, reject) => {
-
-          const reader =
-            new FileReader();
-
-          reader.onload =
-            () => resolve(reader.result);
-
-          reader.onerror =
-            reject;
-
-          reader.readAsDataURL(file);
-
-        }
-      );
-    }
-
-    /* =====================================================
-       FILE UI
-       ===================================================== */
-
-    function renderFileList() {
-
-      fileList.innerHTML = "";
-
-      state.files.forEach(
-        (file, index) => {
-
-          const item =
-            document.createElement("div");
-
-          item.className =
-            "file-item";
-
-          item.innerHTML = `
-            <div class="file-icon">
-              ${escapeHtml(
-                extensionOf(file.name)
-                  .toUpperCase()
-              )}
-            </div>
-
-            <div class="file-meta">
-
-              <div
-                class="file-name"
-                title="${escapeHtml(file.name)}"
-              >
-                ${escapeHtml(file.name)}
-              </div>
-
-              <div class="file-size">
-                ${formatBytes(file.size)}
-              </div>
-
-            </div>
-
-            <button
-              class="remove-btn"
-              data-index="${index}"
-              type="button"
-            >
-              ×
-            </button>
-          `;
-
-          fileList.appendChild(item);
-
-        }
-      );
-
-      fileList
-        .querySelectorAll(
-          ".remove-btn"
+          100,
+          Math.round(value)
         )
-        .forEach(
-          button => {
+      );
 
-            button.addEventListener(
-              "click",
-              async event => {
+    progressBar.style.width =
+      `${percent}%`;
 
-                event.preventDefault();
-                event.stopPropagation();
+    progressPercent.textContent =
+      `${percent}%`;
 
-                const index =
-                  Number(
-                    button.dataset.index
-                  );
+    if (label) {
+      progressLabel.textContent =
+        label;
+    }
+  }
 
-                state.files.splice(
-                  index,
-                  1
+  /* ======================================================
+     FILE MANAGEMENT
+     ====================================================== */
+
+  function updateFileUI() {
+    fileList.innerHTML = "";
+
+    state.files.forEach(
+      (file, index) => {
+        const ext =
+          extensionOf(file.name)
+            .toUpperCase();
+
+        const item =
+          document.createElement("div");
+
+        item.className =
+          "file-item";
+
+        item.innerHTML = `
+          <div class="file-icon">
+            ${escapeHtml(ext)}
+          </div>
+
+          <div class="file-meta">
+
+            <div
+              class="file-name"
+              title="${escapeHtml(file.name)}"
+            >
+              ${escapeHtml(file.name)}
+            </div>
+
+            <div class="file-info">
+              ${formatBytes(file.size)}
+            </div>
+
+          </div>
+
+          <button
+            class="remove-file"
+            type="button"
+            data-index="${index}"
+            title="Remove"
+          >
+            ×
+          </button>
+        `;
+
+        fileList.appendChild(item);
+      }
+    );
+
+    fileList
+      .querySelectorAll(".remove-file")
+      .forEach(
+        button => {
+          button.addEventListener(
+            "click",
+            async event => {
+              event.preventDefault();
+              event.stopPropagation();
+
+              const index =
+                Number(
+                  button.dataset.index
                 );
 
-                renderFileList();
+              state.files.splice(
+                index,
+                1
+              );
 
-                await renderPreviews();
+              updateFileUI();
 
-              }
-            );
-
-          }
-        );
-
-      extractBtn.disabled =
-        state.files.length === 0 ||
-        state.busy;
-
-      fileStatus.textContent =
-        `${state.files.length} document${
-          state.files.length === 1
-            ? ""
-            : "s"
-        }`;
-
-      updateStats();
-    }
-
-    async function addFiles(
-      collection
-    ) {
-
-      const files =
-        [...collection]
-          .filter(
-            file =>
-              isImage(file) ||
-              isPdf(file) ||
-              isDocx(file)
+              await renderAllPreviews();
+            }
           );
-
-      if (!files.length) {
-
-        showToast(
-          "No supported documents selected."
-        );
-
-        return;
-      }
-
-      state.files.push(...files);
-
-      renderFileList();
-
-      await renderPreviews();
-    }
-
-    /* =====================================================
-       INPUT EVENTS
-       ===================================================== */
-
-    fileInput.addEventListener(
-      "change",
-      async () => {
-
-        await addFiles(
-          fileInput.files
-        );
-
-        fileInput.value =
-          "";
-
-      }
-    );
-
-    [
-      "dragenter",
-      "dragover"
-    ].forEach(
-      type => {
-
-        uploadZone.addEventListener(
-          type,
-          event => {
-
-            event.preventDefault();
-
-            uploadZone.classList.add(
-              "dragover"
-            );
-
-          }
-        );
-
-      }
-    );
-
-    [
-      "dragleave",
-      "drop"
-    ].forEach(
-      type => {
-
-        uploadZone.addEventListener(
-          type,
-          event => {
-
-            event.preventDefault();
-
-            uploadZone.classList.remove(
-              "dragover"
-            );
-
-          }
-        );
-
-      }
-    );
-
-    uploadZone.addEventListener(
-      "drop",
-      async event => {
-
-        await addFiles(
-          event.dataTransfer.files
-        );
-
-      }
-    );
-
-    /* =====================================================
-       PREVIEW
-       ===================================================== */
-
-    async function renderPreviews() {
-
-      previewPages.innerHTML =
-        "";
-
-      state.pages = [];
-
-      if (!state.files.length) {
-
-        emptyPreview.classList.remove(
-          "hidden"
-        );
-
-        previewPages.classList.add(
-          "hidden"
-        );
-
-        pageCount.textContent =
-          "0 pages";
-
-        updateStats();
-
-        return;
-      }
-
-      emptyPreview.classList.add(
-        "hidden"
-      );
-
-      previewPages.classList.remove(
-        "hidden"
-      );
-
-      for (
-        let fileIndex = 0;
-        fileIndex < state.files.length;
-        fileIndex++
-      ) {
-
-        const file =
-          state.files[fileIndex];
-
-        try {
-
-          if (isImage(file)) {
-
-            await previewImage(
-              file,
-              fileIndex
-            );
-
-          } else if (isPdf(file)) {
-
-            await previewPdf(
-              file,
-              fileIndex
-            );
-
-          } else if (isDocx(file)) {
-
-            await previewDocx(
-              file,
-              fileIndex
-            );
-
-          }
-
-        } catch (error) {
-
-          console.error(error);
-
         }
-      }
-
-      pageCount.textContent =
-        `${state.pages.length} page${
-          state.pages.length === 1
-            ? ""
-            : "s"
-        }`;
-
-      updateStats();
-    }
-
-    async function previewImage(
-      file,
-      fileIndex
-    ) {
-
-      const dataUrl =
-        await fileToDataUrl(file);
-
-      const wrapper =
-        document.createElement("div");
-
-      wrapper.className =
-        "preview-page";
-
-      const image =
-        document.createElement("img");
-
-      image.src =
-        dataUrl;
-
-      image.alt =
-        file.name;
-
-      const label =
-        document.createElement("div");
-
-      label.className =
-        "page-label";
-
-      label.textContent =
-        file.name;
-
-      wrapper.appendChild(image);
-      wrapper.appendChild(label);
-
-      previewPages.appendChild(
-        wrapper
       );
 
-      state.pages.push({
-        type: "image",
-        fileIndex,
-        pageNumber: 1,
-        totalPages: 1,
-        dataUrl
-      });
+    extractBtn.disabled =
+      state.files.length === 0 ||
+      state.busy;
+
+    topFileStatus.textContent =
+      `${state.files.length} document${
+        state.files.length === 1
+          ? ""
+          : "s"
+      }`;
+
+    updateStats();
+  }
+
+  async function addFiles(
+    collection
+  ) {
+    const supported =
+      [...collection]
+        .filter(
+          file =>
+            isImage(file) ||
+            isPdf(file) ||
+            isDocx(file)
+        );
+
+    if (!supported.length) {
+      showToast(
+        "No supported files selected."
+      );
+
+      return;
     }
 
-    async function previewPdf(
-      file,
-      fileIndex
+    state.files.push(
+      ...supported
+    );
+
+    updateFileUI();
+
+    await renderAllPreviews();
+  }
+
+  fileInput.addEventListener(
+    "change",
+    async () => {
+      await addFiles(
+        fileInput.files
+      );
+
+      fileInput.value =
+        "";
+    }
+  );
+
+  [
+    "dragenter",
+    "dragover"
+  ].forEach(
+    eventName => {
+      uploadZone.addEventListener(
+        eventName,
+        event => {
+          event.preventDefault();
+
+          uploadZone
+            .classList
+            .add("dragover");
+        }
+      );
+    }
+  );
+
+  [
+    "dragleave",
+    "drop"
+  ].forEach(
+    eventName => {
+      uploadZone.addEventListener(
+        eventName,
+        event => {
+          event.preventDefault();
+
+          uploadZone
+            .classList
+            .remove("dragover");
+        }
+      );
+    }
+  );
+
+  uploadZone.addEventListener(
+    "drop",
+    async event => {
+      await addFiles(
+        event.dataTransfer.files
+      );
+    }
+  );
+
+  /* ======================================================
+     PREVIEW
+     ====================================================== */
+
+  async function renderImagePreview(
+    file,
+    fileIndex
+  ) {
+    const dataUrl =
+      await fileToDataUrl(file);
+
+    const wrapper =
+      document.createElement("div");
+
+    wrapper.className =
+      "preview-page";
+
+    const image =
+      document.createElement("img");
+
+    image.src =
+      dataUrl;
+
+    image.alt =
+      file.name;
+
+    const label =
+      document.createElement("div");
+
+    label.className =
+      "page-number";
+
+    label.textContent =
+      file.name;
+
+    wrapper.appendChild(
+      image
+    );
+
+    wrapper.appendChild(
+      label
+    );
+
+    previewPages.appendChild(
+      wrapper
+    );
+
+    state.pages.push({
+      type: "image",
+      fileIndex,
+      pageNumber: 1,
+      totalPages: 1,
+      dataUrl
+    });
+  }
+
+  /* ======================================================
+     PDF TEXT-LAYER RECONSTRUCTION
+     ====================================================== */
+
+  function reconstructPdfText(
+    textContent
+  ) {
+    if (
+      !textContent ||
+      !Array.isArray(
+        textContent.items
+      )
     ) {
+      return "";
+    }
 
-      const buffer =
-        await file.arrayBuffer();
+    const sourceItems =
+      textContent.items
+        .filter(
+          item =>
+            typeof item.str === "string" &&
+            item.str.trim()
+        )
+        .map(
+          item => {
+            const transform =
+              item.transform || [];
 
-      const pdf =
-        await pdfjsLib
-          .getDocument({
-            data: buffer
-          })
-          .promise;
+            return {
+              text: item.str,
+              x:
+                Number(
+                  transform[4] || 0
+                ),
+              y:
+                Number(
+                  transform[5] || 0
+                ),
+              height:
+                Math.abs(
+                  Number(
+                    transform[3] || 10
+                  )
+                ) || 10,
+              width:
+                Number(
+                  item.width || 0
+                )
+            };
+          }
+        );
 
-      for (
-        let pageNumber = 1;
-        pageNumber <= pdf.numPages;
-        pageNumber++
-      ) {
+    if (!sourceItems.length) {
+      return "";
+    }
 
-        const page =
-          await pdf.getPage(
-            pageNumber
+    sourceItems.sort(
+      (a,b) => {
+        const yDiff =
+          b.y - a.y;
+
+        if (
+          Math.abs(yDiff) > 2
+        ) {
+          return yDiff;
+        }
+
+        return a.x - b.x;
+      }
+    );
+
+    const lines = [];
+
+    sourceItems.forEach(
+      item => {
+        const tolerance =
+          Math.max(
+            2,
+            item.height * .42
           );
 
-        const viewport =
-          page.getViewport({
-            scale: 1.8
-          });
-
-        const canvas =
-          document.createElement(
-            "canvas"
+        let line =
+          lines.find(
+            candidate =>
+              Math.abs(
+                candidate.y -
+                item.y
+              ) <= tolerance
           );
 
-        const context =
-          canvas.getContext(
-            "2d",
-            {
-              willReadFrequently: true
+        if (!line) {
+          line = {
+            y: item.y,
+            items: []
+          };
+
+          lines.push(line);
+        }
+
+        line.items.push(item);
+      }
+    );
+
+    lines.sort(
+      (a,b) =>
+        b.y - a.y
+    );
+
+    const output =
+      lines.map(
+        line => {
+          line.items.sort(
+            (a,b) =>
+              a.x - b.x
+          );
+
+          let text = "";
+          let previous = null;
+
+          line.items.forEach(
+            item => {
+              if (!previous) {
+                text += item.text;
+                previous = item;
+                return;
+              }
+
+              const previousRight =
+                previous.x +
+                previous.width;
+
+              const gap =
+                item.x -
+                previousRight;
+
+              const averageCharacter =
+                previous.text.length
+                  ? previous.width /
+                    previous.text.length
+                  : 4;
+
+              if (
+                gap >
+                averageCharacter * 2.2
+              ) {
+                text += "   ";
+              } else if (
+                gap >
+                averageCharacter * .25
+              ) {
+                text += " ";
+              }
+
+              text += item.text;
+
+              previous = item;
             }
           );
 
-        canvas.width =
-          viewport.width;
-
-        canvas.height =
-          viewport.height;
-
-        await page.render({
-          canvasContext: context,
-          viewport
-        }).promise;
-
-        const wrapper =
-          document.createElement(
-            "div"
-          );
-
-        wrapper.className =
-          "preview-page";
-
-        const label =
-          document.createElement(
-            "div"
-          );
-
-        label.className =
-          "page-label";
-
-        label.textContent =
-          `${file.name} · ${pageNumber}/${pdf.numPages}`;
-
-        wrapper.appendChild(
-          canvas
-        );
-
-        wrapper.appendChild(
-          label
-        );
-
-        previewPages.appendChild(
-          wrapper
-        );
-
-        state.pages.push({
-          type: "pdf",
-          fileIndex,
-          pageNumber,
-          totalPages: pdf.numPages,
-          dataUrl:
-            canvas.toDataURL(
-              "image/png"
-            )
-        });
-      }
-    }
-
-    async function previewDocx(
-      file,
-      fileIndex
-    ) {
-
-      const arrayBuffer =
-        await file.arrayBuffer();
-
-      const htmlResult =
-        await mammoth
-          .convertToHtml({
-            arrayBuffer
-          });
-
-      const page =
-        document.createElement(
-          "div"
-        );
-
-      page.className =
-        "preview-page";
-
-      const content =
-        document.createElement(
-          "div"
-        );
-
-      content.className =
-        "docx-preview";
-
-      content.innerHTML =
-        htmlResult.value;
-
-      const label =
-        document.createElement(
-          "div"
-        );
-
-      label.className =
-        "page-label";
-
-      label.textContent =
-        file.name;
-
-      page.appendChild(
-        content
-      );
-
-      page.appendChild(
-        label
-      );
-
-      previewPages.appendChild(
-        page
-      );
-
-      state.pages.push({
-        type: "docx",
-        fileIndex,
-        pageNumber: 1,
-        totalPages: 1,
-        arrayBuffer,
-        html:
-          htmlResult.value
-      });
-    }
-
-    /* =====================================================
-       QR MASKING
-       ===================================================== */
-
-    async function loadImage(
-      dataUrl
-    ) {
-
-      return new Promise(
-        (resolve, reject) => {
-
-          const image =
-            new Image();
-
-          image.onload =
-            () => resolve(image);
-
-          image.onerror =
-            reject;
-
-          image.src =
-            dataUrl;
-
+          return text.trimEnd();
         }
       );
-    }
 
-    async function prepareImageForOcr(
-      dataUrl
+    return output
+      .join("\n")
+      .trim();
+  }
+
+  function hasUsefulPdfText(
+    text
+  ) {
+    const value =
+      String(text || "");
+
+    const meaningful =
+      (
+        value.match(
+          /[\p{L}\p{N}]/gu
+        ) || []
+      ).length;
+
+    return (
+      meaningful >= 20
+    );
+  }
+
+  async function renderPdfPreview(
+    file,
+    fileIndex
+  ) {
+    const data =
+      await file.arrayBuffer();
+
+    const pdf =
+      await pdfjsLib
+        .getDocument({
+          data
+        })
+        .promise;
+
+    for (
+      let pageNumber = 1;
+      pageNumber <= pdf.numPages;
+      pageNumber++
     ) {
-
-      const image =
-        await loadImage(
-          dataUrl
+      const page =
+        await pdf.getPage(
+          pageNumber
         );
+
+      const viewport =
+        page.getViewport({
+          scale: 2
+        });
 
       const canvas =
         document.createElement(
@@ -2555,1537 +2120,2172 @@ Extracted document content will appear here..."
         );
 
       canvas.width =
-        image.naturalWidth;
+        Math.ceil(
+          viewport.width
+        );
 
       canvas.height =
-        image.naturalHeight;
-
-      context.drawImage(
-        image,
-        0,
-        0
-      );
-
-      let qrCount = 0;
-
-      if (
-        excludeQR.checked &&
-        typeof jsQR === "function"
-      ) {
-
-        qrCount =
-          maskQrCodes(
-            canvas,
-            context
-          );
-
-      }
-
-      return {
-        dataUrl:
-          canvas.toDataURL(
-            "image/png"
-          ),
-
-        qrCount
-      };
-    }
-
-    function maskQrCodes(
-      canvas,
-      context
-    ) {
-
-      let count = 0;
-
-      /*
-       * jsQR normally returns one QR code at a time.
-       * After each detection the region is masked white.
-       * The scan repeats to find another QR code.
-       */
-
-      for (
-        let attempt = 0;
-        attempt < 6;
-        attempt++
-      ) {
-
-        const imageData =
-          context.getImageData(
-            0,
-            0,
-            canvas.width,
-            canvas.height
-          );
-
-        const result =
-          jsQR(
-            imageData.data,
-            imageData.width,
-            imageData.height,
-            {
-              inversionAttempts:
-                "attemptBoth"
-            }
-          );
-
-        if (!result) {
-          break;
-        }
-
-        const points = [
-          result.location.topLeftCorner,
-          result.location.topRightCorner,
-          result.location.bottomRightCorner,
-          result.location.bottomLeftCorner
-        ];
-
-        const xs =
-          points.map(
-            point => point.x
-          );
-
-        const ys =
-          points.map(
-            point => point.y
-          );
-
-        const margin =
-          Math.max(
-            12,
-            Math.min(
-              canvas.width,
-              canvas.height
-            ) * .01
-          );
-
-        const left =
-          Math.max(
-            0,
-            Math.min(...xs) -
-            margin
-          );
-
-        const top =
-          Math.max(
-            0,
-            Math.min(...ys) -
-            margin
-          );
-
-        const right =
-          Math.min(
-            canvas.width,
-            Math.max(...xs) +
-            margin
-          );
-
-        const bottom =
-          Math.min(
-            canvas.height,
-            Math.max(...ys) +
-            margin
-          );
-
-        context.fillStyle =
-          "#ffffff";
-
-        context.fillRect(
-          left,
-          top,
-          right - left,
-          bottom - top
+        Math.ceil(
+          viewport.height
         );
 
-        count++;
-      }
+      await page.render({
+        canvasContext: context,
+        viewport
+      }).promise;
 
-      return count;
-    }
+      let embeddedText = "";
 
-    /* =====================================================
-       OCR CLEANING
-       ===================================================== */
+      try {
+        const textContent =
+          await page.getTextContent();
 
-    function normalizeLineBreaks(
-      text
-    ) {
-
-      return String(text || "")
-        .replace(/\r\n/g, "\n")
-        .replace(/\r/g, "\n")
-        .replace(/\u00ad/g, "")
-        .replace(/[ \t]+\n/g, "\n")
-        .replace(/\n{5,}/g, "\n\n\n")
-        .trim();
-    }
-
-    /*
-     * This filter targets typical OCR residue produced by
-     * handwritten signature strokes.
-     *
-     * It does not delete normal alphabetic lines.
-     */
-
-    function removeSignatureArtifacts(
-      text
-    ) {
-
-      if (!excludeSignature.checked) {
-        return text;
-      }
-
-      return text
-        .split("\n")
-        .filter(
-          line => {
-
-            const value =
-              line.trim();
-
-            if (!value) {
-              return true;
-            }
-
-            const alphaNumeric =
-              (
-                value.match(
-                  /[\p{L}\p{N}]/gu
-                ) || []
-              ).length;
-
-            const symbols =
-              (
-                value.match(
-                  /[^\p{L}\p{N}\s]/gu
-                ) || []
-              ).length;
-
-            /*
-             * Keep all meaningful text.
-             */
-
-            if (
-              alphaNumeric >= 2
-            ) {
-              return true;
-            }
-
-            /*
-             * Omit lines that are predominantly
-             * signature-like strokes or punctuation.
-             */
-
-            if (
-              symbols >= 3 &&
-              alphaNumeric <= 1
-            ) {
-              return false;
-            }
-
-            return true;
-          }
-        )
-        .join("\n");
-    }
-
-    function isQrNoise(
-      line
-    ) {
-
-      const value =
-        line.trim();
-
-      if (!value) {
-        return false;
-      }
-
-      /*
-       * QR OCR residue is often a dense group of
-       * random punctuation.
-       */
-
-      const letters =
-        (
-          value.match(
-            /[\p{L}\p{N}]/gu
-          ) || []
-        ).length;
-
-      const symbols =
-        (
-          value.match(
-            /[^\p{L}\p{N}\s]/gu
-          ) || []
-        ).length;
-
-      return (
-        value.length > 8 &&
-        letters <= 2 &&
-        symbols >= 6
-      );
-    }
-
-    function cleanOcr(
-      text
-    ) {
-
-      let result =
-        normalizeLineBreaks(
-          text
-        );
-
-      result =
-        removeSignatureArtifacts(
-          result
-        );
-
-      if (excludeQR.checked) {
-
-        result =
-          result
-            .split("\n")
-            .filter(
-              line =>
-                !isQrNoise(line)
-            )
-            .join("\n");
-
-      }
-
-      return result.trim();
-    }
-
-    /* =====================================================
-       STRUCTURE DETECTION
-       ===================================================== */
-
-    function isLikelyHeading(
-      line
-    ) {
-
-      const value =
-        line.trim();
-
-      if (
-        !value ||
-        value.length > 100
+        embeddedText =
+          reconstructPdfText(
+            textContent
+          );
+      } catch (
+        error
       ) {
-        return false;
-      }
-
-      if (
-        /^[\d\s.:,/()-]+$/.test(
-          value
-        )
-      ) {
-        return false;
-      }
-
-      const letters =
-        value.match(
-          /\p{L}/gu
-        ) || [];
-
-      if (
-        letters.length < 3
-      ) {
-        return false;
-      }
-
-      const upper =
-        value.match(
-          /\p{Lu}/gu
-        ) || [];
-
-      const ratio =
-        upper.length /
-        letters.length;
-
-      if (
-        ratio >= .72
-      ) {
-        return true;
-      }
-
-      const commonTitles = [
-        "PERAKUAN PENDAFTARAN",
-        "PERAKUAN PEMBAHARUAN",
-        "SIJIL",
-        "BORANG",
-        "MAKLUMAT SYARIKAT",
-        "MAKLUMAT PERNIAGAAN",
-        "MAKLUMAT CAWANGAN",
-        "JENIS PERNIAGAAN",
-        "PEGAWAI SYARIKAT",
-        "KATEGORI",
-        "GRED",
-        "CONTRACTOR",
-        "REGISTRATION",
-        "CERTIFICATE",
-        "GOVERNMENT GAZETTE",
-        "FEDERAL GOVERNMENT GAZETTE",
-        "FOURTH SCHEDULE",
-        "JADUAL KEEMPAT"
-      ];
-
-      return commonTitles.some(
-        title =>
-          value
-            .toUpperCase()
-            .includes(title)
-      );
-    }
-
-    function headingLevel(
-      line
-    ) {
-
-      const value =
-        line.trim();
-
-      if (
-        value.length <= 42
-      ) {
-        return 3;
-      }
-
-      return 4;
-    }
-
-    function isListItem(
-      line
-    ) {
-
-      return (
-        /^\s*[•●▪◦■◆]\s*/.test(line) ||
-        /^\s*[-*]\s+/.test(line) ||
-        /^\s*\d+[.)]\s+/.test(line) ||
-        /^\s*[ivxlcdm]+[.)]\s+/i.test(line) ||
-        /^\s*\([a-z0-9ivx]+\)\s+/i.test(line)
-      );
-    }
-
-    function normalizeList(
-      line
-    ) {
-
-      let value =
-        line.trim();
-
-      value =
-        value.replace(
-          /^[•●▪◦■◆]\s*/,
-          "- "
-        );
-
-      return value;
-    }
-
-    function isExplicitKeyValue(
-      line
-    ) {
-
-      const value =
-        line.trim();
-
-      /*
-       * Preserve visible colon.
-       */
-
-      if (
-        /^[^:]{1,60}\s*:\s*.+$/.test(
-          value
-        )
-      ) {
-        return true;
-      }
-
-      /*
-       * Forms frequently contain wide visual spaces.
-       */
-
-      return (
-        /^[^\t]{2,60}\s{3,}\S+/.test(
-          value
-        )
-      );
-    }
-
-    function formatKeyValue(
-      line
-    ) {
-
-      const value =
-        line.trim();
-
-      if (
-        value.includes(":")
-      ) {
-
-        const position =
-          value.indexOf(":");
-
-        const key =
-          value
-            .slice(
-              0,
-              position
-            )
-            .trim();
-
-        const content =
-          value
-            .slice(
-              position + 1
-            )
-            .trim();
-
-        return (
-          `**${key}:** ${content}`
+        console.warn(
+          "PDF text layer unavailable:",
+          error
         );
       }
 
-      const parts =
-        value.split(
-          /\s{3,}/
-        );
-
-      if (
-        parts.length >= 2
-      ) {
-
-        return (
-          `**${parts[0]}:** ` +
-          parts
-            .slice(1)
-            .join(" ")
-        );
-      }
-
-      return value;
-    }
-
-    /* =====================================================
-       TABLE DETECTION
-       ===================================================== */
-
-    function tableColumns(
-      line
-    ) {
-
-      return line
-        .trim()
-        .split(
-          /\t+|\s{3,}/
-        )
-        .map(
-          part =>
-            part.trim()
-        )
-        .filter(Boolean);
-    }
-
-    function detectTableBlock(
-      lines,
-      start
-    ) {
-
-      const rows = [];
-
-      let index =
-        start;
-
-      while (
-        index < lines.length
-      ) {
-
-        const line =
-          lines[index];
-
-        const columns =
-          tableColumns(
-            line
-          );
-
-        if (
-          columns.length < 2
-        ) {
-          break;
-        }
-
-        rows.push(
-          columns
-        );
-
-        index++;
-      }
-
-      if (
-        rows.length < 2
-      ) {
-        return null;
-      }
-
-      const counts =
-        rows.map(
-          row => row.length
-        );
-
-      const dominant =
-        counts
-          .sort(
-            (a, b) =>
-              counts.filter(
-                value => value === a
-              ).length -
-              counts.filter(
-                value => value === b
-              ).length
-          )
-          .pop();
-
-      const compatible =
-        rows.filter(
-          row =>
-            Math.abs(
-              row.length -
-              dominant
-            ) <= 1
-        );
-
-      if (
-        compatible.length < 2
-      ) {
-        return null;
-      }
-
-      return {
-        rows,
-        nextIndex: index
-      };
-    }
-
-    function markdownTable(
-      rows
-    ) {
-
-      const maxColumns =
-        Math.max(
-          ...rows.map(
-            row => row.length
-          )
-        );
-
-      const normalized =
-        rows.map(
-          row => {
-
-            const output =
-              [...row];
-
-            while (
-              output.length <
-              maxColumns
-            ) {
-              output.push("");
-            }
-
-            return output;
-          }
-        );
-
-      const escape =
-        value =>
-          String(value)
-            .replace(/\|/g, "\\|");
-
-      const header =
-        normalized[0];
-
-      const divider =
-        header.map(
-          () => "---"
-        );
-
-      const body =
-        normalized
-          .slice(1);
-
-      const output = [
-        `| ${header
-          .map(escape)
-          .join(" | ")} |`,
-
-        `| ${divider
-          .join(" | ")} |`
-      ];
-
-      body.forEach(
-        row => {
-
-          output.push(
-            `| ${row
-              .map(escape)
-              .join(" | ")} |`
-          );
-
-        }
-      );
-
-      return output.join("\n");
-    }
-
-    /* =====================================================
-       ULTRA STRUCTURED MARKDOWN
-       ===================================================== */
-
-    function ultraStructure(
-      rawText
-    ) {
-
-      const text =
-        cleanOcr(
-          rawText
-        );
-
-      if (
-        outputMode.value ===
-        "literal"
-      ) {
-        return text;
-      }
-
-      const lines =
-        text.split("\n");
-
-      const result = [];
-
-      let i = 0;
-
-      while (
-        i < lines.length
-      ) {
-
-        const raw =
-          lines[i];
-
-        const line =
-          raw.trim();
-
-        if (!line) {
-
-          if (
-            result.length &&
-            result[
-              result.length - 1
-            ] !== ""
-          ) {
-            result.push("");
-          }
-
-          i++;
-          continue;
-        }
-
-        /*
-         * TABLE
-         */
-
-        if (
-          detectTables.checked
-        ) {
-
-          const table =
-            detectTableBlock(
-              lines,
-              i
-            );
-
-          if (table) {
-
-            result.push(
-              markdownTable(
-                table.rows
-              )
-            );
-
-            result.push("");
-
-            i =
-              table.nextIndex;
-
-            continue;
-          }
-        }
-
-        /*
-         * HEADING
-         */
-
-        if (
-          detectHeadings.checked &&
-          isLikelyHeading(line)
-        ) {
-
-          const level =
-            headingLevel(line);
-
-          result.push(
-            `${"#".repeat(level)} ${line}`
-          );
-
-          result.push("");
-
-          i++;
-          continue;
-        }
-
-        /*
-         * LIST
-         */
-
-        if (
-          isListItem(line)
-        ) {
-
-          result.push(
-            normalizeList(line)
-          );
-
-          i++;
-          continue;
-        }
-
-        /*
-         * KEY : VALUE
-         */
-
-        if (
-          detectKV.checked &&
-          isExplicitKeyValue(line)
-        ) {
-
-          result.push(
-            formatKeyValue(
-              line
-            )
-          );
-
-          i++;
-          continue;
-        }
-
-        /*
-         * LITERAL BODY
-         */
-
-        result.push(line);
-
-        i++;
-      }
-
-      return result
-        .join("\n")
-        .replace(
-          /\n{4,}/g,
-          "\n\n\n"
-        )
-        .trim();
-    }
-
-    /* =====================================================
-       DOCX -> MARKDOWN
-       ===================================================== */
-
-    function htmlTableToMarkdown(
-      table
-    ) {
-
-      const rows =
-        [
-          ...table.querySelectorAll(
-            "tr"
-          )
-        ];
-
-      if (!rows.length) {
-        return "";
-      }
-
-      const matrix =
-        rows.map(
-          row =>
-            [
-              ...row.querySelectorAll(
-                "th,td"
-              )
-            ].map(
-              cell =>
-                cell.innerText
-                  .replace(
-                    /\s+/g,
-                    " "
-                  )
-                  .trim()
-            )
-        );
-
-      return markdownTable(
-        matrix
-      );
-    }
-
-    function docxHtmlToMarkdown(
-      html
-    ) {
-
-      const container =
+      const wrapper =
         document.createElement(
           "div"
         );
 
-      container.innerHTML =
-        html;
+      wrapper.className =
+        "preview-page";
 
-      function walk(node) {
+      const label =
+        document.createElement(
+          "div"
+        );
 
-        if (
-          node.nodeType ===
-          Node.TEXT_NODE
-        ) {
-          return node.nodeValue;
-        }
+      label.className =
+        "page-number";
 
-        if (
-          node.nodeType !==
-          Node.ELEMENT_NODE
-        ) {
-          return "";
-        }
+      label.textContent =
+        `${file.name} · Page ${pageNumber}/${pdf.numPages}`;
 
-        const tag =
-          node.tagName
-            .toLowerCase();
+      wrapper.appendChild(
+        canvas
+      );
 
-        if (
-          tag === "table"
-        ) {
+      wrapper.appendChild(
+        label
+      );
 
-          return (
-            "\n" +
-            htmlTableToMarkdown(
-              node
-            ) +
-            "\n"
+      previewPages.appendChild(
+        wrapper
+      );
+
+      state.pages.push({
+        type: "pdf-page",
+        fileIndex,
+        pageNumber,
+        totalPages: pdf.numPages,
+        dataUrl:
+          canvas.toDataURL(
+            "image/png"
+          ),
+        embeddedText
+      });
+    }
+  }
+
+  async function renderDocxPreview(
+    file,
+    fileIndex
+  ) {
+    const arrayBuffer =
+      await file.arrayBuffer();
+
+    const result =
+      await mammoth.convertToHtml({
+        arrayBuffer
+      });
+
+    const content =
+      document.createElement(
+        "div"
+      );
+
+    content.className =
+      "docx-preview";
+
+    content.innerHTML =
+      result.value;
+
+    const outer =
+      document.createElement(
+        "div"
+      );
+
+    outer.className =
+      "preview-page";
+
+    const label =
+      document.createElement(
+        "div"
+      );
+
+    label.className =
+      "page-number";
+
+    label.textContent =
+      file.name;
+
+    outer.appendChild(
+      content
+    );
+
+    outer.appendChild(
+      label
+    );
+
+    previewPages.appendChild(
+      outer
+    );
+
+    state.pages.push({
+      type: "docx",
+      fileIndex,
+      pageNumber: 1,
+      totalPages: 1,
+      html: result.value,
+      arrayBuffer
+    });
+  }
+
+  async function renderAllPreviews() {
+    previewPages.innerHTML =
+      "";
+
+    state.pages =
+      [];
+
+    if (!state.files.length) {
+      emptyPreview
+        .classList
+        .remove("hidden");
+
+      previewPages
+        .classList
+        .add("hidden");
+
+      previewCount.textContent =
+        "0 pages";
+
+      updateStats();
+
+      return;
+    }
+
+    emptyPreview
+      .classList
+      .add("hidden");
+
+    previewPages
+      .classList
+      .remove("hidden");
+
+    for (
+      let index = 0;
+      index < state.files.length;
+      index++
+    ) {
+      const file =
+        state.files[index];
+
+      try {
+        if (isImage(file)) {
+          await renderImagePreview(
+            file,
+            index
+          );
+        } else if (isPdf(file)) {
+          await renderPdfPreview(
+            file,
+            index
+          );
+        } else if (isDocx(file)) {
+          await renderDocxPreview(
+            file,
+            index
           );
         }
+      } catch (
+        error
+      ) {
+        console.error(error);
+      }
+    }
 
-        const content =
-          [...node.childNodes]
-            .map(walk)
-            .join("");
+    previewCount.textContent =
+      `${state.pages.length} page${
+        state.pages.length === 1
+          ? ""
+          : "s"
+      }`;
 
-        switch (tag) {
+    updateStats();
+  }
 
-          case "h1":
-            return (
-              `# ${content.trim()}\n\n`
-            );
+  /* ======================================================
+     QR MASKING
+     ====================================================== */
 
-          case "h2":
-            return (
-              `## ${content.trim()}\n\n`
-            );
+  function maskQrCodes(
+    canvas,
+    context
+  ) {
+    if (
+      !excludeQR.checked ||
+      typeof jsQR !== "function"
+    ) {
+      return 0;
+    }
 
-          case "h3":
-            return (
-              `### ${content.trim()}\n\n`
-            );
+    let count = 0;
 
-          case "h4":
-            return (
-              `#### ${content.trim()}\n\n`
-            );
+    /*
+      jsQR normally detects one QR code at a time.
+      Once detected, the region is replaced with white
+      and scanning repeats to find additional QR codes.
+    */
 
-          case "p":
-            return (
-              `${content.trim()}\n\n`
-            );
+    for (
+      let attempt = 0;
+      attempt < 8;
+      attempt++
+    ) {
+      const imageData =
+        context.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
 
-          case "li":
-            return (
-              `- ${content.trim()}\n`
-            );
+      const result =
+        jsQR(
+          imageData.data,
+          imageData.width,
+          imageData.height,
+          {
+            inversionAttempts:
+              "attemptBoth"
+          }
+        );
 
-          case "ul":
-          case "ol":
-            return (
-              `${content}\n`
-            );
+      if (!result) {
+        break;
+      }
 
-          case "strong":
-          case "b":
-            return (
-              `**${content}**`
-            );
+      const points = [
+        result.location.topLeftCorner,
+        result.location.topRightCorner,
+        result.location.bottomRightCorner,
+        result.location.bottomLeftCorner
+      ];
 
-          case "em":
-          case "i":
-            return (
-              `*${content}*`
-            );
+      const xs =
+        points.map(
+          point => point.x
+        );
 
-          case "br":
-            return "\n";
+      const ys =
+        points.map(
+          point => point.y
+        );
 
-          case "img":
-            return "";
+      const margin =
+        Math.max(
+          15,
+          Math.min(
+            canvas.width,
+            canvas.height
+          ) * .012
+        );
 
-          default:
-            return content;
+      const left =
+        Math.max(
+          0,
+          Math.min(...xs) -
+          margin
+        );
+
+      const top =
+        Math.max(
+          0,
+          Math.min(...ys) -
+          margin
+        );
+
+      const right =
+        Math.min(
+          canvas.width,
+          Math.max(...xs) +
+          margin
+        );
+
+      const bottom =
+        Math.min(
+          canvas.height,
+          Math.max(...ys) +
+          margin
+        );
+
+      context.fillStyle =
+        "#ffffff";
+
+      context.fillRect(
+        left,
+        top,
+        right - left,
+        bottom - top
+      );
+
+      count++;
+    }
+
+    return count;
+  }
+
+  async function prepareImageForOcr(
+    dataUrl
+  ) {
+    const image =
+      await loadImage(
+        dataUrl
+      );
+
+    /*
+      Upscale smaller scans to improve character recognition.
+    */
+
+    const targetMinimumWidth =
+      1800;
+
+    const scale =
+      image.naturalWidth <
+      targetMinimumWidth
+        ? Math.min(
+            2,
+            targetMinimumWidth /
+            image.naturalWidth
+          )
+        : 1;
+
+    const canvas =
+      document.createElement(
+        "canvas"
+      );
+
+    canvas.width =
+      Math.round(
+        image.naturalWidth *
+        scale
+      );
+
+    canvas.height =
+      Math.round(
+        image.naturalHeight *
+        scale
+      );
+
+    const context =
+      canvas.getContext(
+        "2d",
+        {
+          willReadFrequently: true
+        }
+      );
+
+    context.fillStyle =
+      "#ffffff";
+
+    context.fillRect(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    context.drawImage(
+      image,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    const qrCount =
+      maskQrCodes(
+        canvas,
+        context
+      );
+
+    return {
+      dataUrl:
+        canvas.toDataURL(
+          "image/png"
+        ),
+      qrCount
+    };
+  }
+
+  /* ======================================================
+     TEXT CLEANING
+     ====================================================== */
+
+  function normalizeOcrText(
+    text
+  ) {
+    return String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/\u00AD/g, "")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{5,}/g, "\n\n\n")
+      .trim();
+  }
+
+  function isDenseVisualNoise(
+    line
+  ) {
+    const value =
+      line.trim();
+
+    if (!value) {
+      return false;
+    }
+
+    const lettersAndNumbers =
+      (
+        value.match(
+          /[\p{L}\p{N}]/gu
+        ) || []
+      ).length;
+
+    const symbols =
+      (
+        value.match(
+          /[^\p{L}\p{N}\s]/gu
+        ) || []
+      ).length;
+
+    return (
+      value.length >= 5 &&
+      lettersAndNumbers <= 1 &&
+      symbols >= 3
+    );
+  }
+
+  function isQrLikeNoise(
+    line
+  ) {
+    const value =
+      line.trim();
+
+    if (
+      !value ||
+      value.length < 8
+    ) {
+      return false;
+    }
+
+    const alphanumeric =
+      (
+        value.match(
+          /[\p{L}\p{N}]/gu
+        ) || []
+      ).length;
+
+    const punctuation =
+      (
+        value.match(
+          /[^\p{L}\p{N}\s]/gu
+        ) || []
+      ).length;
+
+    return (
+      alphanumeric <= 2 &&
+      punctuation >= 6
+    );
+  }
+
+  function cleanExtractedText(
+    text
+  ) {
+    let value =
+      normalizeOcrText(
+        text
+      );
+
+    let lines =
+      value.split("\n");
+
+    if (
+      excludeSignatures.checked
+    ) {
+      /*
+        A handwritten signature is visual content rather than
+        textual content. OCR residue consisting almost entirely
+        of stroke-like symbols is omitted. Nearby printed names,
+        positions and dates remain untouched.
+      */
+
+      lines =
+        lines.filter(
+          line =>
+            !isDenseVisualNoise(
+              line
+            )
+        );
+    }
+
+    if (
+      excludeQR.checked
+    ) {
+      lines =
+        lines.filter(
+          line =>
+            !isQrLikeNoise(
+              line
+            )
+        );
+    }
+
+    return lines
+      .join("\n")
+      .replace(
+        /\n{5,}/g,
+        "\n\n\n"
+      )
+      .trim();
+  }
+
+  /* ======================================================
+     STRUCTURE DETECTION
+     ====================================================== */
+
+  function likelyHeading(
+    line
+  ) {
+    const value =
+      line.trim();
+
+    if (
+      !value ||
+      value.length > 110
+    ) {
+      return false;
+    }
+
+    if (
+      /^[\d\s.,:/()\-]+$/.test(
+        value
+      )
+    ) {
+      return false;
+    }
+
+    const letters =
+      value.match(
+        /\p{L}/gu
+      ) || [];
+
+    if (
+      letters.length < 3
+    ) {
+      return false;
+    }
+
+    const uppercase =
+      value.match(
+        /\p{Lu}/gu
+      ) || [];
+
+    const ratio =
+      uppercase.length /
+      letters.length;
+
+    const keywords = [
+      "SIJIL",
+      "PERAKUAN",
+      "BORANG",
+      "MAKLUMAT",
+      "KATEGORI",
+      "GRED",
+      "PEGAWAI",
+      "PENDAFTARAN",
+      "PERNIAGAAN",
+      "MALAYSIA",
+      "CERTIFICATE",
+      "REGISTRATION",
+      "GOVERNMENT",
+      "GAZETTE",
+      "SCHEDULE",
+      "CONTRACTOR",
+      "PROJECT",
+      "DECLARATION",
+      "JADUAL",
+      "STANDARD",
+      "STANDARDS"
+    ];
+
+    return (
+      ratio >= .72 ||
+      keywords.some(
+        keyword =>
+          value
+            .toUpperCase()
+            .includes(keyword)
+      )
+    );
+  }
+
+  function markdownHeadingLevel(
+    line
+  ) {
+    const length =
+      line.trim().length;
+
+    if (length <= 35) {
+      return 2;
+    }
+
+    if (length <= 70) {
+      return 3;
+    }
+
+    return 4;
+  }
+
+  function isListLine(
+    line
+  ) {
+    return (
+      /^\s*[•●▪■◆◦]\s*/.test(line) ||
+      /^\s*[-*]\s+/.test(line) ||
+      /^\s*\d+[.)]\s+/.test(line) ||
+      /^\s*[ivxlcdm]+[.)]\s+/i.test(line) ||
+      /^\s*\([a-z0-9ivx]+\)\s+/i.test(line)
+    );
+  }
+
+  function formatListLine(
+    line
+  ) {
+    const value =
+      line.trim();
+
+    const bulletMatch =
+      value.match(
+        /^[•●▪■◆◦]\s*(.*)$/
+      );
+
+    if (bulletMatch) {
+      return `- ${bulletMatch[1]}`;
+    }
+
+    return value;
+  }
+
+  function isColonKeyValue(
+    line
+  ) {
+    const value =
+      line.trim();
+
+    return (
+      /^[^:]{1,65}:\s*.+$/.test(
+        value
+      )
+    );
+  }
+
+  function formatColonKeyValue(
+    line
+  ) {
+    const value =
+      line.trim();
+
+    const index =
+      value.indexOf(":");
+
+    if (
+      index === -1
+    ) {
+      return value;
+    }
+
+    const key =
+      value
+        .slice(
+          0,
+          index + 1
+        );
+
+    const content =
+      value
+        .slice(
+          index + 1
+        );
+
+    /*
+      Existing punctuation is preserved.
+      Only Markdown emphasis is added.
+    */
+
+    return (
+      `**${key}**${content}`
+    );
+  }
+
+  function splitVisualColumns(
+    line
+  ) {
+    return line
+      .trim()
+      .split(
+        /\t+|\s{3,}/
+      )
+      .map(
+        value =>
+          value.trim()
+      )
+      .filter(Boolean);
+  }
+
+  function isVisualKeyValue(
+    line
+  ) {
+    const columns =
+      splitVisualColumns(
+        line
+      );
+
+    if (
+      columns.length !== 2
+    ) {
+      return false;
+    }
+
+    if (
+      columns[0].length > 60
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function formatVisualKeyValue(
+    line
+  ) {
+    const columns =
+      splitVisualColumns(
+        line
+      );
+
+    if (
+      columns.length !== 2
+    ) {
+      return line.trim();
+    }
+
+    /*
+      No colon is invented if it was not visible.
+    */
+
+    return (
+      `**${columns[0]}**  ${columns[1]}`
+    );
+  }
+
+  /* ======================================================
+     TABLE DETECTION
+     ====================================================== */
+
+  function detectTableBlock(
+    lines,
+    start
+  ) {
+    const rows = [];
+
+    let index =
+      start;
+
+    while (
+      index < lines.length
+    ) {
+      const value =
+        lines[index]
+          .trim();
+
+      if (!value) {
+        break;
+      }
+
+      const columns =
+        splitVisualColumns(
+          value
+        );
+
+      if (
+        columns.length < 2
+      ) {
+        break;
+      }
+
+      rows.push(
+        columns
+      );
+
+      index++;
+    }
+
+    /*
+      Require at least 3 consistent rows.
+      This avoids converting ordinary key-value forms into tables.
+    */
+
+    if (
+      rows.length < 3
+    ) {
+      return null;
+    }
+
+    const counts =
+      rows.map(
+        row =>
+          row.length
+      );
+
+    const frequencies =
+      {};
+
+    counts.forEach(
+      count => {
+        frequencies[count] =
+          (
+            frequencies[count] ||
+            0
+          ) + 1;
+      }
+    );
+
+    let dominantCount = 0;
+    let dominantFrequency = 0;
+
+    Object
+      .entries(frequencies)
+      .forEach(
+        ([count, frequency]) => {
+          if (
+            frequency >
+            dominantFrequency
+          ) {
+            dominantFrequency =
+              frequency;
+
+            dominantCount =
+              Number(count);
+          }
+        }
+      );
+
+    if (
+      dominantFrequency < 3
+    ) {
+      return null;
+    }
+
+    return {
+      rows,
+      nextIndex: index,
+      columnCount:
+        dominantCount
+    };
+  }
+
+  function markdownTable(
+    rows
+  ) {
+    const maxColumns =
+      Math.max(
+        ...rows.map(
+          row => row.length
+        )
+      );
+
+    const normalized =
+      rows.map(
+        row => {
+          const copy =
+            [...row];
+
+          while (
+            copy.length <
+            maxColumns
+          ) {
+            copy.push("");
+          }
+
+          return copy;
+        }
+      );
+
+    const escapeCell =
+      value =>
+        String(value)
+          .replace(
+            /\|/g,
+            "\\|"
+          )
+          .replace(
+            /\n/g,
+            " "
+          );
+
+    const header =
+      normalized[0];
+
+    const output = [];
+
+    output.push(
+      `| ${header
+        .map(escapeCell)
+        .join(" | ")} |`
+    );
+
+    output.push(
+      `| ${header
+        .map(() => "---")
+        .join(" | ")} |`
+    );
+
+    normalized
+      .slice(1)
+      .forEach(
+        row => {
+          output.push(
+            `| ${row
+              .map(escapeCell)
+              .join(" | ")} |`
+          );
+        }
+      );
+
+    return output.join("\n");
+  }
+
+  /* ======================================================
+     ULTRA STRUCTURED MARKDOWN
+     ====================================================== */
+
+  function structureTextToMarkdown(
+    rawText
+  ) {
+    const cleaned =
+      cleanExtractedText(
+        rawText
+      );
+
+    if (!cleaned) {
+      return "";
+    }
+
+    if (
+      outputMode.value ===
+      "literal"
+    ) {
+      return cleaned;
+    }
+
+    const lines =
+      cleaned.split("\n");
+
+    const output = [];
+
+    let index = 0;
+
+    while (
+      index < lines.length
+    ) {
+      const sourceLine =
+        lines[index];
+
+      const line =
+        sourceLine.trim();
+
+      if (!line) {
+        if (
+          output.length &&
+          output[
+            output.length - 1
+          ] !== ""
+        ) {
+          output.push("");
+        }
+
+        index++;
+        continue;
+      }
+
+      if (
+        detectTables.checked
+      ) {
+        const table =
+          detectTableBlock(
+            lines,
+            index
+          );
+
+        if (table) {
+          output.push(
+            markdownTable(
+              table.rows
+            )
+          );
+
+          output.push("");
+
+          index =
+            table.nextIndex;
+
+          continue;
         }
       }
 
-      return walk(container)
+      if (
+        detectHeadings.checked &&
+        likelyHeading(line)
+      ) {
+        const level =
+          markdownHeadingLevel(
+            line
+          );
+
+        output.push(
+          `${"#".repeat(level)} ${line}`
+        );
+
+        output.push("");
+
+        index++;
+
+        continue;
+      }
+
+      if (
+        isListLine(line)
+      ) {
+        output.push(
+          formatListLine(
+            line
+          )
+        );
+
+        index++;
+
+        continue;
+      }
+
+      if (
+        detectKeyValues.checked &&
+        isColonKeyValue(line)
+      ) {
+        output.push(
+          formatColonKeyValue(
+            line
+          )
+        );
+
+        index++;
+
+        continue;
+      }
+
+      if (
+        detectKeyValues.checked &&
+        isVisualKeyValue(
+          sourceLine
+        )
+      ) {
+        output.push(
+          formatVisualKeyValue(
+            sourceLine
+          )
+        );
+
+        index++;
+
+        continue;
+      }
+
+      output.push(
+        preserveLiteral.checked
+          ? sourceLine.trimEnd()
+          : line
+      );
+
+      index++;
+    }
+
+    let result =
+      output
+        .join("\n")
         .replace(
           /\n{4,}/g,
           "\n\n\n"
-        )
-        .trim();
-    }
+        );
 
-    /* =====================================================
-       OCR
-       ===================================================== */
-
-    async function recognizeImage(
-      dataUrl,
-      index,
-      total
+    if (
+      !preserveLines.checked
     ) {
-
-      const prepared =
-        await prepareImageForOcr(
-          dataUrl
+      result =
+        result.replace(
+          /(?<!\n)\n(?!\n|#|- |\|)/g,
+          " "
         );
-
-      if (
-        prepared.qrCount > 0
-      ) {
-
-        log(
-          `${prepared.qrCount} QR region(s) excluded`
-        );
-      }
-
-      const result =
-        await Tesseract.recognize(
-          prepared.dataUrl,
-          ocrLanguage.value,
-          {
-            logger:
-              event => {
-
-                if (
-                  typeof event.progress ===
-                  "number"
-                ) {
-
-                  const overall =
-                    (
-                      (
-                        index +
-                        event.progress
-                      ) /
-                      total
-                    ) *
-                    100;
-
-                  setProgress(
-                    overall,
-                    `OCR page ${index + 1} of ${total}`
-                  );
-                }
-
-              }
-          }
-        );
-
-      return {
-        text:
-          cleanOcr(
-            result.data.text
-          ),
-
-        qrCount:
-          prepared.qrCount
-      };
     }
 
-    /* =====================================================
-       EXTRACTION
-       ===================================================== */
+    return result.trim();
+  }
 
-    async function extractDocuments() {
+  /* ======================================================
+     DOCX TO MARKDOWN
+     ====================================================== */
 
-      if (
-        !state.files.length ||
-        state.busy
-      ) {
-        return;
-      }
+  function tableElementToMarkdown(
+    table
+  ) {
+    const rows =
+      [
+        ...table.querySelectorAll(
+          "tr"
+        )
+      ];
 
-      state.busy =
-        true;
+    if (!rows.length) {
+      return "";
+    }
 
-      extractBtn.disabled =
-        true;
-
-      progressSection.style.display =
-        "block";
-
-      ocrLog.textContent =
-        "";
-
-      setProgress(
-        0,
-        "Preparing"
+    const matrix =
+      rows.map(
+        row =>
+          [
+            ...row.querySelectorAll(
+              "th,td"
+            )
+          ].map(
+            cell =>
+              cell.innerText
+                .replace(
+                  /\s+/g,
+                  " "
+                )
+                .trim()
+          )
       );
 
-      const output = [];
+    return markdownTable(
+      matrix
+    );
+  }
 
-      try {
+  function htmlToMarkdown(
+    html
+  ) {
+    const container =
+      document.createElement(
+        "div"
+      );
 
-        const total =
-          state.pages.length || 1;
+    container.innerHTML =
+      html;
 
-        for (
-          let index = 0;
-          index < state.pages.length;
-          index++
-        ) {
+    function walk(node) {
+      if (
+        node.nodeType ===
+        Node.TEXT_NODE
+      ) {
+        return node.nodeValue;
+      }
 
-          const page =
-            state.pages[index];
+      if (
+        node.nodeType !==
+        Node.ELEMENT_NODE
+      ) {
+        return "";
+      }
 
-          const file =
-            state.files[
-              page.fileIndex
-            ];
+      const tag =
+        node.tagName
+          .toLowerCase();
 
-          log(
-            `Processing ${file.name} · page ${page.pageNumber}`
+      /*
+        Images are intentionally omitted.
+        This prevents QR graphics and handwritten
+        signatures embedded as images from being exported.
+      */
+
+      if (
+        tag === "img"
+      ) {
+        return "";
+      }
+
+      if (
+        tag === "table"
+      ) {
+        return (
+          "\n" +
+          tableElementToMarkdown(
+            node
+          ) +
+          "\n\n"
+        );
+      }
+
+      const content =
+        [...node.childNodes]
+          .map(walk)
+          .join("");
+
+      switch (tag) {
+        case "h1":
+          return `# ${content.trim()}\n\n`;
+
+        case "h2":
+          return `## ${content.trim()}\n\n`;
+
+        case "h3":
+          return `### ${content.trim()}\n\n`;
+
+        case "h4":
+          return `#### ${content.trim()}\n\n`;
+
+        case "h5":
+          return `##### ${content.trim()}\n\n`;
+
+        case "h6":
+          return `###### ${content.trim()}\n\n`;
+
+        case "p":
+          return `${content.trim()}\n\n`;
+
+        case "strong":
+        case "b":
+          return `**${content}**`;
+
+        case "em":
+        case "i":
+          return `*${content}*`;
+
+        case "br":
+          return "\n";
+
+        case "li":
+          return `- ${content.trim()}\n`;
+
+        case "ul":
+        case "ol":
+          return `${content}\n`;
+
+        default:
+          return content;
+      }
+    }
+
+    return walk(container)
+      .replace(
+        /\n{4,}/g,
+        "\n\n\n"
+      )
+      .trim();
+  }
+
+  async function extractDocx(
+    page
+  ) {
+    const raw =
+      await mammoth
+        .extractRawText({
+          arrayBuffer:
+            page.arrayBuffer
+        });
+
+    const markdown =
+      page.html
+        ? htmlToMarkdown(
+            page.html
+          )
+        : structureTextToMarkdown(
+            raw.value
           );
 
-          let markdown =
-            "";
+    return {
+      text:
+        cleanExtractedText(
+          raw.value
+        ),
+      markdown
+    };
+  }
 
-          /*
-           * IMAGE / PDF PAGE
-           */
+  /* ======================================================
+     OCR
+     ====================================================== */
 
-          if (
-            page.type === "image" ||
-            page.type === "pdf"
-          ) {
+  async function recognizeImage(
+    dataUrl,
+    pageIndex,
+    totalPages
+  ) {
+    const prepared =
+      await prepareImageForOcr(
+        dataUrl
+      );
 
-            const ocr =
-              await recognizeImage(
-                page.dataUrl,
-                index,
-                total
+    if (
+      prepared.qrCount > 0
+    ) {
+      log(
+        `${prepared.qrCount} QR region(s) excluded`
+      );
+    }
+
+    const result =
+      await Tesseract.recognize(
+        prepared.dataUrl,
+        ocrLanguage.value,
+        {
+          logger:
+            message => {
+              if (
+                typeof message.progress ===
+                "number"
+              ) {
+                const overall =
+                  (
+                    (
+                      pageIndex +
+                      message.progress
+                    ) /
+                    totalPages
+                  ) *
+                  100;
+
+                setProgress(
+                  overall,
+                  `OCR page ${pageIndex + 1} of ${totalPages}`
+                );
+              }
+
+              if (
+                message.status
+              ) {
+                progressLabel.textContent =
+                  message.status;
+              }
+            }
+        }
+      );
+
+    return cleanExtractedText(
+      result.data.text
+    );
+  }
+
+  /* ======================================================
+     MARKDOWN -> HTML
+     ====================================================== */
+
+  function markdownToHtml(
+    markdown
+  ) {
+    const lines =
+      String(markdown || "")
+        .split("\n");
+
+    const output = [];
+
+    let inList = false;
+    let inTable = false;
+
+    function closeList() {
+      if (inList) {
+        output.push("</ul>");
+        inList = false;
+      }
+    }
+
+    function closeTable() {
+      if (inTable) {
+        output.push("</tbody></table>");
+        inTable = false;
+      }
+    }
+
+    for (
+      let i = 0;
+      i < lines.length;
+      i++
+    ) {
+      const raw =
+        lines[i];
+
+      const line =
+        raw.trim();
+
+      if (
+        /^\|.*\|$/.test(line)
+      ) {
+        closeList();
+
+        const cells =
+          line
+            .slice(1,-1)
+            .split("|")
+            .map(
+              cell =>
+                cell.trim()
+            );
+
+        const next =
+          lines[i + 1] || "";
+
+        const nextIsDivider =
+          /^\|\s*:?-+/.test(
+            next.trim()
+          );
+
+        if (!inTable) {
+          output.push("<table>");
+          inTable = true;
+        }
+
+        if (nextIsDivider) {
+          output.push("<thead><tr>");
+
+          cells.forEach(
+            cell => {
+              output.push(
+                `<th>${escapeHtml(cell)}</th>`
               );
+            }
+          );
 
-            markdown =
-              ultraStructure(
-                ocr.text
-              );
+          output.push("</tr></thead><tbody>");
+
+          i++;
+
+          continue;
+        }
+
+        output.push("<tr>");
+
+        cells.forEach(
+          cell => {
+            output.push(
+              `<td>${escapeHtml(cell)}</td>`
+            );
           }
+        );
 
-          /*
-           * DOCX
-           */
+        output.push("</tr>");
 
-          if (
-            page.type === "docx"
-          ) {
+        continue;
+      }
 
-            markdown =
-              docxHtmlToMarkdown(
-                page.html
+      closeTable();
+
+      if (!line) {
+        closeList();
+        output.push("");
+        continue;
+      }
+
+      const heading =
+        line.match(
+          /^(#{1,6})\s+(.+)$/
+        );
+
+      if (heading) {
+        closeList();
+
+        const level =
+          heading[1].length;
+
+        output.push(
+          `<h${level}>${escapeHtml(heading[2])}</h${level}>`
+        );
+
+        continue;
+      }
+
+      if (
+        /^- /.test(line)
+      ) {
+        if (!inList) {
+          output.push("<ul>");
+          inList = true;
+        }
+
+        output.push(
+          `<li>${escapeHtml(line.slice(2))}</li>`
+        );
+
+        continue;
+      }
+
+      closeList();
+
+      let paragraph =
+        escapeHtml(raw);
+
+      paragraph =
+        paragraph.replace(
+          /\*\*(.+?)\*\*/g,
+          "<strong>$1</strong>"
+        );
+
+      output.push(
+        `<p>${paragraph}</p>`
+      );
+    }
+
+    closeList();
+    closeTable();
+
+    return output.join("\n");
+  }
+
+  function createExportHtml(
+    bodyHtml
+  ) {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Extracted Document</title>
+<style>
+body{
+  max-width:1000px;
+  margin:40px auto;
+  padding:0 30px;
+  font-family:Arial,sans-serif;
+  line-height:1.55;
+  color:#111;
+}
+.document-page{
+  padding:25px 0 50px;
+  border-bottom:1px solid #ccc;
+}
+.document-meta{
+  margin-bottom:20px;
+  padding:8px 10px;
+  background:#f1f1f1;
+  font-size:11px;
+  font-family:monospace;
+}
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin:14px 0;
+}
+th,td{
+  border:1px solid #222;
+  padding:6px;
+  text-align:left;
+  vertical-align:top;
+}
+</style>
+</head>
+<body>
+${bodyHtml}
+</body>
+</html>`;
+  }
+
+  /* ======================================================
+     EXTRACTION
+     ====================================================== */
+
+  async function extractDocuments() {
+    if (
+      !state.files.length ||
+      state.busy
+    ) {
+      return;
+    }
+
+    state.busy = true;
+
+    extractBtn.disabled =
+      true;
+
+    progressWrap.style.display =
+      "block";
+
+    ocrLog.textContent =
+      "";
+
+    setProgress(
+      0,
+      "Preparing document extraction"
+    );
+
+    const markdownDocuments = [];
+    const textDocuments = [];
+    const htmlDocuments = [];
+
+    const totalPages =
+      state.pages.length || 1;
+
+    try {
+      for (
+        let index = 0;
+        index < state.pages.length;
+        index++
+      ) {
+        const page =
+          state.pages[index];
+
+        const file =
+          state.files[
+            page.fileIndex
+          ];
+
+        log(
+          `Processing ${file.name} · page ${page.pageNumber}`
+        );
+
+        let pageText = "";
+        let pageMarkdown = "";
+
+        /* IMAGE */
+
+        if (
+          page.type === "image"
+        ) {
+          pageText =
+            await recognizeImage(
+              page.dataUrl,
+              index,
+              totalPages
+            );
+
+          pageMarkdown =
+            structureTextToMarkdown(
+              pageText
+            );
+        }
+
+        /* PDF */
+
+        if (
+          page.type ===
+          "pdf-page"
+        ) {
+          const useTextLayer =
+            preferPdfText.checked &&
+            hasUsefulPdfText(
+              page.embeddedText
+            );
+
+          if (useTextLayer) {
+            log(
+              "Using embedded PDF text layer"
+            );
+
+            pageText =
+              cleanExtractedText(
+                page.embeddedText
+              );
+
+            pageMarkdown =
+              structureTextToMarkdown(
+                pageText
               );
 
             setProgress(
               (
                 (index + 1) /
-                total
+                totalPages
               ) * 100,
-              `Reading page ${index + 1} of ${total}`
+              `Reading PDF page ${page.pageNumber}`
             );
-          }
-
-          /*
-           * DOCUMENT STRUCTURE
-           */
-
-          const isFirstPage =
-            page.pageNumber === 1;
-
-          if (isFirstPage) {
-
-            output.push(
-              `# DOCUMENT ${page.fileIndex + 1}`
-            );
-
-            output.push("");
-
-            output.push(
-              `**File:** ${file.name}`
-            );
-
-            output.push(
-              `**Document Type:** ${
-                page.type === "pdf"
-                  ? "PDF"
-                  : page.type === "docx"
-                    ? "DOCX"
-                    : "Image"
-              }`
-            );
-
-            output.push("");
-
-            output.push("---");
-            output.push("");
-          }
-
-          output.push(
-            `## PAGE ${page.pageNumber}`
-          );
-
-          output.push("");
-
-          if (markdown) {
-
-            output.push(
-              markdown
-            );
-
           } else {
-
-            output.push(
-              "[Illegible]"
+            log(
+              "No usable PDF text layer — OCR fallback"
             );
 
+            pageText =
+              await recognizeImage(
+                page.dataUrl,
+                index,
+                totalPages
+              );
+
+            pageMarkdown =
+              structureTextToMarkdown(
+                pageText
+              );
           }
+        }
 
-          output.push("");
+        /* DOCX */
 
-          if (
-            page.pageNumber ===
-            page.totalPages
-          ) {
+        if (
+          page.type ===
+          "docx"
+        ) {
+          const result =
+            await extractDocx(
+              page
+            );
 
-            output.push("---");
-            output.push("");
+          pageText =
+            result.text;
 
-          }
+          pageMarkdown =
+            result.markdown;
 
           setProgress(
             (
               (index + 1) /
-              total
+              totalPages
             ) * 100,
-            `Completed ${index + 1} of ${total}`
+            `Reading DOCX`
           );
-
         }
 
-        editor.value =
-          output
-            .join("\n")
-            .replace(
-              /\n{4,}/g,
-              "\n\n\n"
-            )
-            .trim();
+        /*
+          File/page metadata is kept inside HTML comments in
+          Markdown so it does not alter the visible transcription.
+        */
+
+        const metadataComment =
+          `<!-- FILE: ${file.name} | PAGE: ${page.pageNumber}/${page.totalPages || 1} -->`;
+
+        markdownDocuments.push(
+          `${metadataComment}\n\n${pageMarkdown || "[Illegible]"}`
+        );
+
+        textDocuments.push(
+          `FILE: ${file.name}\n` +
+          `PAGE: ${page.pageNumber}/${page.totalPages || 1}\n\n` +
+          `${pageText || "[Illegible]"}`
+        );
+
+        htmlDocuments.push(
+          `<section class="document-page" data-document="${escapeHtml(file.name)}" data-page="${page.pageNumber}">
+            <div class="document-meta">
+              ${escapeHtml(file.name)} · Page ${page.pageNumber}/${page.totalPages || 1}
+            </div>
+            ${markdownToHtml(pageMarkdown || "[Illegible]")}
+          </section>`
+        );
 
         setProgress(
-          100,
-          "Extraction completed"
+          (
+            (index + 1) /
+            totalPages
+          ) * 100,
+          `Completed ${index + 1} of ${totalPages}`
         );
-
-        log(
-          "Extraction completed"
-        );
-
-        updateStats();
-
-        showToast(
-          "Extraction completed."
-        );
-
-      } catch (error) {
-
-        console.error(error);
-
-        log(
-          `ERROR: ${error.message}`
-        );
-
-        progressLabel.textContent =
-          "Extraction failed";
-
-        showToast(
-          "Extraction failed."
-        );
-
-      } finally {
-
-        state.busy =
-          false;
-
-        extractBtn.disabled =
-          state.files.length === 0;
-
       }
+
+      state.extracted.markdown =
+        markdownDocuments.join(
+          "\n\n---\n\n"
+        );
+
+      state.extracted.text =
+        textDocuments.join(
+          "\n\n========================================\n\n"
+        );
+
+      state.extracted.html =
+        createExportHtml(
+          htmlDocuments.join(
+            "\n\n"
+          )
+        );
+
+      outputEditor.value =
+        state.extracted[
+          state.activeTab
+        ];
+
+      setProgress(
+        100,
+        "Extraction completed"
+      );
+
+      log(
+        "Extraction completed."
+      );
+
+      updateStats();
+
+      showToast(
+        "Document extraction completed."
+      );
+    } catch (
+      error
+    ) {
+      console.error(error);
+
+      log(
+        `ERROR: ${error.message}`
+      );
+
+      progressLabel.textContent =
+        "Extraction failed";
+
+      showToast(
+        "Extraction failed."
+      );
+    } finally {
+      state.busy =
+        false;
+
+      extractBtn.disabled =
+        state.files.length === 0;
     }
+  }
 
-    /* =====================================================
-       OUTPUT
-       ===================================================== */
+  /* ======================================================
+     OUTPUT CONTROLS
+     ====================================================== */
 
-    function updateStats() {
+  extractBtn.addEventListener(
+    "click",
+    extractDocuments
+  );
 
-      const text =
-        editor.value || "";
+  tabs.forEach(
+    tab => {
+      tab.addEventListener(
+        "click",
+        () => {
+          state.extracted[
+            state.activeTab
+          ] =
+            outputEditor.value;
 
-      const words =
-        text.trim()
-          ? text
-              .trim()
-              .split(/\s+/)
-              .length
-          : 0;
-
-      statDocuments.textContent =
-        state.files.length;
-
-      statPages.textContent =
-        state.pages.length;
-
-      statWords.textContent =
-        words.toLocaleString();
-
-      statChars.textContent =
-        text.length.toLocaleString();
-    }
-
-    editor.addEventListener(
-      "input",
-      updateStats
-    );
-
-    copyBtn.addEventListener(
-      "click",
-      async () => {
-
-        if (!editor.value) {
-
-          showToast(
-            "No extracted data."
-          );
-
-          return;
-        }
-
-        try {
-
-          await navigator.clipboard
-            .writeText(
-              editor.value
-            );
-
-          showToast(
-            "Markdown copied."
-          );
-
-        } catch {
-
-          editor.select();
-
-          document.execCommand(
-            "copy"
-          );
-
-          showToast(
-            "Markdown copied."
-          );
-        }
-
-      }
-    );
-
-    downloadBtn.addEventListener(
-      "click",
-      () => {
-
-        if (!editor.value) {
-
-          showToast(
-            "No extracted data."
-          );
-
-          return;
-        }
-
-        const blob =
-          new Blob(
-            [editor.value],
-            {
-              type:
-                "text/markdown;charset=utf-8"
+          tabs.forEach(
+            current => {
+              current
+                .classList
+                .remove("active");
             }
           );
 
-        const url =
-          URL.createObjectURL(
-            blob
-          );
+          tab
+            .classList
+            .add("active");
 
-        const anchor =
-          document.createElement(
-            "a"
-          );
+          state.activeTab =
+            tab.dataset.tab;
 
-        anchor.href =
-          url;
+          outputEditor.value =
+            state.extracted[
+              state.activeTab
+            ] || "";
 
-        anchor.download =
-          "ultra-structured-extraction.md";
-
-        document.body.appendChild(
-          anchor
-        );
-
-        anchor.click();
-        anchor.remove();
-
-        setTimeout(
-          () => {
-            URL.revokeObjectURL(
-              url
-            );
-          },
-          1000
-        );
-
-      }
-    );
-
-    insertIllegibleBtn.addEventListener(
-      "click",
-      () => {
-
-        const start =
-          editor.selectionStart;
-
-        const end =
-          editor.selectionEnd;
-
-        const value =
-          editor.value;
-
-        const text =
-          "[Illegible]";
-
-        editor.value =
-          value.slice(
-            0,
-            start
-          ) +
-          text +
-          value.slice(
-            end
-          );
-
-        const position =
-          start +
-          text.length;
-
-        editor.selectionStart =
-          position;
-
-        editor.selectionEnd =
-          position;
-
-        editor.focus();
-
-        updateStats();
-
-      }
-    );
-
-    /* =====================================================
-       CLEAR
-       ===================================================== */
-
-    clearBtn.addEventListener(
-      "click",
-      () => {
-
-        if (state.busy) {
-          return;
+          updateStats();
         }
+      );
+    }
+  );
 
-        state.files =
-          [];
+  outputEditor.addEventListener(
+    "input",
+    () => {
+      state.extracted[
+        state.activeTab
+      ] =
+        outputEditor.value;
 
-        state.pages =
-          [];
+      updateStats();
+    }
+  );
 
-        fileInput.value =
-          "";
-
-        editor.value =
-          "";
-
-        ocrLog.textContent =
-          "";
-
-        progressSection.style.display =
-          "none";
-
-        setProgress(
-          0,
-          ""
+  copyBtn.addEventListener(
+    "click",
+    async () => {
+      if (
+        !outputEditor.value
+      ) {
+        showToast(
+          "No extracted content."
         );
 
-        renderFileList();
-        renderPreviews();
-        updateStats();
+        return;
+      }
+
+      try {
+        await navigator
+          .clipboard
+          .writeText(
+            outputEditor.value
+          );
 
         showToast(
-          "Workspace cleared."
+          "Copied to clipboard."
+        );
+      } catch {
+        outputEditor.select();
+
+        document.execCommand(
+          "copy"
         );
 
+        showToast(
+          "Copied to clipboard."
+        );
       }
-    );
+    }
+  );
 
-    extractBtn.addEventListener(
-      "click",
-      extractDocuments
-    );
+  downloadBtn.addEventListener(
+    "click",
+    () => {
+      const content =
+        outputEditor.value;
 
-    /* =====================================================
-       INITIALIZE
-       ===================================================== */
+      if (!content) {
+        showToast(
+          "No extracted content."
+        );
 
-    renderFileList();
-    updateStats();
+        return;
+      }
 
-  </script>
+      const extensions = {
+        markdown: "md",
+        text: "txt",
+        html: "html"
+      };
+
+      const mimeTypes = {
+        markdown:
+          "text/markdown;charset=utf-8",
+        text:
+          "text/plain;charset=utf-8",
+        html:
+          "text/html;charset=utf-8"
+      };
+
+      const blob =
+        new Blob(
+          [content],
+          {
+            type:
+              mimeTypes[
+                state.activeTab
+              ]
+          }
+        );
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+      const anchor =
+        document.createElement(
+          "a"
+        );
+
+      anchor.href =
+        url;
+
+      anchor.download =
+        `document-extraction.${
+          extensions[
+            state.activeTab
+          ]
+        }`;
+
+      document.body.appendChild(
+        anchor
+      );
+
+      anchor.click();
+      anchor.remove();
+
+      setTimeout(
+        () => {
+          URL.revokeObjectURL(
+            url
+          );
+        },
+        1000
+      );
+    }
+  );
+
+  markIllegibleBtn.addEventListener(
+    "click",
+    () => {
+      const start =
+        outputEditor.selectionStart;
+
+      const end =
+        outputEditor.selectionEnd;
+
+      const value =
+        outputEditor.value;
+
+      const marker =
+        "[Illegible]";
+
+      outputEditor.value =
+        value.slice(
+          0,
+          start
+        ) +
+        marker +
+        value.slice(
+          end
+        );
+
+      const position =
+        start +
+        marker.length;
+
+      outputEditor.selectionStart =
+        position;
+
+      outputEditor.selectionEnd =
+        position;
+
+      outputEditor.focus();
+
+      state.extracted[
+        state.activeTab
+      ] =
+        outputEditor.value;
+
+      updateStats();
+    }
+  );
+
+  /* ======================================================
+     CLEAR
+     ====================================================== */
+
+  clearBtn.addEventListener(
+    "click",
+    async () => {
+      if (
+        state.busy
+      ) {
+        return;
+      }
+
+      state.files =
+        [];
+
+      state.pages =
+        [];
+
+      state.extracted = {
+        markdown: "",
+        text: "",
+        html: ""
+      };
+
+      outputEditor.value =
+        "";
+
+      fileInput.value =
+        "";
+
+      ocrLog.textContent =
+        "";
+
+      progressWrap.style.display =
+        "none";
+
+      setProgress(
+        0,
+        ""
+      );
+
+      updateFileUI();
+
+      await renderAllPreviews();
+
+      updateStats();
+
+      showToast(
+        "Workspace cleared."
+      );
+    }
+  );
+
+  /* ======================================================
+     STATS
+     ====================================================== */
+
+  function updateStats() {
+    const value =
+      outputEditor.value || "";
+
+    const words =
+      value.trim()
+        ? value
+            .trim()
+            .split(/\s+/)
+            .length
+        : 0;
+
+    statDocuments.textContent =
+      state.files.length;
+
+    statPages.textContent =
+      state.pages.length;
+
+    statWords.textContent =
+      words.toLocaleString();
+
+    statChars.textContent =
+      value.length
+        .toLocaleString();
+  }
+
+  window.addEventListener(
+    "beforeunload",
+    event => {
+      if (
+        outputEditor.value.trim()
+      ) {
+        event.preventDefault();
+
+        event.returnValue =
+          "";
+      }
+    }
+  );
+
+  updateFileUI();
+  updateStats();
+</script>
 
 </body>
 </html>
