@@ -1521,35 +1521,34 @@
   let activeOcrLogger = null;
 
   async function getPersistentOcrWorker(language, kind = "fast") {
-    const lang = String(language || "eng").trim();
+    const lang = String(language || "eng").trim() || "eng";
     const isFast = kind === "fast";
-    const worker = isFast ? fastOcrWorker : deepOcrWorker;
+    let worker = isFast ? fastOcrWorker : deepOcrWorker;
     const currentLang = isFast ? fastOcrLanguage : deepOcrLanguage;
     const pending = isFast ? fastOcrWorkerPromise : deepOcrWorkerPromise;
-
     if (worker && currentLang === lang) return worker;
     if (pending) return pending;
-
-    const promise = Tesseract.createWorker(lang, 1, {
-      logger: message => {
-        if (typeof activeOcrLogger === "function") activeOcrLogger(message);
+    if (worker && currentLang !== lang) {
+      try { await worker.terminate(); } catch (_) {}
+      if (isFast) { fastOcrWorker = null; fastOcrLanguage = ""; }
+      else { deepOcrWorker = null; deepOcrLanguage = ""; }
+    }
+    const promise = (async () => {
+      if (!window.Tesseract || typeof Tesseract.createWorker !== "function") {
+        throw new Error("Tesseract.js did not load. Check CDN/network access.");
       }
-    }).then(created => {
-      if (isFast) {
-        fastOcrWorker = created;
-        fastOcrLanguage = lang;
-      } else {
-        deepOcrWorker = created;
-        deepOcrLanguage = lang;
-      }
+      const created = await Tesseract.createWorker(lang, 1, {
+        logger: message => { if (typeof activeOcrLogger === "function") activeOcrLogger(message); }
+      });
+      if (isFast) { fastOcrWorker = created; fastOcrLanguage = lang; }
+      else { deepOcrWorker = created; deepOcrLanguage = lang; }
       return created;
-    }).finally(() => {
-      if (isFast) fastOcrWorkerPromise = null;
-      else deepOcrWorkerPromise = null;
-    });
-
-    if (isFast) fastOcrWorkerPromise = promise;
-    else deepOcrWorkerPromise = promise;
+    })().catch(error => {
+      if (isFast) { fastOcrWorker = null; fastOcrLanguage = ""; }
+      else { deepOcrWorker = null; deepOcrLanguage = ""; }
+      throw error;
+    }).finally(() => { if (isFast) fastOcrWorkerPromise = null; else deepOcrWorkerPromise = null; });
+    if (isFast) fastOcrWorkerPromise = promise; else deepOcrWorkerPromise = promise;
     return promise;
   }
 
@@ -1672,7 +1671,7 @@
   ].join("+");
 
   function resolveOcrLanguage() {
-    if (ocrLanguage.value === "AUTO_BROAD") return BROAD_MULTILINGUAL_LANGS;
+    if (ocrLanguage.value === "AUTO_BROAD") return "eng+msa";
     if (ocrLanguage.value === "custom") {
       const value = String(customOcrLanguage.value || "").trim();
       if (!value) throw new Error("Enter at least one valid Tesseract language code.");
@@ -4249,7 +4248,7 @@
     let fastResult;
     try {
       fastResult = await queuedWorkerRecognize(
-        prepared.originalDataUrl || prepared.dataUrl,
+        fastInput,
         language,
         {
           logger: progressLogger,
@@ -4261,7 +4260,20 @@
         "fast"
       );
     } catch (error) {
-      throw new Error(`Fast OCR failed: ${error?.message || error}`);
+      log(`FAST OCR primary language failed: ${error?.message || error}`);
+      if (language !== "eng") {
+        log("Retrying FAST OCR with fallback language: eng");
+        try {
+          fastResult = await queuedWorkerRecognize(fastInput, "eng", {
+            logger: progressLogger,
+            config: { tessedit_pageseg_mode: "3", preserve_interword_spaces: "1" }
+          }, "fast");
+        } catch (fallbackError) {
+          throw new Error(`Fast OCR failed. Primary: ${error?.message || error}. Fallback: ${fallbackError?.message || fallbackError}`);
+        }
+      } else {
+        throw new Error(`Fast OCR failed: ${error?.message || error}`);
+      }
     }
 
     const fastParsed = rebuildOcrLines(fastResult);
@@ -5577,6 +5589,16 @@ ${bodyHtml}
   updateFileUI();
   updateAccuracySummary();
   updateStats();
+
+  window.addEventListener("error", event => {
+    console.error("NeuroOCR runtime error:", event.error || event.message);
+    if (state.busy) log(`Runtime error: ${event.message || "Unknown error"}`);
+  });
+  window.addEventListener("unhandledrejection", event => {
+    console.error("NeuroOCR promise error:", event.reason);
+    if (state.busy) log(`Async error: ${event.reason?.message || event.reason || "Unknown error"}`);
+    event.preventDefault();
+  });
 
   // Warm the common Malaysian OCR model in the background so the first user
   // extraction does not pay the worker-startup cost. This never blocks the UI.
