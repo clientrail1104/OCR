@@ -1119,7 +1119,7 @@
               <input id="customOcrLanguage" class="control" type="text"
                 placeholder="e.g. eng+msa+chi_sim+jpn+kor" style="display:none;margin-top:6px"
                 autocomplete="off" spellcheck="false" />
-              <small class="field-help"></small>
+              <small class="field-help">AUTO automatically selects the broad multilingual OCR profile. You do not need to enter a language code. Use Custom only when you know a specific Tesseract trained-data code.</small>
             </div>
 
             <div class="field">
@@ -1488,6 +1488,8 @@
     busy: false,
     ocrMetrics: [],
     pageEvidence: {},
+    deepJobs: {},
+    livePages: [],
 
     extracted: {
       markdown: "",
@@ -4115,6 +4117,15 @@
     return evidence;
   }
 
+  /* ======================================================
+     FAST-FIRST OCR
+     ======================================================
+     User-facing results are never blocked by the expensive verification
+     pipeline. The first reliable OCR observation is returned immediately;
+     deeper passes continue in the background and replace the page result
+     only when they have additional evidence. No guessed text is inserted.
+  */
+
   async function recognizeImage(
     dataUrl,
     pageIndex,
@@ -4123,36 +4134,97 @@
     const prepared = await prepareImageForOcr(dataUrl);
     const language = resolveOcrLanguage();
 
-    if (prepared.qrCount > 0) {
-      log(`${prepared.qrCount} QR region(s) masked before OCR`);
-    }
-
     log(`OCR input ${prepared.width}×${prepared.height}px`);
-    log(`ULTRA mode: independent multi-pass visual consensus`);
-    log(`Languages: ${language}`);
+    log(`FAST-FIRST mode: first OCR result is shown immediately`);
+    log(`Background verification will continue without blocking the result`);
 
     const progressLogger = message => {
       if (typeof message.progress === "number") {
         const overall = ((pageIndex + message.progress) / totalPages) * 100;
-        setProgress(overall, `OCR page ${pageIndex + 1} of ${totalPages}`);
+        setProgress(Math.min(overall, 100), `Reading page ${pageIndex + 1} of ${totalPages}`);
       }
       if (message.status) progressLabel.textContent = message.status;
     };
 
+    let fastResult;
+    try {
+      fastResult = await Tesseract.recognize(
+        prepared.originalDataUrl || prepared.dataUrl,
+        language,
+        {
+          logger: progressLogger,
+          config: {
+            tessedit_pageseg_mode: "3",
+            preserve_interword_spaces: "1"
+          }
+        }
+      );
+    } catch (error) {
+      throw new Error(`Fast OCR failed: ${error?.message || error}`);
+    }
+
+    const fastParsed = rebuildOcrLines(fastResult);
+    state.ocrMetrics.push({
+      confidence: fastParsed.confidence,
+      lowConfidenceLines: fastParsed.lowConfidenceLines.length,
+      conflicts: 0,
+      passes: 1,
+      phase: "fast"
+    });
+
+    /*
+      Start deep verification, but DO NOT await it here. This is the key
+      latency fix. The result is available to the UI as soon as this first
+      OCR pass finishes.
+    */
+    state.deepJobs[pageIndex] = runBackgroundVerification(
+      prepared,
+      fastResult,
+      fastParsed,
+      pageIndex,
+      totalPages,
+      language
+    ).catch(error => {
+      log(`Background verification stopped: ${error?.message || error}`);
+      return null;
+    });
+
+    log(`FAST RESULT READY — page ${pageIndex + 1}`);
+    return fastParsed.text;
+  }
+
+  async function runBackgroundVerification(
+    prepared,
+    fastResult,
+    fastParsed,
+    pageIndex,
+    totalPages,
+    language
+  ) {
+    const progressLogger = message => {
+      if (typeof message.progress === "number") {
+        // Keep background work visually unobtrusive. Never reset progress to
+        // a lower value while the fast result is already visible.
+        const base = Math.max(0, (pageIndex / totalPages) * 100);
+        const span = 100 / totalPages;
+        const value = Math.min(99, base + message.progress * span);
+        setProgress(Math.max(value, 1), `Verifying page ${pageIndex + 1} in background`);
+      }
+    };
+
+    const results = [fastResult];
     const configs = [
-      { name: "layout", psm: "6" },
       { name: "sparse", psm: "11" },
-      { name: "single_block", psm: "4" },
-      { name: "uniform", psm: "3" }
+      { name: "layout", psm: "6" },
+      { name: "single_block", psm: "4" }
     ];
 
-    const results = [];
-    for (let i = 0; i < configs.length; i++) {
-      const cfg = configs[i];
-      log(`Visual pass ${i + 1}/${configs.length}: ${cfg.name}`);
+    // Limit background work to the original image. Running every preprocessing
+    // variant through every PSM is much slower and usually duplicates evidence.
+    for (const cfg of configs) {
       try {
         const result = await Tesseract.recognize(
-          prepared.dataUrl,
+          prepared.originalDataUrl || prepared.dataUrl,
           language,
           {
             logger: progressLogger,
@@ -4164,43 +4236,50 @@
         );
         results.push(result);
       } catch (error) {
-        log(`Pass ${cfg.name} unavailable: ${error?.message || error}`);
+        log(`Background pass ${cfg.name} skipped: ${error?.message || error}`);
       }
     }
 
-    if (!results.length) {
-      throw new Error("All OCR passes failed. No text was extracted.");
-    }
+    let parsed = consensusOcrPasses(results);
+    let evidence = null;
 
-    // If the first evidence pass strongly identifies a Malaysian MyKad, run
-    // focused region OCR. This is not a correction step: it is a second visual
-    // observation of small fields that can be missed by full-page segmentation.
-    const firstPassText = String(results[0]?.data?.text || "");
-    let targetedEvidence = null;
+    // Targeted MyKad OCR is also background-only. It can improve small fields
+    // without delaying the initial document result.
+    const firstPassText = String(fastResult?.data?.text || "");
     if (looksLikeMyKadAnchorText(firstPassText)) {
-      log("MyKad anchors detected — running focused field-region OCR");
-      targetedEvidence = await recognizeTargetedMyKadRegions(prepared, progressLogger);
-      state.pageEvidence[pageIndex] = targetedEvidence;
+      log("MyKad anchors detected — targeted verification running in background");
+      try {
+        evidence = await recognizeTargetedMyKadRegions(
+          prepared,
+          progressLogger
+        );
+        state.pageEvidence[pageIndex] = evidence;
+      } catch (error) {
+        log(`Targeted MyKad verification skipped: ${error?.message || error}`);
+      }
     }
 
-    const parsed = consensusOcrPasses(results);
     state.ocrMetrics.push({
       confidence: parsed.confidence,
       lowConfidenceLines: parsed.lowConfidenceLines.length,
       conflicts: parsed.conflicts?.length || 0,
-      passes: results.length
+      passes: results.length,
+      phase: "deep"
     });
 
-    if (parsed.conflicts?.length) {
-      log(`${parsed.conflicts.length} disagreement(s) retained as verification flags`);
-    }
-    if (parsed.lowConfidenceLines.length) {
-      log(`${parsed.lowConfidenceLines.length} line(s) require verification — no guessing applied`);
-    } else {
-      log("No low-confidence lines detected by the OCR engine");
+    const pageMarkdown = structureTextToMarkdown(parsed.text, evidence);
+    const pageText = parsed.text || fastParsed.text || "[Illegible]";
+
+    if (state.livePages[pageIndex]) {
+      state.livePages[pageIndex].text = pageText;
+      state.livePages[pageIndex].markdown = pageMarkdown || "[Illegible]";
+      refreshLiveOutput();
+      log(`DEEP RESULT READY — page ${pageIndex + 1}; visible result updated`);
     }
 
-    return parsed.text;
+    updateAccuracySummary();
+    updateStats();
+    return { text: pageText, markdown: pageMarkdown, evidence };
   }
 
   /* ======================================================
@@ -4657,6 +4736,34 @@ ${bodyHtml}
   }
 
   /* ======================================================
+     LIVE OUTPUT
+     ====================================================== */
+
+  function refreshLiveOutput() {
+    const pages = state.livePages.filter(Boolean);
+    const markdownDocuments = pages.map(x =>
+      `${x.metadata}\n\n${x.markdown || "[Illegible]"}`
+    );
+    const textDocuments = pages.map(x =>
+      `${x.fileName}\nPAGE: ${x.pageNumber}/${x.totalPages}\n\n${x.text || "[Illegible]"}`
+    );
+    const htmlDocuments = pages.map(x =>
+      `<section class="document-page" data-document="${escapeHtml(x.fileName)}" data-page="${x.pageNumber}">
+        <div class="document-meta">${escapeHtml(x.fileName)} · Page ${x.pageNumber}/${x.totalPages}</div>
+        ${markdownToHtml(x.markdown || "[Illegible]")}
+      </section>`
+    );
+
+    state.extracted.markdown = markdownDocuments.join("\n\n---\n\n");
+    state.extracted.text = textDocuments.join("\n\n========================================\n\n");
+    state.extracted.html = createExportHtml(htmlDocuments.join("\n\n"));
+
+    outputEditor.value = state.extracted[state.activeTab];
+    updateAccuracySummary();
+    updateStats();
+  }
+
+  /* ======================================================
      EXTRACTION
      ====================================================== */
 
@@ -4689,6 +4796,8 @@ ${bodyHtml}
     const htmlDocuments = [];
     state.ocrMetrics = [];
     state.pageEvidence = {};
+    state.deepJobs = {};
+    state.livePages = [];
 
     const totalPages =
       state.pages.length || 1;
@@ -4829,70 +4938,47 @@ ${bodyHtml}
         const metadataComment =
           `<!-- FILE: ${file.name} | PAGE: ${page.pageNumber}/${page.totalPages || 1} -->`;
 
-        markdownDocuments.push(
-          `${metadataComment}\n\n${pageMarkdown || "[Illegible]"}`
-        );
+        state.livePages[index] = {
+          fileName: file.name,
+          pageNumber: page.pageNumber,
+          totalPages: page.totalPages || 1,
+          metadata: metadataComment,
+          text: pageText || "[Illegible]",
+          markdown: pageMarkdown || "[Illegible]"
+        };
 
-        textDocuments.push(
-          `FILE: ${file.name}\n` +
-          `PAGE: ${page.pageNumber}/${page.totalPages || 1}\n\n` +
-          `${pageText || "[Illegible]"}`
-        );
-
-        htmlDocuments.push(
-          `<section class="document-page" data-document="${escapeHtml(file.name)}" data-page="${page.pageNumber}">
-            <div class="document-meta">
-              ${escapeHtml(file.name)} · Page ${page.pageNumber}/${page.totalPages || 1}
-            </div>
-            ${markdownToHtml(pageMarkdown || "[Illegible]")}
-          </section>`
-        );
+        // Publish immediately. Do not wait for the expensive verification jobs.
+        refreshLiveOutput();
 
         setProgress(
-          (
-            (index + 1) /
-            totalPages
-          ) * 100,
-          `Completed ${index + 1} of ${totalPages}`
+          Math.max(
+            ((index + 1) / totalPages) * 100,
+            1
+          ),
+          `FAST RESULT READY · ${index + 1} of ${totalPages}`
         );
+
+        log(`Instant result published for ${file.name} · page ${page.pageNumber}`);
       }
 
-      state.extracted.markdown =
-        markdownDocuments.join(
-          "\n\n---\n\n"
-        );
-
-      state.extracted.text =
-        textDocuments.join(
-          "\n\n========================================\n\n"
-        );
-
-      state.extracted.html =
-        createExportHtml(
-          htmlDocuments.join(
-            "\n\n"
-          )
-        );
-
-      outputEditor.value =
-        state.extracted[
-          state.activeTab
-        ];
+      // The output has already been published page-by-page. Keep the current
+      // fast result visible while background verification continues.
+      refreshLiveOutput();
 
       setProgress(
         100,
-        "Extraction completed"
+        "Fast extraction ready · verification continues in background"
       );
 
       log(
-        "Extraction completed."
+        "Fast extraction completed. Background verification is still running where applicable."
       );
 
       updateAccuracySummary();
       updateStats();
 
       showToast(
-        "Document extraction completed."
+        "Instant extraction ready. Deep verification continues in background."
       );
     } catch (
       error
