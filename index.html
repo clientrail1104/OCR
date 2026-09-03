@@ -4226,15 +4226,17 @@
     pageIndex,
     totalPages
   ) {
-    // Critical-path optimization: FAST OCR starts from the source image immediately.
-    // Upscaling/enhancement is prepared concurrently for later verification.
-    const preparedPromise = prepareImageForOcr(dataUrl);
-    const isAuto = ocrLanguage.value === "AUTO_BROAD";
-    const language = isAuto ? "eng+msa" : resolveOcrLanguage();
-    const deepLanguage = resolveOcrLanguage();
+    // FAST PATH: never wait for enhancement before the first OCR result.
+    // Enhancement runs concurrently and is used by background verification.
+    const language = resolveOcrLanguage();
+    const preparedPromise = prepareImageForOcr(dataUrl).catch(error => {
+      log(`Enhanced image preparation skipped: ${error?.message || error}`);
+      return { originalDataUrl: dataUrl, dataUrl, width: 0, height: 0 };
+    });
 
-    log(`FAST OCR starts immediately on source image`);
-    log(`Enhanced image preparation runs in parallel`);
+    log(`FAST OCR starting immediately on source image`);
+    log(`FAST-FIRST mode: first OCR result is shown immediately`);
+    log(`Background verification will continue without blocking the result`);
 
     const progressLogger = message => {
       if (typeof message.progress === "number") {
@@ -4276,18 +4278,16 @@
       latency fix. The result is available to the UI as soon as this first
       OCR pass finishes.
     */
-    state.deepJobs[pageIndex] = (async () => {
-      const prepared = await preparedPromise;
-      log(`Enhanced image ready: ${prepared.width}×${prepared.height}px`);
-      return runBackgroundVerification(
+    state.deepJobs[pageIndex] = preparedPromise.then(prepared =>
+      runBackgroundVerification(
         prepared,
         fastResult,
-        fastParsed,
-        pageIndex,
+      fastParsed,
+      pageIndex,
         totalPages,
-        deepLanguage
-      );
-    })().catch(error => {
+        language
+      )
+    ).catch(error => {
       log(`Background verification stopped: ${error?.message || error}`);
       return null;
     });
