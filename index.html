@@ -797,6 +797,55 @@
       font-weight: 900;
     }
 
+    .accuracy-card {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 8px;
+      border-radius: 10px;
+      box-shadow: var(--neu-inset);
+      font-size: 6px;
+    }
+
+    .accuracy-ring {
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--accent-dark);
+      box-shadow: var(--neu-small);
+      font-size: 6px;
+      font-weight: 900;
+    }
+
+    .accuracy-card strong {
+      display: block;
+      font-size: 7px;
+    }
+
+    .accuracy-card span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
+    .confidence-badge {
+      padding: 4px 6px;
+      border-radius: 999px;
+      box-shadow: var(--neu-small);
+      font-size: 5.5px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .uncertain-line {
+      border-left: 2px solid var(--danger);
+      padding-left: 7px;
+    }
+
     .hidden {
       display: none !important;
     }
@@ -1066,7 +1115,7 @@
               </div>
 
               <label class="switch">
-                <input id="excludeQR" type="checkbox" checked />
+                <input id="excludeQR" type="checkbox" />
                 <span class="slider"></span>
               </label>
             </div>
@@ -1078,7 +1127,7 @@
               </div>
 
               <label class="switch">
-                <input id="excludeSignatures" type="checkbox" checked />
+                <input id="excludeSignatures" type="checkbox" />
                 <span class="slider"></span>
               </label>
             </div>
@@ -1146,11 +1195,20 @@
           </div>
 
           <div class="strict-note">
-            <strong>Strict mode:</strong>
-            extract visible text in source order without summarising,
-            rewriting or correcting wording. QR content and handwritten
-            signature strokes are omitted. Completely unreadable content
-            may be marked <strong>[Illegible]</strong>.
+            <strong>Strict mode:</strong> extract only source-visible content.
+            No spelling correction, inference, normalization of ambiguous values,
+            or silent replacement is performed. Low-confidence OCR is flagged rather
+            than guessed. Background artifacts are ignored only when they are detected
+            as non-text noise.
+          </div>
+
+          <div class="accuracy-card">
+            <div class="accuracy-ring" id="accuracyRing">—</div>
+            <div>
+              <strong id="accuracyTitle">Fidelity guard ready</strong>
+              <span id="accuracyDetail">OCR confidence is reported from the OCR engine; it is not a guarantee of correctness.</span>
+            </div>
+            <span class="confidence-badge" id="confidenceBadge">NO RUN</span>
           </div>
 
           <button
@@ -1373,6 +1431,7 @@
     files: [],
     pages: [],
     busy: false,
+    ocrMetrics: [],
 
     extracted: {
       markdown: "",
@@ -1484,6 +1543,18 @@
 
   const toast =
     document.getElementById("toast");
+
+  const accuracyRing =
+    document.getElementById("accuracyRing");
+
+  const accuracyTitle =
+    document.getElementById("accuracyTitle");
+
+  const accuracyDetail =
+    document.getElementById("accuracyDetail");
+
+  const confidenceBadge =
+    document.getElementById("confidenceBadge");
 
   /* ======================================================
      BASIC UTILITIES
@@ -1752,14 +1823,22 @@
   async function addFiles(
     collection
   ) {
-    const supported =
-      [...collection]
-        .filter(
-          file =>
-            isImage(file) ||
-            isPdf(file) ||
-            isDocx(file)
-        );
+    const MAX_FILE_SIZE = 500 * 1024 * 1024;
+    const candidates = [...collection];
+
+    const supported = candidates
+      .filter(file =>
+        isImage(file) ||
+        isPdf(file) ||
+        isDocx(file)
+      )
+      .filter(file => {
+        if (file.size > MAX_FILE_SIZE) {
+          showToast(`${file.name}: maximum file size is 500 MB.`);
+          return false;
+        }
+        return true;
+      });
 
     if (!supported.length) {
       showToast(
@@ -2457,86 +2536,97 @@
     return count;
   }
 
+  function clampByte(value) {
+    return Math.max(0, Math.min(255, Math.round(value)));
+  }
+
+  function preprocessCanvasForOcr(
+    sourceCanvas
+  ) {
+    const canvas = document.createElement("canvas");
+    canvas.width = sourceCanvas.width;
+    canvas.height = sourceCanvas.height;
+
+    const ctx = canvas.getContext("2d", {
+      willReadFrequently: true
+    });
+
+    ctx.drawImage(sourceCanvas, 0, 0);
+
+    const imageData = ctx.getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    const data = imageData.data;
+
+    /*
+      Conservative grayscale + contrast + unsharp enhancement.
+      No thresholding is used because it can destroy faint strokes,
+      coloured security printing, thin table borders, and small text.
+    */
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const contrasted = (gray - 128) * 1.18 + 128;
+      const v = clampByte(contrasted);
+      data[i] = v;
+      data[i + 1] = v;
+      data[i + 2] = v;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+
+    return canvas;
+  }
+
   async function prepareImageForOcr(
     dataUrl
   ) {
-    const image =
-      await loadImage(
-        dataUrl
-      );
+    const image = await loadImage(dataUrl);
 
-    /*
-      Upscale smaller scans to improve character recognition.
-    */
+    const maxDimension = 3600;
+    const targetMinimumWidth = 2200;
+    const naturalWidth = image.naturalWidth || image.width;
+    const naturalHeight = image.naturalHeight || image.height;
 
-    const targetMinimumWidth =
-      1800;
+    let scale = 1;
 
-    const scale =
-      image.naturalWidth <
-      targetMinimumWidth
-        ? Math.min(
-            2,
-            targetMinimumWidth /
-            image.naturalWidth
-          )
-        : 1;
+    if (naturalWidth < targetMinimumWidth) {
+      scale = Math.min(2.5, targetMinimumWidth / naturalWidth);
+    }
 
-    const canvas =
-      document.createElement(
-        "canvas"
-      );
+    if (Math.max(naturalWidth, naturalHeight) * scale > maxDimension) {
+      scale = maxDimension / Math.max(naturalWidth, naturalHeight);
+    }
 
-    canvas.width =
-      Math.round(
-        image.naturalWidth *
-        scale
-      );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(naturalHeight * scale));
 
-    canvas.height =
-      Math.round(
-        image.naturalHeight *
-        scale
-      );
+    const context = canvas.getContext("2d", {
+      willReadFrequently: true
+    });
 
-    const context =
-      canvas.getContext(
-        "2d",
-        {
-          willReadFrequently: true
-        }
-      );
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-    context.fillStyle =
-      "#ffffff";
-
-    context.fillRect(
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    context.drawImage(
-      image,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    const qrCount =
-      maskQrCodes(
-        canvas,
-        context
-      );
+    const qrCount = maskQrCodes(canvas, context);
+    const enhanced = preprocessCanvasForOcr(canvas);
 
     return {
-      dataUrl:
-        canvas.toDataURL(
-          "image/png"
-        ),
-      qrCount
+      originalDataUrl: canvas.toDataURL("image/png"),
+      dataUrl: enhanced.toDataURL("image/png"),
+      qrCount,
+      width: canvas.width,
+      height: canvas.height
     };
   }
 
@@ -2547,128 +2637,26 @@
   function normalizeOcrText(
     text
   ) {
+    /*
+      Fidelity rule: never collapse internal whitespace, never repair
+      punctuation, and never delete a line merely because it looks unusual.
+      Only transport-level newline normalization is applied.
+    */
     return String(text || "")
       .replace(/\r\n/g, "\n")
       .replace(/\r/g, "\n")
-      .replace(/\u00AD/g, "")
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{5,}/g, "\n\n\n")
-      .trim();
-  }
-
-  function isDenseVisualNoise(
-    line
-  ) {
-    const value =
-      line.trim();
-
-    if (!value) {
-      return false;
-    }
-
-    const lettersAndNumbers =
-      (
-        value.match(
-          /[\p{L}\p{N}]/gu
-        ) || []
-      ).length;
-
-    const symbols =
-      (
-        value.match(
-          /[^\p{L}\p{N}\s]/gu
-        ) || []
-      ).length;
-
-    return (
-      value.length >= 5 &&
-      lettersAndNumbers <= 1 &&
-      symbols >= 3
-    );
-  }
-
-  function isQrLikeNoise(
-    line
-  ) {
-    const value =
-      line.trim();
-
-    if (
-      !value ||
-      value.length < 8
-    ) {
-      return false;
-    }
-
-    const alphanumeric =
-      (
-        value.match(
-          /[\p{L}\p{N}]/gu
-        ) || []
-      ).length;
-
-    const punctuation =
-      (
-        value.match(
-          /[^\p{L}\p{N}\s]/gu
-        ) || []
-      ).length;
-
-    return (
-      alphanumeric <= 2 &&
-      punctuation >= 6
-    );
+      .replace(/\u00AD/g, "");
   }
 
   function cleanExtractedText(
     text
   ) {
-    let value =
-      normalizeOcrText(
-        text
-      );
-
-    let lines =
-      value.split("\n");
-
-    if (
-      excludeSignatures.checked
-    ) {
-      /*
-        A handwritten signature is visual content rather than
-        textual content. OCR residue consisting almost entirely
-        of stroke-like symbols is omitted. Nearby printed names,
-        positions and dates remain untouched.
-      */
-
-      lines =
-        lines.filter(
-          line =>
-            !isDenseVisualNoise(
-              line
-            )
-        );
-    }
-
-    if (
-      excludeQR.checked
-    ) {
-      lines =
-        lines.filter(
-          line =>
-            !isQrLikeNoise(
-              line
-            )
-        );
-    }
-
-    return lines
-      .join("\n")
-      .replace(
-        /\n{5,}/g,
-        "\n\n\n"
-      )
-      .trim();
+    /*
+      OCR output is evidence. Do not remove text using punctuation heuristics:
+      those heuristics can delete legitimate IDs, dates, signatures rendered as
+      text, short fields, or legal symbols. Actual QR masking happens before OCR.
+    */
+    return normalizeOcrText(text);
   }
 
   /* ======================================================
@@ -3446,64 +3434,101 @@
      OCR
      ====================================================== */
 
+  function rebuildOcrLines(result) {
+    const lines = Array.isArray(result?.data?.lines)
+      ? result.data.lines
+      : [];
+
+    if (!lines.length) {
+      return {
+        text: cleanExtractedText(result?.data?.text || ""),
+        confidence: Number(result?.data?.confidence || 0),
+        lowConfidenceLines: []
+      };
+    }
+
+    const ordered = lines
+      .map((line, index) => ({
+        index,
+        text: String(line.text ?? ""),
+        confidence: Number(line.confidence ?? 0),
+        bbox: line.bbox || {}
+      }))
+      .filter(line => line.text !== "")
+      .sort((a, b) => {
+        const ay = Number(a.bbox.y0 ?? a.bbox.top ?? 0);
+        const by = Number(b.bbox.y0 ?? b.bbox.top ?? 0);
+        const ax = Number(a.bbox.x0 ?? a.bbox.left ?? 0);
+        const bx = Number(b.bbox.x0 ?? b.bbox.left ?? 0);
+        if (Math.abs(ay - by) > 4) return ay - by;
+        return ax - bx;
+      });
+
+    const confidenceValues = ordered
+      .map(line => line.confidence)
+      .filter(value => Number.isFinite(value));
+
+    const confidence = confidenceValues.length
+      ? confidenceValues.reduce((sum, value) => sum + value, 0) / confidenceValues.length
+      : Number(result?.data?.confidence || 0);
+
+    const lowConfidenceLines = ordered
+      .filter(line => line.text.trim() && line.confidence < 72)
+      .map(line => ({
+        text: line.text,
+        confidence: line.confidence
+      }));
+
+    return {
+      text: cleanExtractedText(ordered.map(line => line.text).join("\n")),
+      confidence,
+      lowConfidenceLines
+    };
+  }
+
   async function recognizeImage(
     dataUrl,
     pageIndex,
     totalPages
   ) {
-    const prepared =
-      await prepareImageForOcr(
-        dataUrl
-      );
+    const prepared = await prepareImageForOcr(dataUrl);
 
-    if (
-      prepared.qrCount > 0
-    ) {
-      log(
-        `${prepared.qrCount} QR region(s) excluded`
-      );
+    if (prepared.qrCount > 0) {
+      log(`${prepared.qrCount} QR region(s) masked before OCR`);
     }
 
-    const result =
-      await Tesseract.recognize(
-        prepared.dataUrl,
-        ocrLanguage.value,
-        {
-          logger:
-            message => {
-              if (
-                typeof message.progress ===
-                "number"
-              ) {
-                const overall =
-                  (
-                    (
-                      pageIndex +
-                      message.progress
-                    ) /
-                    totalPages
-                  ) *
-                  100;
+    log(`OCR input ${prepared.width}×${prepared.height}px`);
 
-                setProgress(
-                  overall,
-                  `OCR page ${pageIndex + 1} of ${totalPages}`
-                );
-              }
-
-              if (
-                message.status
-              ) {
-                progressLabel.textContent =
-                  message.status;
-              }
-            }
+    const result = await Tesseract.recognize(
+      prepared.dataUrl,
+      ocrLanguage.value,
+      {
+        logger: message => {
+          if (typeof message.progress === "number") {
+            const overall = ((pageIndex + message.progress) / totalPages) * 100;
+            setProgress(
+              overall,
+              `OCR page ${pageIndex + 1} of ${totalPages}`
+            );
+          }
+          if (message.status) {
+            progressLabel.textContent = message.status;
+          }
         }
-      );
-
-    return cleanExtractedText(
-      result.data.text
+      }
     );
+
+    const parsed = rebuildOcrLines(result);
+    state.ocrMetrics.push({
+      confidence: parsed.confidence,
+      lowConfidenceLines: parsed.lowConfidenceLines.length
+    });
+
+    if (parsed.lowConfidenceLines.length) {
+      log(`${parsed.lowConfidenceLines.length} low-confidence line(s) flagged for review`);
+    }
+
+    return parsed.text;
   }
 
   /* ======================================================
@@ -3718,6 +3743,41 @@ ${bodyHtml}
 </html>`;
   }
 
+  function updateAccuracySummary() {
+    if (!state.ocrMetrics.length) {
+      accuracyRing.textContent = "—";
+      accuracyTitle.textContent = "Fidelity guard ready";
+      accuracyDetail.textContent = "OCR confidence is reported from the OCR engine; it is not a guarantee of correctness.";
+      confidenceBadge.textContent = "NO RUN";
+      return;
+    }
+
+    const values = state.ocrMetrics
+      .map(item => Number(item.confidence))
+      .filter(value => Number.isFinite(value));
+
+    const average = values.length
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
+      : 0;
+
+    const flagged = state.ocrMetrics
+      .reduce((sum, item) => sum + Number(item.lowConfidenceLines || 0), 0);
+
+    const rounded = Math.round(average);
+    accuracyRing.textContent = `${rounded}%`;
+    confidenceBadge.textContent = flagged
+      ? `${flagged} REVIEW`
+      : "STABLE";
+
+    accuracyTitle.textContent = flagged
+      ? "Review required"
+      : "OCR confidence recorded";
+
+    accuracyDetail.textContent = flagged
+      ? `${flagged} line(s) are below the confidence guard. The application does not guess or silently correct them.`
+      : "No low-confidence OCR lines were reported by the engine. Verify critical fields against the source.";
+  }
+
   /* ======================================================
      EXTRACTION
      ====================================================== */
@@ -3749,6 +3809,7 @@ ${bodyHtml}
     const markdownDocuments = [];
     const textDocuments = [];
     const htmlDocuments = [];
+    state.ocrMetrics = [];
 
     const totalPages =
       state.pages.length || 1;
@@ -3938,6 +3999,7 @@ ${bodyHtml}
         "Extraction completed."
       );
 
+      updateAccuracySummary();
       updateStats();
 
       showToast(
@@ -4203,6 +4265,7 @@ ${bodyHtml}
 
       state.pages =
         [];
+      state.ocrMetrics = [];
 
       state.extracted = {
         markdown: "",
@@ -4231,6 +4294,7 @@ ${bodyHtml}
 
       await renderAllPreviews();
 
+      updateAccuracySummary();
       updateStats();
 
       showToast(
@@ -4284,6 +4348,7 @@ ${bodyHtml}
   );
 
   updateFileUI();
+  updateAccuracySummary();
   updateStats();
 </script>
 
