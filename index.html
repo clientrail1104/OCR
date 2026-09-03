@@ -4225,6 +4225,10 @@
     pageIndex,
     totalPages
   ) {
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+      throw new Error("Invalid image data supplied to FAST OCR.");
+    }
+
     // FAST PATH: never wait for enhancement before the first OCR result.
     // Enhancement runs concurrently and is used by background verification.
     const language = resolveOcrLanguage();
@@ -4248,7 +4252,7 @@
     let fastResult;
     try {
       fastResult = await queuedWorkerRecognize(
-        fastInput,
+        dataUrl,
         language,
         {
           logger: progressLogger,
@@ -4264,7 +4268,7 @@
       if (language !== "eng") {
         log("Retrying FAST OCR with fallback language: eng");
         try {
-          fastResult = await queuedWorkerRecognize(fastInput, "eng", {
+          fastResult = await queuedWorkerRecognize(dataUrl, "eng", {
             logger: progressLogger,
             config: { tessedit_pageseg_mode: "3", preserve_interword_spaces: "1" }
           }, "fast");
