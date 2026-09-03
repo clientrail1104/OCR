@@ -1071,12 +1071,55 @@
               <label for="ocrLanguage">OCR LANGUAGE</label>
 
               <select id="ocrLanguage" class="control">
-                <option value="eng+msa" selected>
-                  English + Bahasa Melayu
+                <option value="AUTO_BROAD" selected>
+                  AUTO — Broad Multilingual OCR
                 </option>
+                <option value="eng+msa">English + Bahasa Melayu</option>
                 <option value="eng">English</option>
                 <option value="msa">Bahasa Melayu</option>
+                <option value="chi_sim">Chinese — Simplified</option>
+                <option value="chi_tra">Chinese — Traditional</option>
+                <option value="jpn">Japanese</option>
+                <option value="kor">Korean</option>
+                <option value="ara">Arabic</option>
+                <option value="hin">Hindi</option>
+                <option value="ben">Bengali</option>
+                <option value="tam">Tamil</option>
+                <option value="tel">Telugu</option>
+                <option value="tha">Thai</option>
+                <option value="heb">Hebrew</option>
+                <option value="rus">Russian</option>
+                <option value="ukr">Ukrainian</option>
+                <option value="deu">German</option>
+                <option value="fra">French</option>
+                <option value="spa">Spanish</option>
+                <option value="ita">Italian</option>
+                <option value="por">Portuguese</option>
+                <option value="nld">Dutch</option>
+                <option value="tur">Turkish</option>
+                <option value="vie">Vietnamese</option>
+                <option value="ind">Indonesian</option>
+                <option value="fil">Filipino</option>
+                <option value="pol">Polish</option>
+                <option value="ces">Czech</option>
+                <option value="slk">Slovak</option>
+                <option value="ron">Romanian</option>
+                <option value="ell">Greek</option>
+                <option value="bul">Bulgarian</option>
+                <option value="srp">Serbian</option>
+                <option value="hrv">Croatian</option>
+                <option value="hun">Hungarian</option>
+                <option value="swe">Swedish</option>
+                <option value="dan">Danish</option>
+                <option value="nor">Norwegian</option>
+                <option value="fin">Finnish</option>
+                <option value="ara+fas+urd">Arabic + Persian + Urdu</option>
+                <option value="custom">Custom Tesseract language codes…</option>
               </select>
+              <input id="customOcrLanguage" class="control" type="text"
+                placeholder="e.g. eng+msa+chi_sim+jpn+kor" style="display:none;margin-top:6px"
+                autocomplete="off" spellcheck="false" />
+              <small class="field-help">AUTO loads a broad multilingual set. For languages not listed, enter the Tesseract trained-data code manually.</small>
             </div>
 
             <div class="field">
@@ -1513,6 +1556,32 @@
 
   const ocrLanguage =
     document.getElementById("ocrLanguage");
+  const customOcrLanguage =
+    document.getElementById("customOcrLanguage");
+
+  // Broad language coverage. AUTO mode deliberately uses a wide set rather
+  // than translating, correcting, or guessing text. Tesseract language packs
+  // are downloaded on demand by Tesseract.js.
+  const BROAD_MULTILINGUAL_LANGS = [
+    "eng","msa","ind","fil","deu","fra","spa","ita","por","nld",
+    "tur","vie","pol","ces","slk","ron","hun","swe","dan","nor",
+    "fin","ell","bul","srp","hrv","rus","ukr","ara","fas","urd",
+    "heb","hin","ben","tam","tel","tha","chi_sim","chi_tra","jpn","kor"
+  ].join("+");
+
+  function resolveOcrLanguage() {
+    if (ocrLanguage.value === "AUTO_BROAD") return BROAD_MULTILINGUAL_LANGS;
+    if (ocrLanguage.value === "custom") {
+      const value = String(customOcrLanguage.value || "").trim();
+      if (!value) throw new Error("Enter at least one valid Tesseract language code.");
+      return value.replace(/\s+/g, "");
+    }
+    return ocrLanguage.value;
+  }
+
+  ocrLanguage.addEventListener("change", () => {
+    customOcrLanguage.style.display = ocrLanguage.value === "custom" ? "block" : "none";
+  });
 
   const outputMode =
     document.getElementById("outputMode");
@@ -3501,7 +3570,7 @@
 
     const result = await Tesseract.recognize(
       prepared.dataUrl,
-      ocrLanguage.value,
+      resolveOcrLanguage(),
       {
         logger: message => {
           if (typeof message.progress === "number") {
