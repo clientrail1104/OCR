@@ -4,82 +4,89 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>NeuroOCR</title>
+  <title>NAIKER Ultra OCR</title>
 
-  <!-- OCR -->
+  <!-- Tesseract OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-  <!-- PDF -->
+  <!-- PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <!-- DOCX -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 
+  <!-- QR Detection -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
   <style>
     :root {
       --bg: #edf2f5;
-      --bg-soft: #f5f8fa;
       --panel: #edf2f5;
-      --text: #26343c;
-      --muted: #73828b;
-      --accent: #279aa2;
-      --accent-dark: #17757b;
-      --accent-soft: #d9f1f2;
-      --success: #3f9b76;
-      --warning: #c8903f;
-      --danger: #c95d68;
 
-      --shadow-dark: rgba(163, 177, 198, 0.46);
-      --shadow-light: rgba(255, 255, 255, 0.9);
+      --text: #24343d;
+      --muted: #71818a;
+
+      --accent: #239aa2;
+      --accent-dark: #17757c;
+      --accent-soft: #d8f1f2;
+
+      --success: #37936c;
+      --warning: #c58d3e;
+      --danger: #c85b66;
+
+      --shadow-dark: rgba(159, 174, 193, 0.46);
+      --shadow-light: rgba(255, 255, 255, 0.92);
 
       --neu:
-        10px 10px 24px var(--shadow-dark),
-        -10px -10px 24px var(--shadow-light);
+        8px 8px 20px var(--shadow-dark),
+        -8px -8px 20px var(--shadow-light);
 
       --neu-small:
-        5px 5px 12px var(--shadow-dark),
-        -5px -5px 12px var(--shadow-light);
+        4px 4px 10px var(--shadow-dark),
+        -4px -4px 10px var(--shadow-light);
 
       --neu-inset:
-        inset 5px 5px 12px rgba(163, 177, 198, 0.36),
-        inset -5px -5px 12px rgba(255, 255, 255, 0.95);
+        inset 4px 4px 10px rgba(159, 174, 193, 0.34),
+        inset -4px -4px 10px rgba(255, 255, 255, 0.94);
 
-      --radius-xl: 28px;
-      --radius-lg: 20px;
-      --radius-md: 14px;
-      --radius-sm: 10px;
+      --radius-xl: 22px;
+      --radius-lg: 16px;
+      --radius-md: 12px;
     }
 
     * {
       box-sizing: border-box;
     }
 
-    html {
-      scroll-behavior: smooth;
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
     }
 
     body {
-      margin: 0;
-      min-height: 100vh;
       font-family:
         Inter,
-        ui-sans-serif,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
         Arial,
         sans-serif;
+
       color: var(--text);
+
       background:
         radial-gradient(
-          circle at 10% 10%,
-          rgba(255, 255, 255, 0.75),
-          transparent 30%
+          circle at top left,
+          rgba(255,255,255,.82),
+          transparent 32%
         ),
         radial-gradient(
-          circle at 90% 90%,
-          rgba(205, 235, 237, 0.45),
-          transparent 35%
+          circle at bottom right,
+          rgba(207,238,240,.48),
+          transparent 34%
         ),
         var(--bg);
     }
@@ -96,155 +103,221 @@
     }
 
     .app {
-      width: min(1780px, calc(100% - 30px));
-      margin: 15px auto;
-      min-height: calc(100vh - 30px);
+      width: calc(100vw - 16px);
+      height: calc(100vh - 16px);
+      margin: 8px;
+
+      display: flex;
+      flex-direction: column;
+
+      overflow: hidden;
     }
 
+    /* =====================================================
+       HEADER
+       ===================================================== */
+
     .topbar {
+      flex: 0 0 62px;
+
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 20px;
-      padding: 18px 24px;
-      border-radius: var(--radius-xl);
+
+      padding: 8px 16px;
+      margin-bottom: 10px;
+
+      border-radius: 20px;
+
       background: var(--panel);
       box-shadow: var(--neu);
-      margin-bottom: 22px;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
-      min-width: 260px;
+      gap: 12px;
     }
 
-    .brand-mark {
-      width: 52px;
-      height: 52px;
-      border-radius: 16px;
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+
       display: grid;
       place-items: center;
-      box-shadow: var(--neu-small);
+
+      border-radius: 13px;
+
       color: var(--accent);
       font-weight: 900;
-      font-size: 21px;
-      letter-spacing: -1px;
-    }
+      font-size: 17px;
 
-    .brand-text h1 {
-      margin: 0;
-      font-size: 18px;
-      line-height: 1.1;
-      letter-spacing: 0.02em;
-    }
-
-    .brand-text p {
-      margin: 5px 0 0;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .top-status {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 36px;
-      padding: 8px 13px;
-      border-radius: 999px;
-      color: var(--muted);
       background: var(--panel);
       box-shadow: var(--neu-small);
-      font-size: 12px;
-      font-weight: 700;
     }
 
-    .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      background: var(--success);
-      box-shadow: 0 0 0 4px rgba(63, 155, 118, 0.12);
+    .brand h1 {
+      margin: 0;
+
+      font-size: 15px;
+      line-height: 1.1;
     }
+
+    .brand p {
+      margin: 3px 0 0;
+
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .status-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+
+      min-height: 31px;
+      padding: 5px 10px;
+
+      border-radius: 999px;
+
+      color: var(--muted);
+
+      background: var(--panel);
+      box-shadow: var(--neu-small);
+
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+
+      border-radius: 50%;
+
+      background: var(--success);
+
+      box-shadow:
+        0 0 0 4px rgba(55,147,108,.12);
+    }
+
+    /* =====================================================
+       WORKSPACE
+       ===================================================== */
 
     .workspace {
+      flex: 1;
+      min-height: 0;
+
       display: grid;
-      grid-template-columns: minmax(310px, 0.8fr) minmax(400px, 1.2fr) minmax(400px, 1.2fr);
-      gap: 22px;
-      align-items: stretch;
+
+      grid-template-columns:
+        minmax(260px, .72fr)
+        minmax(390px, 1.12fr)
+        minmax(430px, 1.22fr);
+
+      gap: 10px;
+
+      overflow: hidden;
     }
 
     .panel {
       min-width: 0;
-      min-height: calc(100vh - 140px);
-      border-radius: var(--radius-xl);
-      background: var(--panel);
-      box-shadow: var(--neu);
-      overflow: hidden;
+      min-height: 0;
+
       display: flex;
       flex-direction: column;
+
+      border-radius: var(--radius-xl);
+
+      background: var(--panel);
+      box-shadow: var(--neu);
+
+      overflow: hidden;
     }
 
-    .panel-head {
-      padding: 20px 22px 15px;
+    .panel-header {
+      flex: 0 0 50px;
+
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-    }
 
-    .panel-title {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+      gap: 10px;
+
+      padding: 9px 14px 6px;
     }
 
     .panel-title h2 {
       margin: 0;
-      font-size: 15px;
-      letter-spacing: 0.01em;
+
+      font-size: 12px;
     }
 
     .panel-title span {
-      font-size: 11px;
+      display: block;
+
+      margin-top: 2px;
+
       color: var(--muted);
+      font-size: 8px;
     }
 
     .panel-body {
-      padding: 8px 22px 22px;
       flex: 1;
       min-height: 0;
-    }
 
-    /* UPLOAD */
-    .upload-zone {
-      position: relative;
-      min-height: 230px;
-      border-radius: 24px;
-      box-shadow: var(--neu-inset);
-      display: grid;
-      place-items: center;
-      text-align: center;
-      padding: 30px 18px;
-      cursor: pointer;
-      transition: 0.2s ease;
+      padding: 5px 14px 13px;
+
       overflow: hidden;
     }
 
+    /* =====================================================
+       INPUT
+       ===================================================== */
+
+    .input-body {
+      height: 100%;
+
+      display: flex;
+      flex-direction: column;
+
+      gap: 8px;
+    }
+
+    .upload-zone {
+      position: relative;
+
+      flex: 0 0 115px;
+
+      display: grid;
+      place-items: center;
+
+      padding: 10px;
+
+      text-align: center;
+
+      border-radius: 15px;
+
+      box-shadow: var(--neu-inset);
+
+      cursor: pointer;
+
+      transition: .18s ease;
+    }
+
+    .upload-zone:hover,
     .upload-zone.dragover {
-      transform: translateY(-2px);
-      outline: 2px dashed var(--accent);
-      outline-offset: -8px;
-      background: rgba(217, 241, 242, 0.4);
+      background: rgba(216,241,242,.44);
+
+      outline: 2px dashed rgba(35,154,162,.55);
+      outline-offset: -7px;
     }
 
     .upload-zone input {
@@ -254,101 +327,233 @@
     }
 
     .upload-icon {
-      width: 72px;
-      height: 72px;
-      margin: 0 auto 18px;
-      border-radius: 22px;
-      background: var(--panel);
-      box-shadow: var(--neu-small);
+      width: 38px;
+      height: 38px;
+
       display: grid;
       place-items: center;
+
+      margin: 0 auto 6px;
+
+      border-radius: 12px;
+
       color: var(--accent);
+
+      background: var(--panel);
+      box-shadow: var(--neu-small);
     }
 
     .upload-icon svg {
-      width: 34px;
-      height: 34px;
+      width: 20px;
+      height: 20px;
     }
 
     .upload-zone h3 {
       margin: 0;
-      font-size: 16px;
+
+      font-size: 11px;
     }
 
     .upload-zone p {
-      max-width: 310px;
-      margin: 9px auto 0;
+      margin: 3px auto 0;
+
+      max-width: 260px;
+
       color: var(--muted);
-      font-size: 12px;
-      line-height: 1.6;
+      font-size: 7.5px;
+      line-height: 1.35;
     }
 
     .upload-types {
-      margin-top: 15px;
-      font-size: 10px;
-      font-weight: 800;
+      margin-top: 4px;
+
       color: var(--accent-dark);
-      letter-spacing: 0.08em;
+
+      font-size: 7px;
+      font-weight: 900;
+      letter-spacing: .08em;
     }
 
-    .settings {
-      margin-top: 22px;
+    /* =====================================================
+       FILE LIST
+       ===================================================== */
+
+    .file-list {
+      flex: 0 1 90px;
+
+      min-height: 0;
+
       display: grid;
-      gap: 16px;
+      gap: 5px;
+
+      padding: 2px;
+
+      overflow: auto;
+    }
+
+    .file-item {
+      display: grid;
+
+      grid-template-columns:
+        29px minmax(0,1fr) 23px;
+
+      align-items: center;
+
+      gap: 7px;
+
+      padding: 5px 7px;
+
+      border-radius: 10px;
+
+      background: var(--panel);
+      box-shadow: var(--neu-small);
+    }
+
+    .file-icon {
+      width: 29px;
+      height: 29px;
+
+      display: grid;
+      place-items: center;
+
+      border-radius: 8px;
+
+      color: var(--accent-dark);
+
+      box-shadow: var(--neu-inset);
+
+      font-size: 7px;
+      font-weight: 900;
+    }
+
+    .file-meta {
+      min-width: 0;
+    }
+
+    .file-name {
+      overflow: hidden;
+
+      text-overflow: ellipsis;
+      white-space: nowrap;
+
+      font-size: 8px;
+      font-weight: 800;
+    }
+
+    .file-size {
+      margin-top: 2px;
+
+      color: var(--muted);
+      font-size: 6.5px;
+    }
+
+    .remove-btn {
+      width: 23px;
+      height: 23px;
+
+      border-radius: 7px;
+
+      color: var(--danger);
+
+      background: var(--panel);
+      box-shadow: var(--neu-small);
+
+      cursor: pointer;
+    }
+
+    /* =====================================================
+       SETTINGS
+       ===================================================== */
+
+    .settings {
+      display: grid;
+      gap: 6px;
+    }
+
+    .form-row {
+      display: grid;
+
+      grid-template-columns: 1fr 1fr;
+
+      gap: 6px;
     }
 
     .field label {
       display: block;
-      margin: 0 0 7px 3px;
-      font-size: 11px;
-      font-weight: 800;
+
+      margin: 0 0 3px 2px;
+
       color: var(--muted);
+
+      font-size: 7px;
+      font-weight: 900;
     }
 
     .control {
       width: 100%;
+      height: 31px;
+
+      padding: 0 9px;
+
       border: 0;
-      outline: none;
-      min-height: 46px;
-      border-radius: 14px;
-      background: var(--panel);
+      outline: 0;
+
+      border-radius: 9px;
+
       color: var(--text);
-      padding: 0 14px;
+
+      background: var(--panel);
       box-shadow: var(--neu-inset);
+
+      font-size: 8px;
     }
 
-    .control:focus {
-      box-shadow:
-        var(--neu-inset),
-        0 0 0 2px rgba(39, 154, 162, 0.18);
+    .switch-grid {
+      display: grid;
+
+      grid-template-columns: 1fr 1fr;
+
+      gap: 6px;
     }
 
-    .switch-row {
+    .switch-box {
+      min-height: 34px;
+
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      min-height: 48px;
-      padding: 10px 13px;
-      border-radius: 14px;
+
+      gap: 5px;
+
+      padding: 5px 7px;
+
+      border-radius: 9px;
+
       box-shadow: var(--neu-inset);
     }
 
-    .switch-label strong {
+    .switch-copy strong {
       display: block;
-      font-size: 12px;
+
+      font-size: 7.5px;
     }
 
-    .switch-label span {
-      font-size: 10px;
+    .switch-copy span {
+      display: block;
+
+      margin-top: 1px;
+
       color: var(--muted);
+      font-size: 6px;
     }
 
     .switch {
       position: relative;
-      width: 46px;
-      height: 26px;
+
       flex: 0 0 auto;
+
+      width: 34px;
+      height: 19px;
     }
 
     .switch input {
@@ -358,53 +563,103 @@
     .slider {
       position: absolute;
       inset: 0;
-      cursor: pointer;
+
       border-radius: 999px;
+
       background: #d9e0e4;
       box-shadow: var(--neu-inset);
+
+      cursor: pointer;
     }
 
     .slider::before {
       content: "";
+
       position: absolute;
-      width: 20px;
-      height: 20px;
+
+      width: 13px;
+      height: 13px;
+
       top: 3px;
       left: 3px;
+
       border-radius: 50%;
+
       background: #f8fbfc;
-      box-shadow: 2px 2px 6px rgba(120, 135, 148, 0.4);
-      transition: 0.2s ease;
+
+      box-shadow:
+        1px 1px 4px rgba(100,120,130,.35);
+
+      transition: .18s ease;
     }
 
     .switch input:checked + .slider {
-      background: rgba(39, 154, 162, 0.28);
+      background: rgba(35,154,162,.3);
     }
 
     .switch input:checked + .slider::before {
-      transform: translateX(20px);
+      transform: translateX(15px);
+
       background: var(--accent);
     }
 
+    .strict-rule {
+      padding: 7px 8px;
+
+      border-radius: 10px;
+
+      color: var(--muted);
+
+      box-shadow: var(--neu-inset);
+
+      font-size: 6.8px;
+      line-height: 1.35;
+    }
+
+    .strict-rule strong {
+      color: var(--text);
+    }
+
+    /* =====================================================
+       BUTTONS
+       ===================================================== */
+
     .primary-btn,
     .neu-btn {
-      min-height: 46px;
-      border-radius: 15px;
-      padding: 0 16px;
-      font-weight: 800;
+      height: 32px;
+
+      border-radius: 10px;
+
+      font-size: 8px;
+      font-weight: 900;
+
       cursor: pointer;
-      transition:
-        transform 0.15s ease,
-        box-shadow 0.15s ease;
+
+      transition: transform .15s ease;
     }
 
     .primary-btn {
-      width: 100%;
       color: white;
-      background: linear-gradient(145deg, #2aa7af, #238d94);
+
+      background:
+        linear-gradient(
+          145deg,
+          #2aa7af,
+          #218c94
+        );
+
       box-shadow:
-        5px 5px 12px rgba(148, 165, 179, 0.55),
-        -5px -5px 12px rgba(255, 255, 255, 0.85);
+        4px 4px 10px rgba(147,164,181,.55),
+        -4px -4px 10px rgba(255,255,255,.82);
+    }
+
+    .neu-btn {
+      padding: 0 10px;
+
+      color: var(--text);
+
+      background: var(--panel);
+      box-shadow: var(--neu-small);
     }
 
     .primary-btn:hover,
@@ -418,360 +673,407 @@
     }
 
     .primary-btn:disabled {
+      opacity: .45;
+
       cursor: not-allowed;
-      opacity: 0.5;
       transform: none;
     }
 
-    .neu-btn {
-      background: var(--panel);
-      color: var(--text);
-      box-shadow: var(--neu-small);
-    }
+    /* =====================================================
+       PROGRESS
+       ===================================================== */
 
-    .neu-btn:active {
-      box-shadow: var(--neu-inset);
-    }
-
-    .small-btn {
-      min-height: 35px;
-      border-radius: 11px;
-      font-size: 11px;
-      padding: 0 12px;
-    }
-
-    /* FILES */
-    .file-list {
-      margin-top: 20px;
-      display: grid;
-      gap: 11px;
-      max-height: 300px;
-      overflow: auto;
-      padding: 3px 5px 10px 2px;
-    }
-
-    .file-item {
-      display: grid;
-      grid-template-columns: 42px minmax(0, 1fr) auto;
-      gap: 11px;
-      align-items: center;
-      padding: 10px;
-      border-radius: 15px;
-      box-shadow: var(--neu-small);
-    }
-
-    .file-icon {
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-      display: grid;
-      place-items: center;
-      font-size: 10px;
-      font-weight: 900;
-      color: var(--accent-dark);
-      box-shadow: var(--neu-inset);
-    }
-
-    .file-meta {
-      min-width: 0;
-    }
-
-    .file-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-weight: 800;
-      font-size: 11px;
-    }
-
-    .file-info {
-      margin-top: 4px;
-      color: var(--muted);
-      font-size: 9px;
-    }
-
-    .remove-file {
-      width: 29px;
-      height: 29px;
-      border-radius: 9px;
-      cursor: pointer;
-      color: var(--danger);
-      background: var(--panel);
-      box-shadow: var(--neu-small);
-    }
-
-    /* PREVIEW */
-    .preview-toolbar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .page-badge {
-      padding: 7px 10px;
-      font-size: 10px;
-      color: var(--muted);
-      font-weight: 800;
-      border-radius: 999px;
-      box-shadow: var(--neu-inset);
-    }
-
-    .preview-shell {
-      height: 100%;
-      min-height: 560px;
-      border-radius: 20px;
-      padding: 16px;
-      box-shadow: var(--neu-inset);
-      overflow: auto;
-      position: relative;
-    }
-
-    .empty-preview {
-      height: 100%;
-      min-height: 500px;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      color: var(--muted);
-    }
-
-    .empty-preview svg {
-      width: 72px;
-      height: 72px;
-      opacity: 0.35;
-      margin-bottom: 10px;
-    }
-
-    .preview-pages {
-      display: grid;
-      gap: 20px;
-    }
-
-    .preview-page {
-      background: white;
-      box-shadow: 0 8px 25px rgba(52, 71, 81, 0.17);
-      border-radius: 6px;
-      overflow: hidden;
-      position: relative;
-      margin: 0 auto;
-      max-width: 100%;
-    }
-
-    .preview-page img,
-    .preview-page canvas {
-      display: block;
-      max-width: 100%;
-      height: auto;
-      margin: auto;
-    }
-
-    .page-number {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      padding: 5px 8px;
-      border-radius: 999px;
-      background: rgba(28, 40, 47, 0.7);
-      color: white;
-      font-size: 9px;
-      font-weight: 800;
-      backdrop-filter: blur(6px);
-    }
-
-    .docx-preview {
-      width: min(100%, 850px);
-      min-height: 1000px;
-      margin: auto;
-      padding: 60px 65px;
-      background: white;
-      color: #111;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: 13px;
-      line-height: 1.65;
-      box-shadow: 0 8px 25px rgba(52, 71, 81, 0.17);
-    }
-
-    .docx-preview table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .docx-preview td,
-    .docx-preview th {
-      border: 1px solid #333;
-      padding: 5px;
-    }
-
-    /* OUTPUT */
-    .tabs {
-      display: inline-flex;
-      padding: 4px;
-      gap: 4px;
-      border-radius: 14px;
-      box-shadow: var(--neu-inset);
-    }
-
-    .tab {
-      border: 0;
-      border-radius: 10px;
-      min-height: 30px;
-      padding: 0 11px;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 10px;
-      font-weight: 900;
-    }
-
-    .tab.active {
-      color: var(--accent-dark);
-      background: var(--panel);
-      box-shadow: var(--neu-small);
-    }
-
-    .output-tools {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 13px;
-      flex-wrap: wrap;
-    }
-
-    .editor {
-      width: 100%;
-      height: calc(100vh - 280px);
-      min-height: 500px;
-      border: 0;
-      resize: none;
-      outline: none;
-      padding: 18px;
-      border-radius: 18px;
-      color: #26343c;
-      background: var(--panel);
-      box-shadow: var(--neu-inset);
-      font-family:
-        "SFMono-Regular",
-        Consolas,
-        "Liberation Mono",
-        Menlo,
-        monospace;
-      font-size: 12px;
-      line-height: 1.65;
-      tab-size: 2;
-    }
-
-    .editor:focus {
-      box-shadow:
-        var(--neu-inset),
-        0 0 0 2px rgba(39, 154, 162, 0.14);
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-top: 14px;
-    }
-
-    .stat {
-      padding: 11px;
-      border-radius: 14px;
-      text-align: center;
-      box-shadow: var(--neu-small);
-    }
-
-    .stat strong {
-      display: block;
-      font-size: 14px;
-    }
-
-    .stat span {
-      display: block;
-      margin-top: 3px;
-      font-size: 9px;
-      color: var(--muted);
-      font-weight: 700;
-    }
-
-    /* PROGRESS */
-    .progress-wrap {
-      margin-top: 18px;
+    .progress-section {
       display: none;
     }
 
     .progress-head {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
-      font-size: 10px;
+
+      margin-bottom: 4px;
+
       color: var(--muted);
+
+      font-size: 7px;
       font-weight: 800;
     }
 
     .progress-track {
-      height: 11px;
+      height: 7px;
+
       padding: 2px;
+
       border-radius: 999px;
+
       box-shadow: var(--neu-inset);
-      overflow: hidden;
     }
 
     .progress-bar {
-      height: 100%;
       width: 0%;
+      height: 100%;
+
       border-radius: inherit;
-      background: linear-gradient(90deg, #279aa2, #54bdbe);
-      transition: width 0.2s ease;
+
+      background:
+        linear-gradient(
+          90deg,
+          var(--accent),
+          #57bdc0
+        );
+
+      transition: width .15s ease;
     }
 
     .ocr-log {
-      margin-top: 9px;
-      max-height: 90px;
+      max-height: 35px;
+
+      margin-top: 4px;
+
       overflow: auto;
-      font-size: 9px;
-      line-height: 1.5;
+
       color: var(--muted);
+
       font-family: monospace;
+      font-size: 6px;
+      line-height: 1.3;
+
       white-space: pre-wrap;
     }
 
-    .notice {
-      margin-top: 18px;
-      padding: 13px;
-      border-radius: 15px;
-      box-shadow: var(--neu-inset);
+    /* =====================================================
+       PREVIEW
+       ===================================================== */
+
+    .preview-tools {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .page-pill {
+      padding: 5px 8px;
+
+      border-radius: 999px;
+
       color: var(--muted);
+
+      box-shadow: var(--neu-inset);
+
+      font-size: 7px;
+      font-weight: 900;
+    }
+
+    .preview-body {
+      height: 100%;
+    }
+
+    .preview-shell {
+      width: 100%;
+      height: 100%;
+
+      padding: 9px;
+
+      border-radius: 14px;
+
+      box-shadow: var(--neu-inset);
+
+      overflow: auto;
+    }
+
+    .empty-preview {
+      width: 100%;
+      height: 100%;
+
+      display: grid;
+      place-items: center;
+
+      text-align: center;
+
+      color: var(--muted);
+
+      font-size: 9px;
+    }
+
+    .empty-preview svg {
+      width: 52px;
+      height: 52px;
+
+      margin-bottom: 8px;
+
+      opacity: .3;
+    }
+
+    .preview-pages {
+      display: grid;
+      gap: 10px;
+    }
+
+    .preview-page {
+      position: relative;
+
+      width: fit-content;
+      max-width: 100%;
+
+      margin: auto;
+
+      overflow: hidden;
+
+      border-radius: 5px;
+
+      background: white;
+
+      box-shadow:
+        0 7px 20px rgba(52,71,81,.16);
+    }
+
+    .preview-page img,
+    .preview-page canvas {
+      display: block;
+
+      max-width: 100%;
+      max-height: calc(100vh - 155px);
+
+      width: auto;
+      height: auto;
+
+      object-fit: contain;
+    }
+
+    .page-label {
+      position: absolute;
+
+      top: 6px;
+      right: 6px;
+
+      padding: 4px 7px;
+
+      border-radius: 999px;
+
+      color: white;
+
+      background: rgba(30,40,46,.7);
+
+      backdrop-filter: blur(4px);
+
+      font-size: 6.5px;
+      font-weight: 800;
+    }
+
+    .qr-mask-info {
+      position: absolute;
+
+      bottom: 6px;
+      left: 6px;
+
+      padding: 3px 6px;
+
+      border-radius: 999px;
+
+      color: white;
+
+      background: rgba(35,154,162,.8);
+
+      font-size: 6px;
+      font-weight: 800;
+    }
+
+    .docx-preview {
+      width: min(100%,760px);
+
+      min-height: 800px;
+
+      padding: 35px 40px;
+
+      color: #111;
+
+      background: white;
+
+      font-family:
+        Georgia,
+        "Times New Roman",
+        serif;
+
       font-size: 10px;
-      line-height: 1.55;
+      line-height: 1.45;
     }
 
-    .notice strong {
-      color: var(--text);
+    .docx-preview table {
+      width: 100%;
+
+      border-collapse: collapse;
     }
 
-    .hidden {
-      display: none !important;
+    .docx-preview th,
+    .docx-preview td {
+      padding: 4px;
+
+      border: 1px solid #222;
     }
+
+    /* =====================================================
+       OUTPUT
+       ===================================================== */
+
+    .output-body {
+      height: 100%;
+
+      display: flex;
+      flex-direction: column;
+    }
+
+    .output-toolbar {
+      flex: 0 0 auto;
+
+      display: flex;
+      align-items: center;
+      gap: 5px;
+
+      margin-bottom: 7px;
+    }
+
+    .output-toolbar .spacer {
+      flex: 1;
+    }
+
+    .format-badge {
+      padding: 5px 8px;
+
+      border-radius: 999px;
+
+      color: var(--accent-dark);
+
+      background: var(--accent-soft);
+
+      font-size: 6.5px;
+      font-weight: 900;
+      letter-spacing: .05em;
+    }
+
+    .editor {
+      flex: 1;
+
+      width: 100%;
+      min-height: 0;
+
+      padding: 11px;
+
+      resize: none;
+
+      border: 0;
+      outline: 0;
+
+      border-radius: 13px;
+
+      color: #23343d;
+
+      background: var(--panel);
+      box-shadow: var(--neu-inset);
+
+      font-family:
+        "SFMono-Regular",
+        Consolas,
+        "Liberation Mono",
+        Menlo,
+        monospace;
+
+      font-size: 8.5px;
+      line-height: 1.45;
+
+      tab-size: 2;
+    }
+
+    .stats {
+      flex: 0 0 auto;
+
+      display: grid;
+
+      grid-template-columns:
+        repeat(4,1fr);
+
+      gap: 6px;
+
+      margin-top: 7px;
+    }
+
+    .stat {
+      padding: 6px;
+
+      text-align: center;
+
+      border-radius: 9px;
+
+      box-shadow: var(--neu-small);
+    }
+
+    .stat strong {
+      display: block;
+
+      font-size: 10px;
+    }
+
+    .stat span {
+      display: block;
+
+      margin-top: 1px;
+
+      color: var(--muted);
+
+      font-size: 5.8px;
+      font-weight: 900;
+    }
+
+    /* =====================================================
+       SCROLLBAR
+       ===================================================== */
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #b6c5cc transparent;
+    }
+
+    *::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+
+      background: #b6c5cc;
+    }
+
+    /* =====================================================
+       TOAST
+       ===================================================== */
 
     .toast {
       position: fixed;
-      right: 25px;
-      bottom: 25px;
-      min-width: 210px;
-      max-width: 380px;
-      padding: 13px 16px;
-      border-radius: 15px;
+
+      right: 18px;
+      bottom: 18px;
+
+      max-width: 330px;
+
+      padding: 10px 13px;
+
+      border-radius: 12px;
+
       color: var(--text);
+
       background: var(--panel);
       box-shadow: var(--neu);
-      font-size: 11px;
+
+      font-size: 8px;
       font-weight: 800;
+
       opacity: 0;
-      transform: translateY(20px);
+      transform: translateY(15px);
+
       pointer-events: none;
-      transition: 0.25s ease;
+
+      transition: .2s ease;
+
       z-index: 1000;
     }
 
@@ -780,106 +1082,192 @@
       transform: translateY(0);
     }
 
-    @media (max-width: 1250px) {
+    .hidden {
+      display: none !important;
+    }
+
+    /* =====================================================
+       SHORT LAPTOP
+       ===================================================== */
+
+    @media (max-height: 760px) and (min-width: 1051px) {
+
+      .topbar {
+        flex-basis: 54px;
+      }
+
+      .upload-zone {
+        flex-basis: 93px;
+      }
+
+      .upload-zone p {
+        display: none;
+      }
+
+      .file-list {
+        flex-basis: 55px;
+      }
+
+      .strict-rule {
+        display: none;
+      }
+
+      .control {
+        height: 28px;
+      }
+
+      .switch-box {
+        min-height: 30px;
+      }
+    }
+
+    /* =====================================================
+       TABLET
+       ===================================================== */
+
+    @media (max-width: 1050px) {
+
+      html,
+      body {
+        overflow: auto;
+      }
+
+      .app {
+        width: calc(100% - 12px);
+        height: auto;
+
+        min-height: 100vh;
+
+        margin: 6px;
+      }
+
       .workspace {
-        grid-template-columns: 340px minmax(0, 1fr);
+        grid-template-columns: 1fr 1fr;
+
+        overflow: visible;
+      }
+
+      .panel {
+        height: 680px;
       }
 
       .output-panel {
         grid-column: 1 / -1;
-        min-height: 650px;
-      }
-
-      .editor {
-        height: 600px;
       }
     }
 
-    @media (max-width: 800px) {
-      .app {
-        width: min(100% - 16px, 1780px);
-        margin: 8px auto;
-      }
+    /* =====================================================
+       MOBILE
+       ===================================================== */
 
-      .topbar {
-        border-radius: 20px;
-        padding: 14px;
-        align-items: flex-start;
-        flex-direction: column;
+    @media (max-width: 720px) {
+
+      .status-group {
+        display: none;
       }
 
       .workspace {
         grid-template-columns: 1fr;
-        gap: 15px;
+      }
+
+      .panel {
+        height: 650px;
       }
 
       .output-panel {
         grid-column: auto;
-      }
-
-      .panel {
-        min-height: unset;
-        border-radius: 20px;
-      }
-
-      .preview-shell {
-        min-height: 430px;
-      }
-
-      .docx-preview {
-        padding: 35px 25px;
-      }
-
-      .editor {
-        min-height: 520px;
       }
     }
   </style>
 </head>
 
 <body>
+
   <main class="app">
 
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark">N</div>
+    <!-- ===================================================
+         HEADER
+         =================================================== -->
 
-        <div class="brand-text">
-          <h1>NeuroOCR</h1>
-          <p>High-fidelity OCR · Images · PDF · DOCX</p>
+    <header class="topbar">
+
+      <div class="brand">
+
+        <div class="brand-logo">
+          N
         </div>
+
+        <div>
+          <h1>NAIKER Ultra OCR</h1>
+
+          <p>
+            Literal extraction · Ultra structured Markdown · QR exclusion
+          </p>
+        </div>
+
       </div>
 
-      <div class="top-status">
-        <div class="pill" id="topFileStatus">
+      <div class="status-group">
+
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          OCR Ready
+        </div>
+
+        <div
+          class="status-pill"
+          id="fileStatus"
+        >
           0 documents
         </div>
+
+        <div class="status-pill">
+          QR + Signature Exclusion
+        </div>
+
       </div>
+
     </header>
+
+    <!-- ===================================================
+         WORKSPACE
+         =================================================== -->
 
     <section class="workspace">
 
-      <!-- LEFT PANEL -->
+      <!-- =================================================
+           LEFT
+           ================================================= -->
+
       <aside class="panel">
-        <div class="panel-head">
+
+        <div class="panel-header">
+
           <div class="panel-title">
             <h2>Document Input</h2>
-            <span>Upload source documents</span>
+            <span>Source files and extraction rules</span>
           </div>
+
         </div>
 
-        <div class="panel-body">
+        <div class="panel-body input-body">
 
-          <label class="upload-zone" id="uploadZone">
+          <label
+            class="upload-zone"
+            id="uploadZone"
+          >
+
             <input
               id="fileInput"
               type="file"
               multiple
-              accept=".png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.pdf,.docx"
+              accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,.pdf,.docx"
             />
 
             <div>
+
               <div class="upload-icon">
+
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"
@@ -890,83 +1278,208 @@
                   <path d="m7 9 5-5 5 5"></path>
                   <path d="M5 14v5h14v-5"></path>
                 </svg>
+
               </div>
 
-              <h3>Drop documents here</h3>
+              <h3>Drop document here</h3>
 
               <p>
-                Select scanned certificates, MyKad, passport,
-                government forms, SSM records, CIDB documents or
-                other document images.
+                Certificates, CIDB forms, SSM documents,
+                identity documents, passports and scanned records.
               </p>
 
               <div class="upload-types">
-                JPG · PNG · WEBP · PDF · DOCX
+                JPG · PNG · PDF · DOCX
               </div>
+
             </div>
+
           </label>
 
-          <div class="file-list" id="fileList"></div>
+          <div
+            class="file-list"
+            id="fileList"
+          ></div>
 
           <div class="settings">
 
-            <div class="field">
-              <label for="ocrLanguage">OCR LANGUAGE</label>
-              <select id="ocrLanguage" class="control">
-                <option value="eng+msa" selected>
-                  English + Bahasa Melayu
-                </option>
-                <option value="eng">English</option>
-                <option value="msa">Bahasa Melayu</option>
-              </select>
-            </div>
+            <div class="form-row">
 
-            <div class="field">
-              <label for="outputMode">OUTPUT STRUCTURE</label>
-              <select id="outputMode" class="control">
-                <option value="structured" selected>
-                  Structured Markdown
-                </option>
-                <option value="literal">
-                  Literal OCR Text
-                </option>
-              </select>
-            </div>
+              <div class="field">
 
-            <div class="switch-row">
-              <div class="switch-label">
-                <strong>Preserve line breaks</strong>
-                <span>Keep visual line separation</span>
+                <label>
+                  OCR LANGUAGE
+                </label>
+
+                <select
+                  id="ocrLanguage"
+                  class="control"
+                >
+                  <option
+                    value="eng+msa"
+                    selected
+                  >
+                    English + Bahasa Melayu
+                  </option>
+
+                  <option value="eng">
+                    English
+                  </option>
+
+                  <option value="msa">
+                    Bahasa Melayu
+                  </option>
+                </select>
+
               </div>
 
-              <label class="switch">
-                <input id="preserveLines" type="checkbox" checked />
-                <span class="slider"></span>
-              </label>
-            </div>
+              <div class="field">
 
-            <div class="switch-row">
-              <div class="switch-label">
-                <strong>Auto-detect headings</strong>
-                <span>Convert likely titles into Markdown</span>
+                <label>
+                  OUTPUT
+                </label>
+
+                <select
+                  id="outputMode"
+                  class="control"
+                >
+                  <option
+                    value="ultra"
+                    selected
+                  >
+                    Ultra Structured Markdown
+                  </option>
+
+                  <option value="literal">
+                    Literal Text
+                  </option>
+                </select>
+
               </div>
 
-              <label class="switch">
-                <input id="detectHeadings" type="checkbox" checked />
-                <span class="slider"></span>
-              </label>
             </div>
 
-            <div class="switch-row">
-              <div class="switch-label">
-                <strong>Detect key-value fields</strong>
-                <span>Preserve form-style information</span>
+            <div class="switch-grid">
+
+              <div class="switch-box">
+
+                <div class="switch-copy">
+                  <strong>Preserve wording</strong>
+                  <span>No autocorrection</span>
+                </div>
+
+                <label class="switch">
+                  <input
+                    id="preserveLiteral"
+                    type="checkbox"
+                    checked
+                  />
+                  <span class="slider"></span>
+                </label>
+
               </div>
 
-              <label class="switch">
-                <input id="detectKeyValues" type="checkbox" checked />
-                <span class="slider"></span>
-              </label>
+              <div class="switch-box">
+
+                <div class="switch-copy">
+                  <strong>Exclude QR</strong>
+                  <span>Mask before OCR</span>
+                </div>
+
+                <label class="switch">
+                  <input
+                    id="excludeQR"
+                    type="checkbox"
+                    checked
+                  />
+                  <span class="slider"></span>
+                </label>
+
+              </div>
+
+              <div class="switch-box">
+
+                <div class="switch-copy">
+                  <strong>Ignore signatures</strong>
+                  <span>Remove scribble artifacts</span>
+                </div>
+
+                <label class="switch">
+                  <input
+                    id="excludeSignature"
+                    type="checkbox"
+                    checked
+                  />
+                  <span class="slider"></span>
+                </label>
+
+              </div>
+
+              <div class="switch-box">
+
+                <div class="switch-copy">
+                  <strong>Detect tables</strong>
+                  <span>Markdown tables</span>
+                </div>
+
+                <label class="switch">
+                  <input
+                    id="detectTables"
+                    type="checkbox"
+                    checked
+                  />
+                  <span class="slider"></span>
+                </label>
+
+              </div>
+
+              <div class="switch-box">
+
+                <div class="switch-copy">
+                  <strong>Key-value fields</strong>
+                  <span>Form structure</span>
+                </div>
+
+                <label class="switch">
+                  <input
+                    id="detectKV"
+                    type="checkbox"
+                    checked
+                  />
+                  <span class="slider"></span>
+                </label>
+
+              </div>
+
+              <div class="switch-box">
+
+                <div class="switch-copy">
+                  <strong>Headings</strong>
+                  <span>Preserve hierarchy</span>
+                </div>
+
+                <label class="switch">
+                  <input
+                    id="detectHeadings"
+                    type="checkbox"
+                    checked
+                  />
+                  <span class="slider"></span>
+                </label>
+
+              </div>
+
+            </div>
+
+            <div class="strict-rule">
+
+              <strong>Strict extraction:</strong>
+              retain literal visible wording, spelling, numbers,
+              punctuation and document order. Do not invent missing
+              information. Completely unreadable text becomes
+              <strong>[Illegible]</strong>. QR codes and signatures
+              are excluded.
+
             </div>
 
             <button
@@ -975,56 +1488,99 @@
               type="button"
               disabled
             >
-              Extract Document
+              EXTRACT DOCUMENT
             </button>
+
           </div>
 
-          <div class="progress-wrap" id="progressWrap">
+          <div
+            class="progress-section"
+            id="progressSection"
+          >
+
             <div class="progress-head">
-              <span id="progressLabel">Preparing...</span>
-              <span id="progressPercent">0%</span>
+
+              <span id="progressLabel">
+                Preparing
+              </span>
+
+              <span id="progressPercent">
+                0%
+              </span>
+
             </div>
 
             <div class="progress-track">
-              <div class="progress-bar" id="progressBar"></div>
+              <div
+                class="progress-bar"
+                id="progressBar"
+              ></div>
             </div>
 
-            <div class="ocr-log" id="ocrLog"></div>
+            <div
+              class="ocr-log"
+              id="ocrLog"
+            ></div>
+
           </div>
-          </div>
+
+        </div>
+
       </aside>
 
-      <!-- CENTER PANEL -->
+      <!-- =================================================
+           CENTER PREVIEW
+           ================================================= -->
+
       <section class="panel">
-        <div class="panel-head">
+
+        <div class="panel-header">
+
           <div class="panel-title">
-            <h2>Source Preview</h2>
-            <span>Original document rendering</span>
+            <h2>Source Document</h2>
+            <span>Original file preview</span>
           </div>
 
-          <div class="preview-toolbar">
-            <span class="page-badge" id="previewCount">0 pages</span>
+          <div class="preview-tools">
+
+            <span
+              class="page-pill"
+              id="pageCount"
+            >
+              0 pages
+            </span>
 
             <button
-              class="neu-btn small-btn"
-              type="button"
+              class="neu-btn"
               id="clearBtn"
+              type="button"
             >
               Clear
             </button>
+
           </div>
+
         </div>
 
-        <div class="panel-body">
-          <div class="preview-shell" id="previewShell">
+        <div class="panel-body preview-body">
 
-            <div class="empty-preview" id="emptyPreview">
+          <div
+            class="preview-shell"
+            id="previewShell"
+          >
+
+            <div
+              class="empty-preview"
+              id="emptyPreview"
+            >
+
               <div>
+
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  stroke-width="1.25"
+                  stroke-width="1.3"
                 >
                   <rect
                     x="4"
@@ -1033,62 +1589,56 @@
                     height="18"
                     rx="2"
                   ></rect>
+
                   <path d="M8 8h8"></path>
                   <path d="M8 12h8"></path>
                   <path d="M8 16h5"></path>
                 </svg>
 
-                <div>No document loaded</div>
+                <div>
+                  No document loaded
+                </div>
+
               </div>
+
             </div>
 
             <div
               class="preview-pages hidden"
               id="previewPages"
             ></div>
+
           </div>
+
         </div>
+
       </section>
 
-      <!-- RIGHT PANEL -->
+      <!-- =================================================
+           RIGHT OUTPUT
+           ================================================= -->
+
       <section class="panel output-panel">
-        <div class="panel-head">
+
+        <div class="panel-header">
+
           <div class="panel-title">
-            <h2>Extracted Document Data</h2>
-            <span>Editable OCR output</span>
+            <h2>Ultra Structured Extraction</h2>
+            <span>Literal document transcription</span>
           </div>
 
-          <div class="tabs">
-            <button
-              class="tab active"
-              data-tab="markdown"
-              type="button"
-            >
-              MARKDOWN
-            </button>
-
-            <button
-              class="tab"
-              data-tab="text"
-              type="button"
-            >
-              TEXT
-            </button>
-
-            <button
-              class="tab"
-              data-tab="html"
-              type="button"
-            >
-              HTML
-            </button>
+          <div class="format-badge">
+            MARKDOWN
           </div>
+
         </div>
 
-        <div class="panel-body">
-          <div class="output-tools">
+        <div class="panel-body output-body">
+
+          <div class="output-toolbar">
+
             <button
-              class="neu-btn small-btn"
+              class="neu-btn"
               id="copyBtn"
               type="button"
             >
@@ -1096,176 +1646,222 @@
             </button>
 
             <button
-              class="neu-btn small-btn"
+              class="neu-btn"
               id="downloadBtn"
               type="button"
             >
-              Download
+              Download .md
             </button>
 
             <button
-              class="neu-btn small-btn"
-              id="markIllegibleBtn"
+              class="neu-btn"
+              id="insertIllegibleBtn"
               type="button"
             >
-              Insert [Illegible]
+              [Illegible]
             </button>
 
-            <button
-              class="neu-btn small-btn"
-              id="markSignatureBtn"
-              type="button"
-            >
-              Insert [Signature]
-            </button>
+            <div class="spacer"></div>
 
-            <button
-              class="neu-btn small-btn"
-              id="markLogoBtn"
-              type="button"
-            >
-              Insert [Logo]
-            </button>
+            <span class="format-badge">
+              QR + SIGNATURES OMITTED
+            </span>
+
           </div>
 
           <textarea
-            id="outputEditor"
+            id="editor"
             class="editor"
             spellcheck="false"
-            placeholder="Extracted document data will appear here..."
+            placeholder="# DOCUMENT
+
+## PAGE 1
+
+Extracted document content will appear here..."
           ></textarea>
 
           <div class="stats">
+
             <div class="stat">
-              <strong id="statPages">0</strong>
+              <strong id="statDocuments">
+                0
+              </strong>
+              <span>DOCUMENTS</span>
+            </div>
+
+            <div class="stat">
+              <strong id="statPages">
+                0
+              </strong>
               <span>PAGES</span>
             </div>
 
             <div class="stat">
-              <strong id="statWords">0</strong>
+              <strong id="statWords">
+                0
+              </strong>
               <span>WORDS</span>
             </div>
 
             <div class="stat">
-              <strong id="statChars">0</strong>
+              <strong id="statChars">
+                0
+              </strong>
               <span>CHARACTERS</span>
             </div>
+
           </div>
+
         </div>
+
       </section>
+
     </section>
+
   </main>
 
-  <div class="toast" id="toast"></div>
+  <div
+    class="toast"
+    id="toast"
+  ></div>
 
   <script>
+    /* =====================================================
+       PDF
+       ===================================================== */
+
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    /* =====================================================
+       STATE
+       ===================================================== */
 
     const state = {
       files: [],
       pages: [],
-      docxHtml: "",
-      extracted: {
-        markdown: "",
-        text: "",
-        html: ""
-      },
-      activeTab: "markdown",
       busy: false
     };
 
-    const fileInput = document.getElementById("fileInput");
-    const uploadZone = document.getElementById("uploadZone");
-    const fileList = document.getElementById("fileList");
-    const extractBtn = document.getElementById("extractBtn");
-    const clearBtn = document.getElementById("clearBtn");
+    /* =====================================================
+       ELEMENTS
+       ===================================================== */
 
-    const previewPages = document.getElementById("previewPages");
-    const emptyPreview = document.getElementById("emptyPreview");
-    const previewCount = document.getElementById("previewCount");
+    const fileInput =
+      document.getElementById("fileInput");
 
-    const outputEditor = document.getElementById("outputEditor");
-    const copyBtn = document.getElementById("copyBtn");
-    const downloadBtn = document.getElementById("downloadBtn");
+    const uploadZone =
+      document.getElementById("uploadZone");
 
-    const progressWrap = document.getElementById("progressWrap");
-    const progressBar = document.getElementById("progressBar");
-    const progressLabel = document.getElementById("progressLabel");
-    const progressPercent = document.getElementById("progressPercent");
-    const ocrLog = document.getElementById("ocrLog");
+    const fileList =
+      document.getElementById("fileList");
 
-    const topFileStatus = document.getElementById("topFileStatus");
+    const extractBtn =
+      document.getElementById("extractBtn");
 
-    const statPages = document.getElementById("statPages");
-    const statWords = document.getElementById("statWords");
-    const statChars = document.getElementById("statChars");
+    const clearBtn =
+      document.getElementById("clearBtn");
 
-    const tabs = [...document.querySelectorAll(".tab")];
+    const previewPages =
+      document.getElementById("previewPages");
 
-    const ocrLanguage = document.getElementById("ocrLanguage");
-    const outputMode = document.getElementById("outputMode");
-    const preserveLines = document.getElementById("preserveLines");
-    const detectHeadings = document.getElementById("detectHeadings");
-    const detectKeyValues = document.getElementById("detectKeyValues");
+    const emptyPreview =
+      document.getElementById("emptyPreview");
 
-    const markIllegibleBtn =
-      document.getElementById("markIllegibleBtn");
+    const pageCount =
+      document.getElementById("pageCount");
 
-    const markSignatureBtn =
-      document.getElementById("markSignatureBtn");
+    const fileStatus =
+      document.getElementById("fileStatus");
 
-    const markLogoBtn =
-      document.getElementById("markLogoBtn");
+    const editor =
+      document.getElementById("editor");
 
-    const toast = document.getElementById("toast");
+    const copyBtn =
+      document.getElementById("copyBtn");
 
-    function showToast(message) {
-      toast.textContent = message;
-      toast.classList.add("show");
+    const downloadBtn =
+      document.getElementById("downloadBtn");
 
-      clearTimeout(showToast.timer);
+    const insertIllegibleBtn =
+      document.getElementById("insertIllegibleBtn");
 
-      showToast.timer = setTimeout(() => {
-        toast.classList.remove("show");
-      }, 2200);
-    }
+    const progressSection =
+      document.getElementById("progressSection");
 
-    function escapeHtml(value) {
-      return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    }
+    const progressLabel =
+      document.getElementById("progressLabel");
 
-    function formatBytes(bytes) {
-      if (!bytes) return "0 B";
+    const progressPercent =
+      document.getElementById("progressPercent");
 
-      const units = ["B", "KB", "MB", "GB"];
-      const index = Math.min(
-        Math.floor(Math.log(bytes) / Math.log(1024)),
-        units.length - 1
-      );
+    const progressBar =
+      document.getElementById("progressBar");
 
-      return (
-        (bytes / Math.pow(1024, index)).toFixed(index ? 1 : 0) +
-        " " +
-        units[index]
-      );
-    }
+    const ocrLog =
+      document.getElementById("ocrLog");
+
+    const ocrLanguage =
+      document.getElementById("ocrLanguage");
+
+    const outputMode =
+      document.getElementById("outputMode");
+
+    const excludeQR =
+      document.getElementById("excludeQR");
+
+    const excludeSignature =
+      document.getElementById("excludeSignature");
+
+    const detectTables =
+      document.getElementById("detectTables");
+
+    const detectKV =
+      document.getElementById("detectKV");
+
+    const detectHeadings =
+      document.getElementById("detectHeadings");
+
+    const statDocuments =
+      document.getElementById("statDocuments");
+
+    const statPages =
+      document.getElementById("statPages");
+
+    const statWords =
+      document.getElementById("statWords");
+
+    const statChars =
+      document.getElementById("statChars");
+
+    const toast =
+      document.getElementById("toast");
+
+    /* =====================================================
+       UTILITIES
+       ===================================================== */
 
     function extensionOf(name) {
-      return name.split(".").pop().toLowerCase();
+      return (
+        name
+          .split(".")
+          .pop()
+          ?.toLowerCase() || ""
+      );
     }
 
     function isImage(file) {
       return (
         file.type.startsWith("image/") ||
-        ["jpg", "jpeg", "png", "webp", "bmp", "tif", "tiff"].includes(
-          extensionOf(file.name)
-        )
+        [
+          "jpg",
+          "jpeg",
+          "png",
+          "webp",
+          "bmp",
+          "tif",
+          "tiff"
+        ].includes(extensionOf(file.name))
       );
     }
 
@@ -1278,295 +1874,77 @@
 
     function isDocx(file) {
       return (
-        extensionOf(file.name) === "docx" ||
-        file.type.includes(
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+        extensionOf(file.name) === "docx"
       );
     }
 
-    function updateFileUI() {
-      fileList.innerHTML = "";
+    function formatBytes(bytes) {
 
-      state.files.forEach((file, index) => {
-        const ext = extensionOf(file.name).toUpperCase();
-
-        const item = document.createElement("div");
-        item.className = "file-item";
-
-        item.innerHTML = `
-          <div class="file-icon">${escapeHtml(ext)}</div>
-
-          <div class="file-meta">
-            <div class="file-name" title="${escapeHtml(file.name)}">
-              ${escapeHtml(file.name)}
-            </div>
-
-            <div class="file-info">
-              ${formatBytes(file.size)}
-            </div>
-          </div>
-
-          <button
-            class="remove-file"
-            type="button"
-            data-index="${index}"
-            title="Remove"
-          >
-            ×
-          </button>
-        `;
-
-        fileList.appendChild(item);
-      });
-
-      fileList
-        .querySelectorAll(".remove-file")
-        .forEach((button) => {
-          button.addEventListener("click", async (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const index = Number(button.dataset.index);
-
-            state.files.splice(index, 1);
-
-            updateFileUI();
-            await renderAllPreviews();
-          });
-        });
-
-      extractBtn.disabled =
-        !state.files.length || state.busy;
-
-      topFileStatus.textContent =
-        `${state.files.length} document${state.files.length === 1 ? "" : "s"}`;
-    }
-
-    async function addFiles(fileCollection) {
-      const newFiles = [...fileCollection].filter((file) => {
-        return isImage(file) || isPdf(file) || isDocx(file);
-      });
-
-      if (!newFiles.length) {
-        showToast("No supported files selected.");
-        return;
+      if (!bytes) {
+        return "0 B";
       }
 
-      state.files.push(...newFiles);
+      const units = [
+        "B",
+        "KB",
+        "MB",
+        "GB"
+      ];
 
-      updateFileUI();
-      await renderAllPreviews();
-    }
-
-    fileInput.addEventListener("change", async () => {
-      await addFiles(fileInput.files);
-      fileInput.value = "";
-    });
-
-    ["dragenter", "dragover"].forEach((eventName) => {
-      uploadZone.addEventListener(eventName, (event) => {
-        event.preventDefault();
-        uploadZone.classList.add("dragover");
-      });
-    });
-
-    ["dragleave", "drop"].forEach((eventName) => {
-      uploadZone.addEventListener(eventName, (event) => {
-        event.preventDefault();
-        uploadZone.classList.remove("dragover");
-      });
-    });
-
-    uploadZone.addEventListener("drop", async (event) => {
-      await addFiles(event.dataTransfer.files);
-    });
-
-    async function fileToDataUrl(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-
-        reader.readAsDataURL(file);
-      });
-    }
-
-    async function renderImagePreview(file, fileIndex) {
-      const url = await fileToDataUrl(file);
-
-      const wrapper = document.createElement("div");
-      wrapper.className = "preview-page";
-
-      const img = document.createElement("img");
-      img.src = url;
-      img.alt = file.name;
-
-      const label = document.createElement("div");
-      label.className = "page-number";
-      label.textContent = file.name;
-
-      wrapper.appendChild(img);
-      wrapper.appendChild(label);
-
-      previewPages.appendChild(wrapper);
-
-      state.pages.push({
-        type: "image",
-        fileIndex,
-        pageNumber: 1,
-        source: file,
-        dataUrl: url
-      });
-    }
-
-    async function renderPdfPreview(file, fileIndex) {
-      const data = await file.arrayBuffer();
-
-      const pdf = await pdfjsLib.getDocument({
-        data
-      }).promise;
-
-      for (
-        let pageNumber = 1;
-        pageNumber <= pdf.numPages;
-        pageNumber++
-      ) {
-        const page = await pdf.getPage(pageNumber);
-
-        const viewport = page.getViewport({
-          scale: 1.5
-        });
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d", {
-          willReadFrequently: true
-        });
-
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-
-        await page.render({
-          canvasContext: ctx,
-          viewport
-        }).promise;
-
-        const wrapper = document.createElement("div");
-        wrapper.className = "preview-page";
-
-        const label = document.createElement("div");
-        label.className = "page-number";
-        label.textContent =
-          `${file.name} · Page ${pageNumber}/${pdf.numPages}`;
-
-        wrapper.appendChild(canvas);
-        wrapper.appendChild(label);
-
-        previewPages.appendChild(wrapper);
-
-        const dataUrl = canvas.toDataURL(
-          "image/jpeg",
-          0.96
+      const index =
+        Math.min(
+          Math.floor(
+            Math.log(bytes) /
+            Math.log(1024)
+          ),
+          units.length - 1
         );
 
-        state.pages.push({
-          type: "pdf-page",
-          fileIndex,
-          pageNumber,
-          totalPages: pdf.numPages,
-          source: file,
-          dataUrl
-        });
-      }
+      return (
+        (
+          bytes /
+          Math.pow(1024, index)
+        ).toFixed(index ? 1 : 0) +
+        " " +
+        units[index]
+      );
     }
 
-    async function renderDocxPreview(file, fileIndex) {
-      const arrayBuffer = await file.arrayBuffer();
+    function escapeHtml(value) {
 
-      const result = await mammoth.convertToHtml({
-        arrayBuffer
-      });
-
-      const wrapper = document.createElement("div");
-      wrapper.className = "docx-preview";
-      wrapper.innerHTML = result.value;
-
-      const outer = document.createElement("div");
-      outer.className = "preview-page";
-      outer.style.background = "transparent";
-      outer.style.boxShadow = "none";
-
-      const label = document.createElement("div");
-      label.className = "page-number";
-      label.textContent = file.name;
-
-      outer.appendChild(wrapper);
-      outer.appendChild(label);
-
-      previewPages.appendChild(outer);
-
-      state.pages.push({
-        type: "docx",
-        fileIndex,
-        pageNumber: 1,
-        source: file,
-        html: result.value,
-        arrayBuffer
-      });
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
-    async function renderAllPreviews() {
-      previewPages.innerHTML = "";
-      state.pages = [];
+    function showToast(message) {
 
-      if (!state.files.length) {
-        emptyPreview.classList.remove("hidden");
-        previewPages.classList.add("hidden");
-        previewCount.textContent = "0 pages";
-        updateStats();
-        return;
-      }
+      toast.textContent =
+        message;
 
-      emptyPreview.classList.add("hidden");
-      previewPages.classList.remove("hidden");
+      toast.classList.add("show");
 
-      for (
-        let index = 0;
-        index < state.files.length;
-        index++
-      ) {
-        const file = state.files[index];
+      clearTimeout(
+        showToast.timer
+      );
 
-        try {
-          if (isImage(file)) {
-            await renderImagePreview(file, index);
-          } else if (isPdf(file)) {
-            await renderPdfPreview(file, index);
-          } else if (isDocx(file)) {
-            await renderDocxPreview(file, index);
-          }
-        } catch (error) {
-          console.error(error);
-
-          const errorBox = document.createElement("div");
-          errorBox.className = "notice";
-          errorBox.textContent =
-            `Unable to preview ${file.name}: ${error.message}`;
-
-          previewPages.appendChild(errorBox);
-        }
-      }
-
-      previewCount.textContent =
-        `${state.pages.length} page${state.pages.length === 1 ? "" : "s"}`;
-
-      updateStats();
+      showToast.timer =
+        setTimeout(
+          () => {
+            toast.classList.remove("show");
+          },
+          1800
+        );
     }
 
     function log(message) {
+
       const time =
-        new Date().toLocaleTimeString();
+        new Date()
+          .toLocaleTimeString();
 
       ocrLog.textContent +=
         `[${time}] ${message}\n`;
@@ -1575,80 +1953,1012 @@
         ocrLog.scrollHeight;
     }
 
-    function setProgress(value, label) {
-      const percent = Math.max(
-        0,
-        Math.min(100, Math.round(value))
-      );
+    function setProgress(
+      percent,
+      message
+    ) {
+
+      const value =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(percent)
+          )
+        );
 
       progressBar.style.width =
-        percent + "%";
+        `${value}%`;
 
       progressPercent.textContent =
-        percent + "%";
+        `${value}%`;
 
-      if (label) {
-        progressLabel.textContent = label;
+      if (message) {
+        progressLabel.textContent =
+          message;
       }
     }
 
-    function cleanOcrText(text) {
-      return String(text || "")
-        .replace(/\u00AD/g, "")
-        .replace(/[ \t]+\n/g, "\n")
-        .replace(/\n{4,}/g, "\n\n\n")
-        .trim();
-    }
+    function fileToDataUrl(file) {
 
-    function likelyHeading(line) {
-      const trimmed = line.trim();
+      return new Promise(
+        (resolve, reject) => {
 
-      if (!trimmed) return false;
-      if (trimmed.length > 95) return false;
-      if (/^[\d.,\-/:()]+$/.test(trimmed)) return false;
+          const reader =
+            new FileReader();
 
-      const letters =
-        trimmed.match(/[A-Za-zÀ-ÿ]/g) || [];
+          reader.onload =
+            () => resolve(reader.result);
 
-      if (!letters.length) return false;
+          reader.onerror =
+            reject;
 
-      const uppercase =
-        trimmed.match(/[A-ZÀ-Þ]/g) || [];
+          reader.readAsDataURL(file);
 
-      const ratio =
-        uppercase.length / letters.length;
-
-      const titleKeywords = [
-        "PERAKUAN",
-        "SIJIL",
-        "BORANG",
-        "MAKLUMAT",
-        "KATEGORI",
-        "GRE",
-        "PEGAWAI",
-        "PENDAFTARAN",
-        "MALAYSIA",
-        "CERTIFICATE",
-        "REGISTRATION",
-        "GOVERNMENT",
-        "GAZETTE",
-        "SCHEDULE",
-        "CONTRACTOR",
-        "PROJECT",
-        "DECLARATION"
-      ];
-
-      return (
-        ratio > 0.76 ||
-        titleKeywords.some((keyword) =>
-          trimmed.toUpperCase().includes(keyword)
-        )
+        }
       );
     }
 
-    function isListLine(line) {
+    /* =====================================================
+       FILE UI
+       ===================================================== */
+
+    function renderFileList() {
+
+      fileList.innerHTML = "";
+
+      state.files.forEach(
+        (file, index) => {
+
+          const item =
+            document.createElement("div");
+
+          item.className =
+            "file-item";
+
+          item.innerHTML = `
+            <div class="file-icon">
+              ${escapeHtml(
+                extensionOf(file.name)
+                  .toUpperCase()
+              )}
+            </div>
+
+            <div class="file-meta">
+
+              <div
+                class="file-name"
+                title="${escapeHtml(file.name)}"
+              >
+                ${escapeHtml(file.name)}
+              </div>
+
+              <div class="file-size">
+                ${formatBytes(file.size)}
+              </div>
+
+            </div>
+
+            <button
+              class="remove-btn"
+              data-index="${index}"
+              type="button"
+            >
+              ×
+            </button>
+          `;
+
+          fileList.appendChild(item);
+
+        }
+      );
+
+      fileList
+        .querySelectorAll(
+          ".remove-btn"
+        )
+        .forEach(
+          button => {
+
+            button.addEventListener(
+              "click",
+              async event => {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                const index =
+                  Number(
+                    button.dataset.index
+                  );
+
+                state.files.splice(
+                  index,
+                  1
+                );
+
+                renderFileList();
+
+                await renderPreviews();
+
+              }
+            );
+
+          }
+        );
+
+      extractBtn.disabled =
+        state.files.length === 0 ||
+        state.busy;
+
+      fileStatus.textContent =
+        `${state.files.length} document${
+          state.files.length === 1
+            ? ""
+            : "s"
+        }`;
+
+      updateStats();
+    }
+
+    async function addFiles(
+      collection
+    ) {
+
+      const files =
+        [...collection]
+          .filter(
+            file =>
+              isImage(file) ||
+              isPdf(file) ||
+              isDocx(file)
+          );
+
+      if (!files.length) {
+
+        showToast(
+          "No supported documents selected."
+        );
+
+        return;
+      }
+
+      state.files.push(...files);
+
+      renderFileList();
+
+      await renderPreviews();
+    }
+
+    /* =====================================================
+       INPUT EVENTS
+       ===================================================== */
+
+    fileInput.addEventListener(
+      "change",
+      async () => {
+
+        await addFiles(
+          fileInput.files
+        );
+
+        fileInput.value =
+          "";
+
+      }
+    );
+
+    [
+      "dragenter",
+      "dragover"
+    ].forEach(
+      type => {
+
+        uploadZone.addEventListener(
+          type,
+          event => {
+
+            event.preventDefault();
+
+            uploadZone.classList.add(
+              "dragover"
+            );
+
+          }
+        );
+
+      }
+    );
+
+    [
+      "dragleave",
+      "drop"
+    ].forEach(
+      type => {
+
+        uploadZone.addEventListener(
+          type,
+          event => {
+
+            event.preventDefault();
+
+            uploadZone.classList.remove(
+              "dragover"
+            );
+
+          }
+        );
+
+      }
+    );
+
+    uploadZone.addEventListener(
+      "drop",
+      async event => {
+
+        await addFiles(
+          event.dataTransfer.files
+        );
+
+      }
+    );
+
+    /* =====================================================
+       PREVIEW
+       ===================================================== */
+
+    async function renderPreviews() {
+
+      previewPages.innerHTML =
+        "";
+
+      state.pages = [];
+
+      if (!state.files.length) {
+
+        emptyPreview.classList.remove(
+          "hidden"
+        );
+
+        previewPages.classList.add(
+          "hidden"
+        );
+
+        pageCount.textContent =
+          "0 pages";
+
+        updateStats();
+
+        return;
+      }
+
+      emptyPreview.classList.add(
+        "hidden"
+      );
+
+      previewPages.classList.remove(
+        "hidden"
+      );
+
+      for (
+        let fileIndex = 0;
+        fileIndex < state.files.length;
+        fileIndex++
+      ) {
+
+        const file =
+          state.files[fileIndex];
+
+        try {
+
+          if (isImage(file)) {
+
+            await previewImage(
+              file,
+              fileIndex
+            );
+
+          } else if (isPdf(file)) {
+
+            await previewPdf(
+              file,
+              fileIndex
+            );
+
+          } else if (isDocx(file)) {
+
+            await previewDocx(
+              file,
+              fileIndex
+            );
+
+          }
+
+        } catch (error) {
+
+          console.error(error);
+
+        }
+      }
+
+      pageCount.textContent =
+        `${state.pages.length} page${
+          state.pages.length === 1
+            ? ""
+            : "s"
+        }`;
+
+      updateStats();
+    }
+
+    async function previewImage(
+      file,
+      fileIndex
+    ) {
+
+      const dataUrl =
+        await fileToDataUrl(file);
+
+      const wrapper =
+        document.createElement("div");
+
+      wrapper.className =
+        "preview-page";
+
+      const image =
+        document.createElement("img");
+
+      image.src =
+        dataUrl;
+
+      image.alt =
+        file.name;
+
+      const label =
+        document.createElement("div");
+
+      label.className =
+        "page-label";
+
+      label.textContent =
+        file.name;
+
+      wrapper.appendChild(image);
+      wrapper.appendChild(label);
+
+      previewPages.appendChild(
+        wrapper
+      );
+
+      state.pages.push({
+        type: "image",
+        fileIndex,
+        pageNumber: 1,
+        totalPages: 1,
+        dataUrl
+      });
+    }
+
+    async function previewPdf(
+      file,
+      fileIndex
+    ) {
+
+      const buffer =
+        await file.arrayBuffer();
+
+      const pdf =
+        await pdfjsLib
+          .getDocument({
+            data: buffer
+          })
+          .promise;
+
+      for (
+        let pageNumber = 1;
+        pageNumber <= pdf.numPages;
+        pageNumber++
+      ) {
+
+        const page =
+          await pdf.getPage(
+            pageNumber
+          );
+
+        const viewport =
+          page.getViewport({
+            scale: 1.8
+          });
+
+        const canvas =
+          document.createElement(
+            "canvas"
+          );
+
+        const context =
+          canvas.getContext(
+            "2d",
+            {
+              willReadFrequently: true
+            }
+          );
+
+        canvas.width =
+          viewport.width;
+
+        canvas.height =
+          viewport.height;
+
+        await page.render({
+          canvasContext: context,
+          viewport
+        }).promise;
+
+        const wrapper =
+          document.createElement(
+            "div"
+          );
+
+        wrapper.className =
+          "preview-page";
+
+        const label =
+          document.createElement(
+            "div"
+          );
+
+        label.className =
+          "page-label";
+
+        label.textContent =
+          `${file.name} · ${pageNumber}/${pdf.numPages}`;
+
+        wrapper.appendChild(
+          canvas
+        );
+
+        wrapper.appendChild(
+          label
+        );
+
+        previewPages.appendChild(
+          wrapper
+        );
+
+        state.pages.push({
+          type: "pdf",
+          fileIndex,
+          pageNumber,
+          totalPages: pdf.numPages,
+          dataUrl:
+            canvas.toDataURL(
+              "image/png"
+            )
+        });
+      }
+    }
+
+    async function previewDocx(
+      file,
+      fileIndex
+    ) {
+
+      const arrayBuffer =
+        await file.arrayBuffer();
+
+      const htmlResult =
+        await mammoth
+          .convertToHtml({
+            arrayBuffer
+          });
+
+      const page =
+        document.createElement(
+          "div"
+        );
+
+      page.className =
+        "preview-page";
+
+      const content =
+        document.createElement(
+          "div"
+        );
+
+      content.className =
+        "docx-preview";
+
+      content.innerHTML =
+        htmlResult.value;
+
+      const label =
+        document.createElement(
+          "div"
+        );
+
+      label.className =
+        "page-label";
+
+      label.textContent =
+        file.name;
+
+      page.appendChild(
+        content
+      );
+
+      page.appendChild(
+        label
+      );
+
+      previewPages.appendChild(
+        page
+      );
+
+      state.pages.push({
+        type: "docx",
+        fileIndex,
+        pageNumber: 1,
+        totalPages: 1,
+        arrayBuffer,
+        html:
+          htmlResult.value
+      });
+    }
+
+    /* =====================================================
+       QR MASKING
+       ===================================================== */
+
+    async function loadImage(
+      dataUrl
+    ) {
+
+      return new Promise(
+        (resolve, reject) => {
+
+          const image =
+            new Image();
+
+          image.onload =
+            () => resolve(image);
+
+          image.onerror =
+            reject;
+
+          image.src =
+            dataUrl;
+
+        }
+      );
+    }
+
+    async function prepareImageForOcr(
+      dataUrl
+    ) {
+
+      const image =
+        await loadImage(
+          dataUrl
+        );
+
+      const canvas =
+        document.createElement(
+          "canvas"
+        );
+
+      const context =
+        canvas.getContext(
+          "2d",
+          {
+            willReadFrequently: true
+          }
+        );
+
+      canvas.width =
+        image.naturalWidth;
+
+      canvas.height =
+        image.naturalHeight;
+
+      context.drawImage(
+        image,
+        0,
+        0
+      );
+
+      let qrCount = 0;
+
+      if (
+        excludeQR.checked &&
+        typeof jsQR === "function"
+      ) {
+
+        qrCount =
+          maskQrCodes(
+            canvas,
+            context
+          );
+
+      }
+
+      return {
+        dataUrl:
+          canvas.toDataURL(
+            "image/png"
+          ),
+
+        qrCount
+      };
+    }
+
+    function maskQrCodes(
+      canvas,
+      context
+    ) {
+
+      let count = 0;
+
+      /*
+       * jsQR normally returns one QR code at a time.
+       * After each detection the region is masked white.
+       * The scan repeats to find another QR code.
+       */
+
+      for (
+        let attempt = 0;
+        attempt < 6;
+        attempt++
+      ) {
+
+        const imageData =
+          context.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+        const result =
+          jsQR(
+            imageData.data,
+            imageData.width,
+            imageData.height,
+            {
+              inversionAttempts:
+                "attemptBoth"
+            }
+          );
+
+        if (!result) {
+          break;
+        }
+
+        const points = [
+          result.location.topLeftCorner,
+          result.location.topRightCorner,
+          result.location.bottomRightCorner,
+          result.location.bottomLeftCorner
+        ];
+
+        const xs =
+          points.map(
+            point => point.x
+          );
+
+        const ys =
+          points.map(
+            point => point.y
+          );
+
+        const margin =
+          Math.max(
+            12,
+            Math.min(
+              canvas.width,
+              canvas.height
+            ) * .01
+          );
+
+        const left =
+          Math.max(
+            0,
+            Math.min(...xs) -
+            margin
+          );
+
+        const top =
+          Math.max(
+            0,
+            Math.min(...ys) -
+            margin
+          );
+
+        const right =
+          Math.min(
+            canvas.width,
+            Math.max(...xs) +
+            margin
+          );
+
+        const bottom =
+          Math.min(
+            canvas.height,
+            Math.max(...ys) +
+            margin
+          );
+
+        context.fillStyle =
+          "#ffffff";
+
+        context.fillRect(
+          left,
+          top,
+          right - left,
+          bottom - top
+        );
+
+        count++;
+      }
+
+      return count;
+    }
+
+    /* =====================================================
+       OCR CLEANING
+       ===================================================== */
+
+    function normalizeLineBreaks(
+      text
+    ) {
+
+      return String(text || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/\u00ad/g, "")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n{5,}/g, "\n\n\n")
+        .trim();
+    }
+
+    /*
+     * This filter targets typical OCR residue produced by
+     * handwritten signature strokes.
+     *
+     * It does not delete normal alphabetic lines.
+     */
+
+    function removeSignatureArtifacts(
+      text
+    ) {
+
+      if (!excludeSignature.checked) {
+        return text;
+      }
+
+      return text
+        .split("\n")
+        .filter(
+          line => {
+
+            const value =
+              line.trim();
+
+            if (!value) {
+              return true;
+            }
+
+            const alphaNumeric =
+              (
+                value.match(
+                  /[\p{L}\p{N}]/gu
+                ) || []
+              ).length;
+
+            const symbols =
+              (
+                value.match(
+                  /[^\p{L}\p{N}\s]/gu
+                ) || []
+              ).length;
+
+            /*
+             * Keep all meaningful text.
+             */
+
+            if (
+              alphaNumeric >= 2
+            ) {
+              return true;
+            }
+
+            /*
+             * Omit lines that are predominantly
+             * signature-like strokes or punctuation.
+             */
+
+            if (
+              symbols >= 3 &&
+              alphaNumeric <= 1
+            ) {
+              return false;
+            }
+
+            return true;
+          }
+        )
+        .join("\n");
+    }
+
+    function isQrNoise(
+      line
+    ) {
+
+      const value =
+        line.trim();
+
+      if (!value) {
+        return false;
+      }
+
+      /*
+       * QR OCR residue is often a dense group of
+       * random punctuation.
+       */
+
+      const letters =
+        (
+          value.match(
+            /[\p{L}\p{N}]/gu
+          ) || []
+        ).length;
+
+      const symbols =
+        (
+          value.match(
+            /[^\p{L}\p{N}\s]/gu
+          ) || []
+        ).length;
+
       return (
-        /^\s*[•●▪■◆◦]\s+/.test(line) ||
+        value.length > 8 &&
+        letters <= 2 &&
+        symbols >= 6
+      );
+    }
+
+    function cleanOcr(
+      text
+    ) {
+
+      let result =
+        normalizeLineBreaks(
+          text
+        );
+
+      result =
+        removeSignatureArtifacts(
+          result
+        );
+
+      if (excludeQR.checked) {
+
+        result =
+          result
+            .split("\n")
+            .filter(
+              line =>
+                !isQrNoise(line)
+            )
+            .join("\n");
+
+      }
+
+      return result.trim();
+    }
+
+    /* =====================================================
+       STRUCTURE DETECTION
+       ===================================================== */
+
+    function isLikelyHeading(
+      line
+    ) {
+
+      const value =
+        line.trim();
+
+      if (
+        !value ||
+        value.length > 100
+      ) {
+        return false;
+      }
+
+      if (
+        /^[\d\s.:,/()-]+$/.test(
+          value
+        )
+      ) {
+        return false;
+      }
+
+      const letters =
+        value.match(
+          /\p{L}/gu
+        ) || [];
+
+      if (
+        letters.length < 3
+      ) {
+        return false;
+      }
+
+      const upper =
+        value.match(
+          /\p{Lu}/gu
+        ) || [];
+
+      const ratio =
+        upper.length /
+        letters.length;
+
+      if (
+        ratio >= .72
+      ) {
+        return true;
+      }
+
+      const commonTitles = [
+        "PERAKUAN PENDAFTARAN",
+        "PERAKUAN PEMBAHARUAN",
+        "SIJIL",
+        "BORANG",
+        "MAKLUMAT SYARIKAT",
+        "MAKLUMAT PERNIAGAAN",
+        "MAKLUMAT CAWANGAN",
+        "JENIS PERNIAGAAN",
+        "PEGAWAI SYARIKAT",
+        "KATEGORI",
+        "GRED",
+        "CONTRACTOR",
+        "REGISTRATION",
+        "CERTIFICATE",
+        "GOVERNMENT GAZETTE",
+        "FEDERAL GOVERNMENT GAZETTE",
+        "FOURTH SCHEDULE",
+        "JADUAL KEEMPAT"
+      ];
+
+      return commonTitles.some(
+        title =>
+          value
+            .toUpperCase()
+            .includes(title)
+      );
+    }
+
+    function headingLevel(
+      line
+    ) {
+
+      const value =
+        line.trim();
+
+      if (
+        value.length <= 42
+      ) {
+        return 3;
+      }
+
+      return 4;
+    }
+
+    function isListItem(
+      line
+    ) {
+
+      return (
+        /^\s*[•●▪◦■◆]\s*/.test(line) ||
         /^\s*[-*]\s+/.test(line) ||
         /^\s*\d+[.)]\s+/.test(line) ||
         /^\s*[ivxlcdm]+[.)]\s+/i.test(line) ||
@@ -1656,203 +2966,520 @@
       );
     }
 
-    function normalizeBullet(line) {
-      let value = line.trim();
+    function normalizeList(
+      line
+    ) {
 
-      value = value.replace(
-        /^[•●▪■◆◦]\s*/,
-        "- "
-      );
+      let value =
+        line.trim();
 
-      if (
-        /^[-*]\s+/.test(value)
-      ) {
-        return value;
-      }
+      value =
+        value.replace(
+          /^[•●▪◦■◆]\s*/,
+          "- "
+        );
 
       return value;
     }
 
-    function isKeyValueLine(line) {
-      const trimmed = line.trim();
+    function isExplicitKeyValue(
+      line
+    ) {
 
-      if (!trimmed) return false;
+      const value =
+        line.trim();
+
+      /*
+       * Preserve visible colon.
+       */
 
       if (
-        /^[^:]{2,50}:\s+.+$/.test(trimmed)
-      ) {
-        return true;
-      }
-
-      if (
-        /^[A-Za-zÀ-ÿ ./'()_-]{2,45}\s{3,}.+$/.test(
-          trimmed
+        /^[^:]{1,60}\s*:\s*.+$/.test(
+          value
         )
       ) {
         return true;
       }
 
-      return false;
+      /*
+       * Forms frequently contain wide visual spaces.
+       */
+
+      return (
+        /^[^\t]{2,60}\s{3,}\S+/.test(
+          value
+        )
+      );
     }
 
-    function normalizeKeyValue(line) {
-      const trimmed = line.trim();
+    function formatKeyValue(
+      line
+    ) {
 
-      if (trimmed.includes(":")) {
-        const index = trimmed.indexOf(":");
+      const value =
+        line.trim();
+
+      if (
+        value.includes(":")
+      ) {
+
+        const position =
+          value.indexOf(":");
 
         const key =
-          trimmed.slice(0, index).trim();
+          value
+            .slice(
+              0,
+              position
+            )
+            .trim();
 
-        const value =
-          trimmed.slice(index + 1).trim();
+        const content =
+          value
+            .slice(
+              position + 1
+            )
+            .trim();
 
-        return `${key}: ${value}`;
-      }
-
-      const parts =
-        trimmed.split(/\s{3,}/);
-
-      if (parts.length >= 2) {
         return (
-          `${parts[0].trim()}: ` +
-          parts.slice(1).join(" ").trim()
+          `**${key}:** ${content}`
         );
       }
 
-      return trimmed;
-    }
-
-    function detectSimpleTable(lines) {
-      const rows = [];
-
-      for (const line of lines) {
-        const columns =
-          line.trim().split(/\s{3,}|\t+/);
-
-        if (columns.length >= 2) {
-          rows.push(columns);
-        } else {
-          rows.push(null);
-        }
-      }
-
-      return rows;
-    }
-
-    function structureTextToMarkdown(rawText) {
-      const cleaned =
-        cleanOcrText(rawText);
-
-      if (!cleaned) return "";
+      const parts =
+        value.split(
+          /\s{3,}/
+        );
 
       if (
-        outputMode.value === "literal"
+        parts.length >= 2
       ) {
-        return cleaned;
+
+        return (
+          `**${parts[0]}:** ` +
+          parts
+            .slice(1)
+            .join(" ")
+        );
+      }
+
+      return value;
+    }
+
+    /* =====================================================
+       TABLE DETECTION
+       ===================================================== */
+
+    function tableColumns(
+      line
+    ) {
+
+      return line
+        .trim()
+        .split(
+          /\t+|\s{3,}/
+        )
+        .map(
+          part =>
+            part.trim()
+        )
+        .filter(Boolean);
+    }
+
+    function detectTableBlock(
+      lines,
+      start
+    ) {
+
+      const rows = [];
+
+      let index =
+        start;
+
+      while (
+        index < lines.length
+      ) {
+
+        const line =
+          lines[index];
+
+        const columns =
+          tableColumns(
+            line
+          );
+
+        if (
+          columns.length < 2
+        ) {
+          break;
+        }
+
+        rows.push(
+          columns
+        );
+
+        index++;
+      }
+
+      if (
+        rows.length < 2
+      ) {
+        return null;
+      }
+
+      const counts =
+        rows.map(
+          row => row.length
+        );
+
+      const dominant =
+        counts
+          .sort(
+            (a, b) =>
+              counts.filter(
+                value => value === a
+              ).length -
+              counts.filter(
+                value => value === b
+              ).length
+          )
+          .pop();
+
+      const compatible =
+        rows.filter(
+          row =>
+            Math.abs(
+              row.length -
+              dominant
+            ) <= 1
+        );
+
+      if (
+        compatible.length < 2
+      ) {
+        return null;
+      }
+
+      return {
+        rows,
+        nextIndex: index
+      };
+    }
+
+    function markdownTable(
+      rows
+    ) {
+
+      const maxColumns =
+        Math.max(
+          ...rows.map(
+            row => row.length
+          )
+        );
+
+      const normalized =
+        rows.map(
+          row => {
+
+            const output =
+              [...row];
+
+            while (
+              output.length <
+              maxColumns
+            ) {
+              output.push("");
+            }
+
+            return output;
+          }
+        );
+
+      const escape =
+        value =>
+          String(value)
+            .replace(/\|/g, "\\|");
+
+      const header =
+        normalized[0];
+
+      const divider =
+        header.map(
+          () => "---"
+        );
+
+      const body =
+        normalized
+          .slice(1);
+
+      const output = [
+        `| ${header
+          .map(escape)
+          .join(" | ")} |`,
+
+        `| ${divider
+          .join(" | ")} |`
+      ];
+
+      body.forEach(
+        row => {
+
+          output.push(
+            `| ${row
+              .map(escape)
+              .join(" | ")} |`
+          );
+
+        }
+      );
+
+      return output.join("\n");
+    }
+
+    /* =====================================================
+       ULTRA STRUCTURED MARKDOWN
+       ===================================================== */
+
+    function ultraStructure(
+      rawText
+    ) {
+
+      const text =
+        cleanOcr(
+          rawText
+        );
+
+      if (
+        outputMode.value ===
+        "literal"
+      ) {
+        return text;
       }
 
       const lines =
-        cleaned.split("\n");
+        text.split("\n");
 
-      const output = [];
+      const result = [];
 
-      for (
-        let i = 0;
-        i < lines.length;
-        i++
+      let i = 0;
+
+      while (
+        i < lines.length
       ) {
-        const original =
+
+        const raw =
           lines[i];
 
         const line =
-          original.trim();
+          raw.trim();
 
         if (!line) {
+
           if (
-            output.length &&
-            output[output.length - 1] !== ""
+            result.length &&
+            result[
+              result.length - 1
+            ] !== ""
           ) {
-            output.push("");
+            result.push("");
           }
 
+          i++;
           continue;
         }
+
+        /*
+         * TABLE
+         */
+
+        if (
+          detectTables.checked
+        ) {
+
+          const table =
+            detectTableBlock(
+              lines,
+              i
+            );
+
+          if (table) {
+
+            result.push(
+              markdownTable(
+                table.rows
+              )
+            );
+
+            result.push("");
+
+            i =
+              table.nextIndex;
+
+            continue;
+          }
+        }
+
+        /*
+         * HEADING
+         */
 
         if (
           detectHeadings.checked &&
-          likelyHeading(line)
+          isLikelyHeading(line)
         ) {
-          if (line.length < 45) {
-            output.push(`# ${line}`);
-          } else {
-            output.push(`## ${line}`);
-          }
 
-          continue;
-        }
+          const level =
+            headingLevel(line);
 
-        if (isListLine(line)) {
-          output.push(
-            normalizeBullet(line)
+          result.push(
+            `${"#".repeat(level)} ${line}`
           );
 
+          result.push("");
+
+          i++;
           continue;
         }
+
+        /*
+         * LIST
+         */
 
         if (
-          detectKeyValues.checked &&
-          isKeyValueLine(line)
+          isListItem(line)
         ) {
-          output.push(
-            normalizeKeyValue(line)
+
+          result.push(
+            normalizeList(line)
           );
 
+          i++;
           continue;
         }
 
-        output.push(line);
-      }
+        /*
+         * KEY : VALUE
+         */
 
-      let result =
-        output.join("\n");
+        if (
+          detectKV.checked &&
+          isExplicitKeyValue(line)
+        ) {
 
-      if (!preserveLines.checked) {
-        result = result
-          .replace(
-            /(?<!\n)\n(?!\n|[-#])/g,
-            " "
-          )
-          .replace(
-            / {2,}/g,
-            " "
+          result.push(
+            formatKeyValue(
+              line
+            )
           );
+
+          i++;
+          continue;
+        }
+
+        /*
+         * LITERAL BODY
+         */
+
+        result.push(line);
+
+        i++;
       }
 
-      return result.trim();
+      return result
+        .join("\n")
+        .replace(
+          /\n{4,}/g,
+          "\n\n\n"
+        )
+        .trim();
     }
 
-    function htmlToMarkdown(html) {
+    /* =====================================================
+       DOCX -> MARKDOWN
+       ===================================================== */
+
+    function htmlTableToMarkdown(
+      table
+    ) {
+
+      const rows =
+        [
+          ...table.querySelectorAll(
+            "tr"
+          )
+        ];
+
+      if (!rows.length) {
+        return "";
+      }
+
+      const matrix =
+        rows.map(
+          row =>
+            [
+              ...row.querySelectorAll(
+                "th,td"
+              )
+            ].map(
+              cell =>
+                cell.innerText
+                  .replace(
+                    /\s+/g,
+                    " "
+                  )
+                  .trim()
+            )
+        );
+
+      return markdownTable(
+        matrix
+      );
+    }
+
+    function docxHtmlToMarkdown(
+      html
+    ) {
+
       const container =
-        document.createElement("div");
+        document.createElement(
+          "div"
+        );
 
-      container.innerHTML = html;
+      container.innerHTML =
+        html;
 
-      const walk = (node) => {
+      function walk(node) {
+
         if (
-          node.nodeType === Node.TEXT_NODE
+          node.nodeType ===
+          Node.TEXT_NODE
         ) {
           return node.nodeValue;
         }
 
         if (
-          node.nodeType !== Node.ELEMENT_NODE
+          node.nodeType !==
+          Node.ELEMENT_NODE
         ) {
           return "";
         }
 
         const tag =
-          node.tagName.toLowerCase();
+          node.tagName
+            .toLowerCase();
+
+        if (
+          tag === "table"
+        ) {
+
+          return (
+            "\n" +
+            htmlTableToMarkdown(
+              node
+            ) +
+            "\n"
+          );
+        }
 
         const content =
           [...node.childNodes]
@@ -1860,409 +3487,347 @@
             .join("");
 
         switch (tag) {
+
           case "h1":
-            return `# ${content.trim()}\n\n`;
+            return (
+              `# ${content.trim()}\n\n`
+            );
 
           case "h2":
-            return `## ${content.trim()}\n\n`;
+            return (
+              `## ${content.trim()}\n\n`
+            );
 
           case "h3":
-            return `### ${content.trim()}\n\n`;
+            return (
+              `### ${content.trim()}\n\n`
+            );
 
           case "h4":
-            return `#### ${content.trim()}\n\n`;
+            return (
+              `#### ${content.trim()}\n\n`
+            );
 
           case "p":
-            return `${content.trim()}\n\n`;
+            return (
+              `${content.trim()}\n\n`
+            );
+
+          case "li":
+            return (
+              `- ${content.trim()}\n`
+            );
+
+          case "ul":
+          case "ol":
+            return (
+              `${content}\n`
+            );
 
           case "strong":
           case "b":
-            return `**${content.trim()}**`;
+            return (
+              `**${content}**`
+            );
 
           case "em":
           case "i":
-            return `*${content.trim()}*`;
+            return (
+              `*${content}*`
+            );
 
           case "br":
             return "\n";
 
-          case "li":
-            return `- ${content.trim()}\n`;
-
-          case "ul":
-          case "ol":
-            return `${content}\n`;
-
-          case "table":
-            return tableElementToMarkdown(node) + "\n\n";
-
-          case "tr":
-          case "td":
-          case "th":
-            return content;
+          case "img":
+            return "";
 
           default:
             return content;
         }
-      };
+      }
 
       return walk(container)
-        .replace(/\n{3,}/g, "\n\n")
+        .replace(
+          /\n{4,}/g,
+          "\n\n\n"
+        )
         .trim();
     }
 
-    function tableElementToMarkdown(table) {
-      const rows =
-        [...table.querySelectorAll("tr")];
-
-      if (!rows.length) return "";
-
-      const matrix = rows.map((row) =>
-        [...row.querySelectorAll("th,td")].map(
-          (cell) =>
-            cell.innerText
-              .replace(/\s+/g, " ")
-              .trim()
-        )
-      );
-
-      const maxColumns =
-        Math.max(
-          ...matrix.map(
-            (row) => row.length
-          )
-        );
-
-      matrix.forEach((row) => {
-        while (
-          row.length < maxColumns
-        ) {
-          row.push("");
-        }
-      });
-
-      const escapeCell = (value) =>
-        String(value)
-          .replace(/\|/g, "\\|")
-          .replace(/\n/g, " ");
-
-      const header =
-        matrix[0]
-          .map(escapeCell)
-          .join(" | ");
-
-      const divider =
-        matrix[0]
-          .map(() => "---")
-          .join(" | ");
-
-      const body =
-        matrix
-          .slice(1)
-          .map(
-            (row) =>
-              `| ${row
-                .map(escapeCell)
-                .join(" | ")} |`
-          )
-          .join("\n");
-
-      return (
-        `| ${header} |\n` +
-        `| ${divider} |` +
-        (body ? `\n${body}` : "")
-      );
-    }
-
-    function markdownToHtml(markdown) {
-      let html =
-        escapeHtml(markdown);
-
-      html = html
-        .replace(
-          /^#### (.+)$/gm,
-          "<h4>$1</h4>"
-        )
-        .replace(
-          /^### (.+)$/gm,
-          "<h3>$1</h3>"
-        )
-        .replace(
-          /^## (.+)$/gm,
-          "<h2>$1</h2>"
-        )
-        .replace(
-          /^# (.+)$/gm,
-          "<h1>$1</h1>"
-        )
-        .replace(
-          /\*\*(.+?)\*\*/g,
-          "<strong>$1</strong>"
-        );
-
-      const lines =
-        html.split("\n");
-
-      const final = [];
-      let inList = false;
-
-      for (const line of lines) {
-        if (/^- /.test(line)) {
-          if (!inList) {
-            final.push("<ul>");
-            inList = true;
-          }
-
-          final.push(
-            `<li>${line.slice(2)}</li>`
-          );
-        } else {
-          if (inList) {
-            final.push("</ul>");
-            inList = false;
-          }
-
-          if (
-            /^<h[1-4]>/.test(line)
-          ) {
-            final.push(line);
-          } else if (!line.trim()) {
-            final.push("");
-          } else {
-            final.push(`<p>${line}</p>`);
-          }
-        }
-      }
-
-      if (inList) {
-        final.push("</ul>");
-      }
-
-      return final.join("\n");
-    }
+    /* =====================================================
+       OCR
+       ===================================================== */
 
     async function recognizeImage(
       dataUrl,
-      pageIndex,
-      totalPages
+      index,
+      total
     ) {
+
+      const prepared =
+        await prepareImageForOcr(
+          dataUrl
+        );
+
+      if (
+        prepared.qrCount > 0
+      ) {
+
+        log(
+          `${prepared.qrCount} QR region(s) excluded`
+        );
+      }
+
       const result =
         await Tesseract.recognize(
-          dataUrl,
+          prepared.dataUrl,
           ocrLanguage.value,
           {
-            logger: (message) => {
-              if (
-                typeof message.progress ===
-                "number"
-              ) {
-                const local =
-                  message.progress;
+            logger:
+              event => {
 
-                const overall =
-                  ((pageIndex + local) /
-                    totalPages) *
-                  100;
+                if (
+                  typeof event.progress ===
+                  "number"
+                ) {
 
-                setProgress(
-                  overall,
-                  `OCR page ${pageIndex + 1} of ${totalPages}`
-                );
+                  const overall =
+                    (
+                      (
+                        index +
+                        event.progress
+                      ) /
+                      total
+                    ) *
+                    100;
+
+                  setProgress(
+                    overall,
+                    `OCR page ${index + 1} of ${total}`
+                  );
+                }
+
               }
-
-              if (message.status) {
-                progressLabel.textContent =
-                  message.status;
-              }
-            }
           }
         );
 
-      return cleanOcrText(
-        result.data.text
-      );
-    }
-
-    async function extractDocx(page) {
-      const raw =
-        await mammoth.extractRawText({
-          arrayBuffer:
-            page.arrayBuffer
-        });
-
-      const html =
-        page.html || "";
-
-      const markdown =
-        html
-          ? htmlToMarkdown(html)
-          : structureTextToMarkdown(
-              raw.value
-            );
-
       return {
-        text: cleanOcrText(raw.value),
-        markdown,
-        html
+        text:
+          cleanOcr(
+            result.data.text
+          ),
+
+        qrCount:
+          prepared.qrCount
       };
     }
 
+    /* =====================================================
+       EXTRACTION
+       ===================================================== */
+
     async function extractDocuments() {
-      if (!state.files.length) return;
-      if (state.busy) return;
 
-      state.busy = true;
-      extractBtn.disabled = true;
-      progressWrap.style.display = "block";
-      ocrLog.textContent = "";
-      setProgress(0, "Preparing document extraction");
+      if (
+        !state.files.length ||
+        state.busy
+      ) {
+        return;
+      }
 
-      const markdownDocuments = [];
-      const textDocuments = [];
-      const htmlDocuments = [];
+      state.busy =
+        true;
 
-      const totalPages =
-        state.pages.length || 1;
+      extractBtn.disabled =
+        true;
+
+      progressSection.style.display =
+        "block";
+
+      ocrLog.textContent =
+        "";
+
+      setProgress(
+        0,
+        "Preparing"
+      );
+
+      const output = [];
 
       try {
+
+        const total =
+          state.pages.length || 1;
+
         for (
-          let i = 0;
-          i < state.pages.length;
-          i++
+          let index = 0;
+          index < state.pages.length;
+          index++
         ) {
+
           const page =
-            state.pages[i];
+            state.pages[index];
 
           const file =
-            state.files[page.fileIndex];
+            state.files[
+              page.fileIndex
+            ];
 
           log(
-            `Processing ${file.name}` +
-              (
-                page.type === "pdf-page"
-                  ? ` page ${page.pageNumber}`
-                  : ""
-              )
+            `Processing ${file.name} · page ${page.pageNumber}`
           );
 
-          let pageText = "";
-          let pageMarkdown = "";
-          let pageHtml = "";
+          let markdown =
+            "";
+
+          /*
+           * IMAGE / PDF PAGE
+           */
 
           if (
             page.type === "image" ||
-            page.type === "pdf-page"
+            page.type === "pdf"
           ) {
-            pageText =
+
+            const ocr =
               await recognizeImage(
                 page.dataUrl,
-                i,
-                totalPages
+                index,
+                total
               );
 
-            pageMarkdown =
-              structureTextToMarkdown(
-                pageText
-              );
-
-            pageHtml =
-              markdownToHtml(
-                pageMarkdown
+            markdown =
+              ultraStructure(
+                ocr.text
               );
           }
 
-          if (page.type === "docx") {
-            const result =
-              await extractDocx(page);
+          /*
+           * DOCX
+           */
 
-            pageText =
-              result.text;
+          if (
+            page.type === "docx"
+          ) {
 
-            pageMarkdown =
-              result.markdown;
-
-            pageHtml =
-              result.html ||
-              markdownToHtml(
-                pageMarkdown
+            markdown =
+              docxHtmlToMarkdown(
+                page.html
               );
 
             setProgress(
-              ((i + 1) / totalPages) *
-                100,
-              `Reading DOCX ${i + 1} of ${totalPages}`
+              (
+                (index + 1) /
+                total
+              ) * 100,
+              `Reading page ${index + 1} of ${total}`
             );
           }
 
-          const fileHeader =
-            `DOCUMENT: ${file.name}`;
+          /*
+           * DOCUMENT STRUCTURE
+           */
 
-          const pageHeader =
-            page.type === "pdf-page"
-              ? `PAGE: ${page.pageNumber}/${page.totalPages}`
-              : "PAGE: 1";
+          const isFirstPage =
+            page.pageNumber === 1;
 
-          markdownDocuments.push(
-            `<!-- ${fileHeader} | ${pageHeader} -->\n\n` +
-              pageMarkdown
+          if (isFirstPage) {
+
+            output.push(
+              `# DOCUMENT ${page.fileIndex + 1}`
+            );
+
+            output.push("");
+
+            output.push(
+              `**File:** ${file.name}`
+            );
+
+            output.push(
+              `**Document Type:** ${
+                page.type === "pdf"
+                  ? "PDF"
+                  : page.type === "docx"
+                    ? "DOCX"
+                    : "Image"
+              }`
+            );
+
+            output.push("");
+
+            output.push("---");
+            output.push("");
+          }
+
+          output.push(
+            `## PAGE ${page.pageNumber}`
           );
 
-          textDocuments.push(
-            `${fileHeader}\n${pageHeader}\n\n${pageText}`
-          );
+          output.push("");
 
-          htmlDocuments.push(
-            `<section class="document-page" data-document="${escapeHtml(
-              file.name
-            )}" data-page="${page.pageNumber}">\n` +
-              `<div class="document-meta">${escapeHtml(
-                fileHeader
-              )} · ${escapeHtml(
-                pageHeader
-              )}</div>\n` +
-              `${pageHtml}\n` +
-              `</section>`
-          );
+          if (markdown) {
+
+            output.push(
+              markdown
+            );
+
+          } else {
+
+            output.push(
+              "[Illegible]"
+            );
+
+          }
+
+          output.push("");
+
+          if (
+            page.pageNumber ===
+            page.totalPages
+          ) {
+
+            output.push("---");
+            output.push("");
+
+          }
 
           setProgress(
-            ((i + 1) / totalPages) *
-              100,
-            `Completed ${i + 1} of ${totalPages}`
+            (
+              (index + 1) /
+              total
+            ) * 100,
+            `Completed ${index + 1} of ${total}`
           );
+
         }
 
-        state.extracted.markdown =
-          markdownDocuments.join(
-            "\n\n---\n\n"
-          );
-
-        state.extracted.text =
-          textDocuments.join(
-            "\n\n========================================\n\n"
-          );
-
-        state.extracted.html =
-          createExportHtml(
-            htmlDocuments.join("\n\n")
-          );
-
-        outputEditor.value =
-          state.extracted[
-            state.activeTab
-          ];
+        editor.value =
+          output
+            .join("\n")
+            .replace(
+              /\n{4,}/g,
+              "\n\n\n"
+            )
+            .trim();
 
         setProgress(
           100,
           "Extraction completed"
         );
 
-        log("Extraction completed.");
+        log(
+          "Extraction completed"
+        );
+
         updateStats();
 
         showToast(
-          "Document extraction completed."
+          "Extraction completed."
         );
+
       } catch (error) {
+
         console.error(error);
 
         log(
@@ -2273,294 +3838,39 @@
           "Extraction failed";
 
         showToast(
-          "OCR failed. Check the document and try again."
+          "Extraction failed."
         );
+
       } finally {
-        state.busy = false;
+
+        state.busy =
+          false;
+
         extractBtn.disabled =
-          !state.files.length;
+          state.files.length === 0;
+
       }
     }
 
-    function createExportHtml(bodyHtml) {
-      return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Extracted Document</title>
-<style>
-body{
-  max-width:1000px;
-  margin:40px auto;
-  padding:0 30px;
-  font-family:Arial,sans-serif;
-  line-height:1.55;
-  color:#111;
-}
-.document-page{
-  padding:25px 0 50px;
-  border-bottom:1px solid #ccc;
-}
-.document-meta{
-  margin-bottom:25px;
-  padding:8px 10px;
-  background:#f1f1f1;
-  font-size:11px;
-  font-family:monospace;
-}
-table{
-  width:100%;
-  border-collapse:collapse;
-}
-th,td{
-  border:1px solid #222;
-  padding:6px;
-  vertical-align:top;
-}
-</style>
-</head>
-<body>
-${bodyHtml}
-</body>
-</html>`;
-    }
-
-    extractBtn.addEventListener(
-      "click",
-      extractDocuments
-    );
-
-    tabs.forEach((tab) => {
-      tab.addEventListener(
-        "click",
-        () => {
-          state.extracted[
-            state.activeTab
-          ] = outputEditor.value;
-
-          tabs.forEach((item) =>
-            item.classList.remove(
-              "active"
-            )
-          );
-
-          tab.classList.add("active");
-
-          state.activeTab =
-            tab.dataset.tab;
-
-          outputEditor.value =
-            state.extracted[
-              state.activeTab
-            ] || "";
-
-          updateStats();
-        }
-      );
-    });
-
-    outputEditor.addEventListener(
-      "input",
-      () => {
-        state.extracted[
-          state.activeTab
-        ] = outputEditor.value;
-
-        updateStats();
-      }
-    );
-
-    copyBtn.addEventListener(
-      "click",
-      async () => {
-        if (!outputEditor.value) {
-          showToast(
-            "There is no extracted content to copy."
-          );
-          return;
-        }
-
-        try {
-          await navigator.clipboard.writeText(
-            outputEditor.value
-          );
-
-          showToast(
-            "Copied to clipboard."
-          );
-        } catch {
-          outputEditor.select();
-          document.execCommand("copy");
-
-          showToast(
-            "Copied to clipboard."
-          );
-        }
-      }
-    );
-
-    downloadBtn.addEventListener(
-      "click",
-      () => {
-        const content =
-          outputEditor.value;
-
-        if (!content) {
-          showToast(
-            "There is no extracted content to download."
-          );
-          return;
-        }
-
-        const extensions = {
-          markdown: "md",
-          text: "txt",
-          html: "html"
-        };
-
-        const mime = {
-          markdown:
-            "text/markdown;charset=utf-8",
-          text:
-            "text/plain;charset=utf-8",
-          html:
-            "text/html;charset=utf-8"
-        };
-
-        const blob =
-          new Blob(
-            [content],
-            {
-              type:
-                mime[state.activeTab]
-            }
-          );
-
-        const url =
-          URL.createObjectURL(blob);
-
-        const a =
-          document.createElement("a");
-
-        a.href = url;
-
-        a.download =
-          `document-extraction.${extensions[state.activeTab]}`;
-
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-
-        setTimeout(
-          () =>
-            URL.revokeObjectURL(url),
-          1000
-        );
-      }
-    );
-
-    function insertAtCursor(text) {
-      const start =
-        outputEditor.selectionStart;
-
-      const end =
-        outputEditor.selectionEnd;
-
-      const value =
-        outputEditor.value;
-
-      outputEditor.value =
-        value.slice(0, start) +
-        text +
-        value.slice(end);
-
-      const newPosition =
-        start + text.length;
-
-      outputEditor.selectionStart =
-        newPosition;
-
-      outputEditor.selectionEnd =
-        newPosition;
-
-      outputEditor.focus();
-
-      state.extracted[
-        state.activeTab
-      ] = outputEditor.value;
-
-      updateStats();
-    }
-
-    markIllegibleBtn.addEventListener(
-      "click",
-      () =>
-        insertAtCursor(
-          "[Illegible]"
-        )
-    );
-
-    markSignatureBtn.addEventListener(
-      "click",
-      () =>
-        insertAtCursor(
-          "[Signature]"
-        )
-    );
-
-    markLogoBtn.addEventListener(
-      "click",
-      () =>
-        insertAtCursor(
-          "[Logo]"
-        )
-    );
-
-    clearBtn.addEventListener(
-      "click",
-      () => {
-        if (state.busy) return;
-
-        state.files = [];
-        state.pages = [];
-
-        state.extracted = {
-          markdown: "",
-          text: "",
-          html: ""
-        };
-
-        outputEditor.value = "";
-        fileInput.value = "";
-
-        progressWrap.style.display =
-          "none";
-
-        ocrLog.textContent = "";
-        setProgress(0, "");
-
-        updateFileUI();
-        renderAllPreviews();
-        updateStats();
-
-        showToast(
-          "Workspace cleared."
-        );
-      }
-    );
+    /* =====================================================
+       OUTPUT
+       ===================================================== */
 
     function updateStats() {
-      const value =
-        outputEditor.value || "";
+
+      const text =
+        editor.value || "";
 
       const words =
-        value.trim()
-          ? value
+        text.trim()
+          ? text
               .trim()
               .split(/\s+/)
               .length
           : 0;
+
+      statDocuments.textContent =
+        state.files.length;
 
       statPages.textContent =
         state.pages.length;
@@ -2569,23 +3879,213 @@ ${bodyHtml}
         words.toLocaleString();
 
       statChars.textContent =
-        value.length.toLocaleString();
+        text.length.toLocaleString();
     }
 
-    window.addEventListener(
-      "beforeunload",
-      (event) => {
-        if (
-          outputEditor.value.trim()
-        ) {
-          event.preventDefault();
-          event.returnValue = "";
+    editor.addEventListener(
+      "input",
+      updateStats
+    );
+
+    copyBtn.addEventListener(
+      "click",
+      async () => {
+
+        if (!editor.value) {
+
+          showToast(
+            "No extracted data."
+          );
+
+          return;
         }
+
+        try {
+
+          await navigator.clipboard
+            .writeText(
+              editor.value
+            );
+
+          showToast(
+            "Markdown copied."
+          );
+
+        } catch {
+
+          editor.select();
+
+          document.execCommand(
+            "copy"
+          );
+
+          showToast(
+            "Markdown copied."
+          );
+        }
+
       }
     );
 
-    updateFileUI();
+    downloadBtn.addEventListener(
+      "click",
+      () => {
+
+        if (!editor.value) {
+
+          showToast(
+            "No extracted data."
+          );
+
+          return;
+        }
+
+        const blob =
+          new Blob(
+            [editor.value],
+            {
+              type:
+                "text/markdown;charset=utf-8"
+            }
+          );
+
+        const url =
+          URL.createObjectURL(
+            blob
+          );
+
+        const anchor =
+          document.createElement(
+            "a"
+          );
+
+        anchor.href =
+          url;
+
+        anchor.download =
+          "ultra-structured-extraction.md";
+
+        document.body.appendChild(
+          anchor
+        );
+
+        anchor.click();
+        anchor.remove();
+
+        setTimeout(
+          () => {
+            URL.revokeObjectURL(
+              url
+            );
+          },
+          1000
+        );
+
+      }
+    );
+
+    insertIllegibleBtn.addEventListener(
+      "click",
+      () => {
+
+        const start =
+          editor.selectionStart;
+
+        const end =
+          editor.selectionEnd;
+
+        const value =
+          editor.value;
+
+        const text =
+          "[Illegible]";
+
+        editor.value =
+          value.slice(
+            0,
+            start
+          ) +
+          text +
+          value.slice(
+            end
+          );
+
+        const position =
+          start +
+          text.length;
+
+        editor.selectionStart =
+          position;
+
+        editor.selectionEnd =
+          position;
+
+        editor.focus();
+
+        updateStats();
+
+      }
+    );
+
+    /* =====================================================
+       CLEAR
+       ===================================================== */
+
+    clearBtn.addEventListener(
+      "click",
+      () => {
+
+        if (state.busy) {
+          return;
+        }
+
+        state.files =
+          [];
+
+        state.pages =
+          [];
+
+        fileInput.value =
+          "";
+
+        editor.value =
+          "";
+
+        ocrLog.textContent =
+          "";
+
+        progressSection.style.display =
+          "none";
+
+        setProgress(
+          0,
+          ""
+        );
+
+        renderFileList();
+        renderPreviews();
+        updateStats();
+
+        showToast(
+          "Workspace cleared."
+        );
+
+      }
+    );
+
+    extractBtn.addEventListener(
+      "click",
+      extractDocuments
+    );
+
+    /* =====================================================
+       INITIALIZE
+       ===================================================== */
+
+    renderFileList();
     updateStats();
+
   </script>
+
 </body>
 </html>
