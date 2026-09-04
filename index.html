@@ -1127,7 +1127,7 @@
 
               <select id="outputMode" class="control">
                 <option value="ultra" selected>
-                  Ultra Structured Markdown
+                  Ultra Structured Form
                 </option>
                 <option value="literal">
                   Literal Text
@@ -3342,6 +3342,230 @@
     return { value:exact, count:winner.items.length, alternatives:groups.slice(1).map(g => g.representative) };
   }
 
+  const STRUCTURED_FORM_RULES = [
+    { section:"Primary Information", field:"Company / Organisation Name", labels:["NAMA SYARIKAT","COMPANY NAME","NAMA KONTRAKTOR","CONTRACTOR NAME"] },
+    { section:"Primary Information", field:"Full Name", labels:["NAMA PENUH","FULL NAME","NAME","NAMA"] },
+    { section:"Registration & Identification", field:"Registration Number", labels:["NO. PENDAFTARAN","NO PENDAFTARAN","NOMBOR PENDAFTARAN","REGISTRATION NUMBER","REGISTRATION NO","NO. REGISTRATION"] },
+    { section:"Registration & Identification", field:"Company Number", labels:["NO. SYARIKAT","NO SYARIKAT","COMPANY NUMBER","COMPANY NO"] },
+    { section:"Registration & Identification", field:"Certificate Number", labels:["NO. SIJIL","NO SIJIL","NOMBOR SIJIL","CERTIFICATE NUMBER","CERTIFICATE NO"] },
+    { section:"Registration & Identification", field:"Reference Number", labels:["NO. RUJUKAN","NO RUJUKAN","NOMBOR RUJUKAN","REFERENCE NUMBER","REFERENCE NO"] },
+    { section:"Registration & Identification", field:"Identity Number", labels:["NO. PENGENALAN","NO PENGENALAN","IDENTITY NUMBER","IDENTITY NO","NRIC","NO. K/P","NO K/P"] },
+    { section:"Registration & Identification", field:"Passport Number", labels:["NO. PASPORT","NO PASPORT","PASSPORT NUMBER","PASSPORT NO"] },
+    { section:"Registration & Identification", field:"Licence Number", labels:["NO. LESEN","NO LESEN","LICENCE NUMBER","LICENCE NO","LICENSE NUMBER","LICENSE NO"] },
+    { section:"Address & Location", field:"Registered Address", labels:["ALAMAT BERDAFTAR","REGISTERED ADDRESS"] , multiline:true },
+    { section:"Address & Location", field:"Business Address", labels:["ALAMAT PERNIAGAAN","BUSINESS ADDRESS"] , multiline:true },
+    { section:"Address & Location", field:"Address", labels:["ALAMAT","ADDRESS"] , multiline:true },
+    { section:"Address & Location", field:"Postcode", labels:["POSKOD","POSTCODE","POSTAL CODE"] },
+    { section:"Address & Location", field:"State", labels:["NEGERI","STATE"] },
+    { section:"Address & Location", field:"District", labels:["DAERAH","DISTRICT"] },
+    { section:"Dates & Validity", field:"Date of Birth", labels:["TARIKH LAHIR","DATE OF BIRTH","DOB"] },
+    { section:"Dates & Validity", field:"Registration Date", labels:["TARIKH PENDAFTARAN","REGISTRATION DATE","DATE OF REGISTRATION"] },
+    { section:"Dates & Validity", field:"Incorporation Date", labels:["TARIKH PENUBUHAN","TARIKH PEMERBADANAN","INCORPORATION DATE","DATE OF INCORPORATION"] },
+    { section:"Dates & Validity", field:"Date of Change", labels:["TARIKH PERTUKARAN","DATE OF CHANGE"] },
+    { section:"Dates & Validity", field:"Issue Date", labels:["TARIKH DIKELUARKAN","DATE OF ISSUE","ISSUE DATE"] },
+    { section:"Dates & Validity", field:"Expiry Date", labels:["TARIKH TAMAT","TARIKH LUPUT","DATE OF EXPIRY","EXPIRY DATE","EXPIRATION DATE"] },
+    { section:"Dates & Validity", field:"Validity", labels:["TEMPOH SAH LAKU","TEMPOH","VALIDITY","VALID UNTIL"] },
+    { section:"Classification & Status", field:"Status", labels:["STATUS"] },
+    { section:"Classification & Status", field:"Type", labels:["JENIS","TYPE"] },
+    { section:"Classification & Status", field:"Class", labels:["KELAS","CLASS"] },
+    { section:"Classification & Status", field:"Grade", labels:["GRED","GRADE","GRED PENDAFTARAN","GRADE PENDAFTARAN"] },
+    { section:"Classification & Status", field:"Category", labels:["KATEGORI","CATEGORY"] },
+    { section:"Classification & Status", field:"Nationality", labels:["WARGANEGARA","KEWARGANEGARAAN","NATIONALITY"] },
+    { section:"Classification & Status", field:"Gender / Sex", labels:["JANTINA","GENDER","SEX"] },
+    { section:"Classification & Status", field:"Place of Birth", labels:["TEMPAT LAHIR","PLACE OF BIRTH"] },
+    { section:"Business / Activity", field:"Nature of Business", labels:["JENIS PERNIAGAAN","NATURE OF BUSINESS","BUSINESS ACTIVITY","AKTIVITI PERNIAGAAN"], multiline:true },
+    { section:"Business / Activity", field:"Origin", labels:["TEMPAT PENUBUHAN","ORIGIN"] },
+    { section:"Other Important Details", field:"Branches", labels:["BIL. CAWANGAN","BIL CAWANGAN","NUMBER OF BRANCHES","BRANCHES"] }
+  ];
+
+  function escapeRegexText(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function matchStructuredFormField(line) {
+    const source = normalizeFieldText(line);
+    if (!source) return null;
+
+    for (const rule of STRUCTURED_FORM_RULES) {
+      const labels = [...rule.labels].sort((a,b) => b.length - a.length);
+      for (const label of labels) {
+        const rx = new RegExp(`^${escapeRegexText(label)}\\s*(?:[:\\-–—])?\\s*(.*)$`, "i");
+        const match = source.match(rx);
+        if (!match) continue;
+        const value = normalizeFieldText(match[1] || "");
+        return { ...rule, sourceLabel: source.slice(0, source.length - value.length).replace(/[\s:\-–—]+$/g, "").trim(), value };
+      }
+    }
+    return null;
+  }
+
+  function detectStructuredTitle(lines) {
+    const top = (lines || []).slice(0, 14);
+    const candidates = top
+      .map((line, index) => {
+        if (matchStructuredFormField(line)) return null;
+        let score = 0;
+        if (/\b(?:PERAKUAN|CERTIFICATE|SIJIL|LESEN|LICENCE|LICENSE|PASSPORT|KAD\s+PENGENALAN|IDENTITY\s+CARD|RENEWAL\s+SLIP|SLIP\s+PEMBAHARUAN|PARTICULARS|BUTIR-BUTIR)\b/i.test(line)) score += 100;
+        if (/\b(?:STATEMENT|INVOICE|RECEIPT)\b/i.test(line)) score += 80;
+        if (/\b(?:BORANG|FORM)\b/i.test(line)) score += 45;
+        if (/^[A-Z0-9 ()/.&'-]{5,}$/u.test(line)) score += 10;
+        score -= index * 0.5;
+        return score > 0 ? { line, score } : null;
+      })
+      .filter(Boolean)
+      .sort((a,b) => b.score - a.score);
+    return candidates[0]?.line || "";
+  }
+
+  function detectStructuredHeader(lines, title) {
+    const titleIndex = title ? lines.indexOf(title) : -1;
+    let candidates = titleIndex > 0 ? lines.slice(0, titleIndex) : lines.slice(1, 6);
+    candidates = candidates
+      .filter(line => !matchStructuredFormField(line))
+      .filter(line => line !== title)
+      .filter(line => line.length >= 3 && line.length <= 120)
+      .filter(line => !/^\d[\d\s./-]*$/.test(line));
+
+    if (titleIndex <= 0) {
+      candidates = candidates.filter(line => /\b(?:MALAYSIA|KEMENTERIAN|JABATAN|SURUHANJAYA|PUSAT|CIDB|SSM|MINISTRY|DEPARTMENT|COMMISSION|AUTHORITY|GOVERNMENT)\b/i.test(line));
+    }
+    return candidates.slice(0, 3);
+  }
+
+  function extractStructuredFormData(lines) {
+    const cleanLines = filterStructuredLines(lines || []).map(normalizeFieldText).filter(Boolean);
+    const consumed = new Set();
+    const sections = new Map();
+
+    const addField = (section, field, value, sourceLabel) => {
+      const v = normalizeFieldText(value);
+      if (!v) return;
+      if (!sections.has(section)) sections.set(section, []);
+      const existing = sections.get(section).find(item => item.field === field && item.value === v);
+      if (!existing) sections.get(section).push({ field, value:v, sourceLabel:sourceLabel || field });
+    };
+
+    for (let i = 0; i < cleanLines.length; i++) {
+      const matched = matchStructuredFormField(cleanLines[i]);
+      if (!matched) continue;
+
+      let value = matched.value;
+      let end = i;
+
+      if (!value && i + 1 < cleanLines.length && !matchStructuredFormField(cleanLines[i + 1])) {
+        value = cleanLines[i + 1];
+        end = i + 1;
+      }
+
+      if (matched.multiline && value) {
+        const values = [value];
+        for (let j = end + 1; j < Math.min(cleanLines.length, end + 6); j++) {
+          const next = cleanLines[j];
+          if (!next || matchStructuredFormField(next)) break;
+          if (detectHeadings.checked && likelyHeading(next) && next.length < 55) break;
+          if (isSignatureOrStampContext(next) || isStructuredArtifactLine(next)) break;
+          values.push(next);
+          end = j;
+        }
+        value = values.join("<br>");
+      }
+
+      if (value) {
+        addField(matched.section, matched.field, value, matched.sourceLabel);
+        for (let j = i; j <= end; j++) consumed.add(j);
+      }
+    }
+
+    // Strong unlabeled subject/entity lines may be promoted only when the text
+    // itself contains reliable identity markers. This avoids guessing arbitrary
+    // uppercase headings as names.
+    for (let i = 0; i < Math.min(cleanLines.length, 18); i++) {
+      if (consumed.has(i)) continue;
+      const line = cleanLines[i];
+      if (/\bSDN\.?\s*BHD\.?\b/i.test(line) && line.length <= 120) {
+        addField("Primary Information", "Company / Organisation Name", line, "Detected entity pattern");
+        consumed.add(i);
+        continue;
+      }
+      if (/\b(?:BIN|BINTI|A\/P|A\/L)\b/i.test(line) && isLikelyPersonName(line)) {
+        addField("Primary Information", "Full Name", line, "Detected name pattern");
+        consumed.add(i);
+      }
+    }
+
+    // Strong pattern-only values are kept generic unless a visible label provides meaning.
+    for (let i = 0; i < cleanLines.length; i++) {
+      if (consumed.has(i)) continue;
+      const line = cleanLines[i];
+      if (/^\d{6}-\d{2}-\d{4}(?:-\d{2}-\d{2})?$/.test(line)) {
+        addField("Registration & Identification", "Detected Identification Number", line, "Detected pattern");
+        consumed.add(i);
+      }
+    }
+
+    const title = detectStructuredTitle(cleanLines);
+    const headers = detectStructuredHeader(cleanLines, title);
+    if (title) consumed.add(cleanLines.indexOf(title));
+    headers.forEach(h => {
+      const idx = cleanLines.indexOf(h);
+      if (idx >= 0) consumed.add(idx);
+    });
+
+    const additional = cleanLines.filter((line, index) => {
+      if (consumed.has(index)) return false;
+      if (matchStructuredFormField(line)) return false;
+      if (isStructuredArtifactLine(line) || isSignatureOrStampContext(line)) return false;
+      if (line.length < 4 && !/[A-Z]{1,3}\d|\d{3,}/.test(line)) return false;
+      return true;
+    });
+
+    return { cleanLines, title, headers, sections, additional };
+  }
+
+  function renderStructuredFieldTable(items) {
+    if (!items || !items.length) return [];
+    const output = ["| Field | Extracted Value |", "| --- | --- |"];
+    items.forEach(item => output.push(`| ${escapeCell(item.field)} | ${escapeCell(item.value).replace(/&lt;br&gt;/g, "<br>")} |`));
+    return output;
+  }
+
+  function buildGenericStructuredForm(lines) {
+    const data = extractStructuredFormData(lines);
+    const output = ["# Ultra Structured Extraction", ""];
+
+    const overview = [];
+    if (data.title) overview.push({ field:"Document Title", value:data.title });
+    if (data.headers.length) overview.push({ field:"Document Header", value:data.headers.join("<br>") });
+    if (overview.length) {
+      output.push("## Document Overview", "", ...renderStructuredFieldTable(overview), "");
+    }
+
+    const sectionOrder = [
+      "Primary Information",
+      "Registration & Identification",
+      "Address & Location",
+      "Dates & Validity",
+      "Classification & Status",
+      "Business / Activity",
+      "Other Important Details"
+    ];
+
+    for (const section of sectionOrder) {
+      const items = data.sections.get(section) || [];
+      if (!items.length) continue;
+      output.push(`## ${section}`, "", ...renderStructuredFieldTable(items), "");
+    }
+
+    if (data.additional.length) {
+      output.push("## Additional Important Information", "");
+      data.additional.forEach(line => output.push(`- ${line}`));
+      output.push("");
+    }
+
+    if (output.length <= 2) return "";
+    return output.join("\n").trim();
+  }
+
   function extractMyKadStructured(lines, evidence = null) {
     // Ultra Structured Extraction must not display phantom readings from
     // unrelated OCR language packs. Filter before field detection.
@@ -3403,48 +3627,36 @@
 
     if (!frontId && !backId && !name && !address.length && !gender && !nationalityText && !authority.length) return null;
 
-    const output = [];
-    output.push("# Structured Document Information");
-    output.push("");
-    output.push("## Document Type");
-    output.push("- Malaysian Identity Card (MyKad)");
-    output.push("");
-    output.push("## Front");
-    output.push("");
-    output.push("| Field | Extracted value | Evidence status |");
-    output.push("| --- | --- | --- |");
-    output.push(`| Identification Number | ${frontId || "[UNKNOWN]"} | ${frontId ? (frontIdEvidence.count >= 2 ? "MULTI-PASS VERIFIED" : "OCR-DETECTED — VERIFY") : "UNKNOWN — no direct readable evidence"} |`);
-    output.push(`| Full Name | ${name || "[UNKNOWN]"} | ${name ? (nameEvidence.count >= 2 ? "MULTI-PASS VERIFIED" : "OCR-DETECTED — VERIFY") : "UNKNOWN — no direct readable evidence"} |`);
-    output.push(`| Address | ${address.length ? address.join("<br>") : "[UNKNOWN]"} | ${address.length >= 5 ? "DIRECT REGION OCR — VERIFY" : "UNKNOWN — incomplete direct region evidence"} |`);
-    output.push(`| Nationality field text | ${nationalityText || "[UNKNOWN]"} | ${nationalityText ? "DIRECT OCR-DETECTED — VERIFY" : "UNKNOWN — no direct readable evidence"} |`);
-    output.push(`| Gender | ${gender || "[UNKNOWN]"} | ${gender ? "DIRECT OCR-DETECTED — VERIFY" : "UNKNOWN — no direct readable evidence"} |`);
-    output.push("");
-    output.push("## Back");
-    output.push("");
-    output.push("| Field | Extracted value | Evidence status |");
-    output.push("| --- | --- | --- |");
-    output.push(`| Identification Number | ${backId || "[UNKNOWN]"} | ${backId ? (backIdEvidence.count >= 2 ? "MULTI-PASS VERIFIED" : "OCR-DETECTED — VERIFY") : "UNKNOWN — no direct readable evidence"} |`);
-    output.push(`| Authority text | ${authority.length ? authority.join("<br>") : "[UNKNOWN]"} | ${authority.length ? "DIRECT REGION OCR — VERIFY" : "UNKNOWN — no direct readable evidence"} |`);
+    const output = ["# Ultra Structured Extraction", ""];
+    output.push("## Document Overview", "");
+    output.push("| Field | Extracted Value |", "| --- | --- |", "| Document Type | Malaysian Identity Card (MyKad) |", "");
 
-    // Never silently reconcile front/back identifiers. If both are present and their
-    // first 12 digits disagree, expose the conflict rather than choosing one.
-    if (frontId && backId && frontId !== backId.slice(0, 13)) {
-      output.push("");
-      output.push("## Verification Warning");
-      output.push("");
-      output.push(`- Front identifier: ${frontId}`);
-      output.push(`- Back identifier: ${backId}`);
-      output.push("- CONFLICT — the application will not correct either value automatically.");
+    const holder = [];
+    if (frontId) holder.push({ field:"Identification Number", value:frontId });
+    if (name) holder.push({ field:"Full Name", value:name });
+    if (nationalityText) holder.push({ field:"Nationality", value:nationalityText });
+    if (gender) holder.push({ field:"Gender", value:gender });
+    if (holder.length) output.push("## Holder Information", "", ...renderStructuredFieldTable(holder), "");
+
+    if (address.length) {
+      output.push("## Address", "", "| Field | Extracted Value |", "| --- | --- |", `| Address | ${address.map(escapeCell).join("<br>")} |`, "");
     }
 
-    output.push("");
-    output.push("## ALL DETECTED INFORMATION");
-    output.push("");
-    output.push("Only OCR-visible readings are preserved below. Uncertain fields are not reconstructed from context:");
-    output.push("");
-    cleanLines.forEach(line => output.push(`- ${line}`));
+    if (backId) {
+      output.push("## Back-Side Information", "", "| Field | Extracted Value |", "| --- | --- |", `| Back Identification Number | ${escapeCell(backId)} |`, "");
+    }
 
-    return output.join("\n");
+    const verification = [];
+    if (frontId) verification.push({ field:"Front ID", value:frontIdEvidence?.count >= 2 ? "MULTI-PASS VERIFIED" : "OCR-DETECTED — VERIFY" });
+    if (name) verification.push({ field:"Full Name", value:nameEvidence?.count >= 2 ? "MULTI-PASS VERIFIED" : "OCR-DETECTED — VERIFY" });
+    if (backId) verification.push({ field:"Back ID", value:backIdEvidence?.count >= 2 ? "MULTI-PASS VERIFIED" : "OCR-DETECTED — VERIFY" });
+    if (verification.length) output.push("## Verification", "", ...renderStructuredFieldTable(verification), "");
+
+    if (frontId && backId && frontId !== backId.slice(0, 13)) {
+      output.push("## Verification Warning", "", `- Front identifier: ${frontId}`, `- Back identifier: ${backId}`, "- CONFLICT — the application will not correct either value automatically.", "");
+    }
+
+    return output.join("\n").trim();
   }
 
   function structureTextToMarkdown(
@@ -3481,6 +3693,9 @@
     ) {
       return cleaned;
     }
+
+    const formResult = buildGenericStructuredForm(sourceLinesForProfile);
+    if (formResult) return formResult;
 
     const lines =
       structuredCleaned.split("\n");
@@ -4569,8 +4784,50 @@
     return true;
   }
 
+  function isStructuredArtifactLine(value) {
+    const line = sanitizeStructuredLine(value);
+    if (!line) return true;
+    if (/^<!--[\s\S]*?-->$/i.test(line)) return true;
+    if (/^\s*(?:FILE|FILENAME|SOURCE|IMAGE|PICTURE|PAGE)\s*:/i.test(line)) return true;
+    if (/\b(?:SCANNED\s+WITH|CAMSCANNER|SPECIMEN|SAMPLE|WATERMARK|DRAFT|CONFIDENTIAL)\b/i.test(line)) return true;
+    if (/\b(?:GOTEMPL|DATEMPL|AXTEMPL|OXTEMPL|SHOTEMPL|CETAK\s*SSM|CETAKSSM|MYDATA\s*SSM)\b/i.test(line)) return true;
+    if (/\b(?:WWW\.|HTTP:\/\/|HTTPS:\/\/)/i.test(line)) return true;
+    if (!/[\p{L}\p{N}]/u.test(line)) return true;
+    return false;
+  }
+
+  function isSignatureOrStampContext(value) {
+    const line = sanitizeStructuredLine(value);
+    if (!line) return false;
+    return /\b(?:SIGNATURE|SIGNED|SIGNATORY|TANDATANGAN|DITANDATANGANI|COP\s+RASMI|OFFICIAL\s+STAMP|STAMP|SEAL|METERAI)\b/i.test(line);
+  }
+
+  function removeStructuredArtifacts(lines) {
+    const src = (lines || []).map(sanitizeStructuredLine).filter(Boolean);
+    const out = [];
+    let signatureWindow = 0;
+
+    for (const line of src) {
+      if (isStructuredArtifactLine(line)) continue;
+      if (isSignatureOrStampContext(line)) {
+        signatureWindow = 3;
+        continue;
+      }
+      if (signatureWindow > 0) {
+        // Do not surface names/titles immediately attached to a signature block.
+        if (isLikelyPersonName(line) || /^(?:PENGARAH|PENDAFTAR|KETUA\s+PENGARAH|AUTHORI[ZS]ED\s+OFFICER)$/i.test(line)) {
+          signatureWindow--;
+          continue;
+        }
+        signatureWindow = 0;
+      }
+      out.push(line);
+    }
+    return out;
+  }
+
   function filterStructuredLines(lines, languageCodes = structuredLanguageCodes()) {
-    const normalized = (lines || [])
+    const normalized = removeStructuredArtifacts(lines || [])
       .map(sanitizeStructuredLine)
       .filter(Boolean);
     const allowed = structuredAllowedScripts(languageCodes, normalized);
@@ -4979,17 +5236,40 @@ ${bodyHtml}
      LIVE OUTPUT
      ====================================================== */
 
+  function structuredMarkdownToPlainText(markdown) {
+    const lines = String(markdown || "").split("\n");
+    const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) {
+        if (out.length && out[out.length - 1] !== "") out.push("");
+        continue;
+      }
+      if (/^\|\s*:?-+/.test(line)) continue;
+      if (/^\|.*\|$/.test(line)) {
+        const cells = line.slice(1,-1).split("|").map(x => x.trim().replace(/<br>/gi, " / "));
+        if (cells.length >= 2 && !/^Field$/i.test(cells[0])) out.push(`${cells[0]}: ${cells.slice(1).join(" | ")}`);
+        continue;
+      }
+      if (/^#{1,6}\s+/.test(line)) {
+        out.push(line.replace(/^#{1,6}\s+/, ""));
+        continue;
+      }
+      out.push(line.replace(/^[-*]\s+/, "- "));
+    }
+    return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
   function refreshLiveOutput() {
     const pages = state.livePages.filter(Boolean);
     const markdownDocuments = pages.map(x =>
-      `${x.metadata}\n\n${x.markdown || "[Illegible]"}`
+      `${x.markdown || "[Illegible]"}`
     );
     const textDocuments = pages.map(x =>
-      `${x.fileName}\nPAGE: ${x.pageNumber}/${x.totalPages}\n\n${x.text || "[Illegible]"}`
+      structuredMarkdownToPlainText(x.markdown || "[Illegible]")
     );
     const htmlDocuments = pages.map(x =>
-      `<section class="document-page" data-document="${escapeHtml(x.fileName)}" data-page="${x.pageNumber}">
-        <div class="document-meta">${escapeHtml(x.fileName)} · Page ${x.pageNumber}/${x.totalPages}</div>
+      `<section class="document-page">
         ${markdownToHtml(x.markdown || "[Illegible]")}
       </section>`
     );
